@@ -8,3 +8,6 @@
 [submodule "gputreeshap"]
 	path = gputreeshap
 	url = https://github.com/rapidsai/gputreeshap.git
+[submodule "rocgputreeshap"]
+	path = rocgputreeshap
+	url = https://www.github.com/AMD-AI/rocgputreeshap
