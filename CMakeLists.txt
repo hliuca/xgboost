@@ -59,8 +59,6 @@ option(USE_HIP  "Build with GPU acceleration" OFF)
 option(USE_RCCL  "Build with RCCL to enable distributed GPU support." OFF)
 option(BUILD_WITH_SHARED_RCCL "Build with shared RCCL library." OFF)
 option(BUILD_WITH_HIP_CUB "Build with cub in HIP installation" OFF)
-set(GPU_COMPUTE_TARGET "" CACHE STRING
-  "Semicolon separated list of compute versions to be built against, e.g. '908;90a'")
 ## Copied From dmlc
 option(USE_HDFS "Build with HDFS support" OFF)
 option(USE_AZURE "Build with AZURE support" OFF)
@@ -194,16 +192,14 @@ if (USE_HIP)
   message(STATUS "Configured HIP host compiler: ${CMAKE_HIP_HOST_COMPILER}")
 
   enable_language(HIP)
-  if (${CMAKE_HIP_COMPILER_VERSION} VERSION_LESS 11.0)
-    message(FATAL_ERROR "HIP version must be at least 11.0!")
-  endif()
-  set(GEN_CODE "")
-  format_gencode_flags("${GPU_COMPUTE_VER}" GEN_CODE)
+  find_package(hip REQUIRED)
+  find_package(rocthrust REQUIRED)
+  find_package(hipcub REQUIRED)
+
+  set(CMAKE_HIP_FLAGS "-I${HIP_INCLUDE_DIRS} -I${HIP_INCLUDE_DIRS}/hip")
   add_subdirectory(${PROJECT_SOURCE_DIR}/rocgputreeshap)
 
-  if ((${CMAKE_HIP_COMPILER_VERSION} VERSION_GREATER_EQUAL 11.4) AND (NOT BUILD_WITH_HIP_CUB))
-    set(BUILD_WITH_HIP_CUB ON)
-  endif ()
+  set(BUILD_WITH_HIP_CUB ON)
 endif (USE_HIP)
 
 if (FORCE_COLORED_OUTPUT AND (CMAKE_GENERATOR STREQUAL "Ninja") AND
