@@ -3,12 +3,15 @@ import os
 import subprocess
 import sys
 from multiprocessing import Pool, cpu_count
-from typing import Dict, Tuple
+from typing import Dict, Optional, Tuple
 
 from pylint import epylint
 from test_utils import PY_PACKAGE, ROOT, cd, print_time, record_time
 
 CURDIR = os.path.normpath(os.path.abspath(os.path.dirname(__file__)))
+SRCPATH = os.path.normpath(
+    os.path.join(CURDIR, os.path.pardir, os.path.pardir, "python-package")
+)
 
 
 @record_time
@@ -29,7 +32,7 @@ Please run the following command on your machine to address the formatting error
 
 @record_time
 def run_isort(rel_path: str) -> bool:
-    cmd = ["isort", "--check", "--profile=black", rel_path]
+    cmd = ["isort", f"--src={SRCPATH}", "--check", "--profile=black", rel_path]
     ret = subprocess.run(cmd).returncode
     if ret != 0:
         subprocess.run(["isort", "--version"])
@@ -151,6 +154,7 @@ def main(args: argparse.Namespace) -> None:
                 "demo/guide-python/sklearn_parallel.py",
                 "demo/guide-python/spark_estimator_examples.py",
                 "demo/guide-python/individual_trees.py",
+                "demo/guide-python/quantile_regression.py",
                 # CI
                 "tests/ci_build/lint_python.py",
                 "tests/ci_build/test_r_package.py",
@@ -193,6 +197,7 @@ def main(args: argparse.Namespace) -> None:
                 "demo/guide-python/cat_in_the_dat.py",
                 "demo/guide-python/feature_weights.py",
                 "demo/guide-python/individual_trees.py",
+                "demo/guide-python/quantile_regression.py",
                 # tests
                 "tests/python/test_dt.py",
                 "tests/python/test_data_iterator.py",

@@ -111,6 +111,16 @@ def make_jcargs(**kwargs: Any) -> bytes:
     return from_pystr_to_cstr(json.dumps(kwargs))
 
 
+def _parse_eval_str(result: str) -> List[Tuple[str, float]]:
+    """Parse an eval result string from the booster."""
+    splited = result.split()[1:]
+    # split up `test-error:0.1234`
+    metric_score_str = [tuple(s.split(":")) for s in splited]
+    # convert to float
+    metric_score = [(n, float(s)) for n, s in metric_score_str]
+    return metric_score
+
+
 IterRange = TypeVar("IterRange", Optional[Tuple[int, int]], Tuple[int, int])
 
 
@@ -1926,6 +1936,8 @@ class Booster:
         elif isinstance(params, str) and value is not None:
             params = [(params, value)]
         for key, val in cast(Iterable[Tuple[str, str]], params):
+            if isinstance(val, np.ndarray):
+                val = val.tolist()
             if val is not None:
                 _check_call(
                     _LIB.XGBoosterSetParam(self.handle, c_str(key), c_str(str(val)))

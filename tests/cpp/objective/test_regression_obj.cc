@@ -6,8 +6,9 @@
 #include <xgboost/json.h>
 #include <xgboost/objective.h>
 
-#include "../../../src/common/linalg_op.h"  // begin,end
+#include "../../../src/common/linalg_op.h"  // for begin, end
 #include "../../../src/objective/adaptive.h"
+#include "../../../src/tree/param.h"        // for TrainParam
 #include "../helpers.h"
 #include "xgboost/base.h"
 #include "xgboost/data.h"
@@ -157,7 +158,7 @@ TEST(Objective, DeclareUnifiedTest(PoissonRegressionGPair)) {
     ObjFunction::Create("count:poisson", &ctx)
   };
 
-  args.emplace_back(std::make_pair("max_delta_step", "0.1f"));
+  args.emplace_back("max_delta_step", "0.1f");
   obj->Configure(args);
 
   CheckObjFunction(obj,
@@ -259,7 +260,7 @@ TEST(Objective, DeclareUnifiedTest(TweedieRegressionGPair)) {
   std::vector<std::pair<std::string, std::string>> args;
   std::unique_ptr<ObjFunction> obj{ObjFunction::Create("reg:tweedie", &ctx)};
 
-  args.emplace_back(std::make_pair("tweedie_variance_power", "1.1f"));
+  args.emplace_back("tweedie_variance_power", "1.1f");
   obj->Configure(args);
 
   CheckObjFunction(obj,
@@ -408,9 +409,13 @@ TEST(Objective, DeclareUnifiedTest(AbsoluteError)) {
     h_predt[i] = labels[i] + i;
   }
 
-  obj->UpdateTreeLeaf(position, info, predt, 0, &tree);
-  ASSERT_EQ(tree[1].LeafValue(), -1);
-  ASSERT_EQ(tree[2].LeafValue(), -4);
+  tree::TrainParam param;
+  param.Init(Args{});
+  auto lr = param.learning_rate;
+
+  obj->UpdateTreeLeaf(position, info, param.learning_rate, predt, 0, &tree);
+  ASSERT_EQ(tree[1].LeafValue(), -1.0f * lr);
+  ASSERT_EQ(tree[2].LeafValue(), -4.0f * lr);
 }
 
 TEST(Objective, DeclareUnifiedTest(AbsoluteErrorLeaf)) {
@@ -428,8 +433,8 @@ TEST(Objective, DeclareUnifiedTest(AbsoluteErrorLeaf)) {
     auto h_labels = info.labels.HostView().Slice(linalg::All(), t);
     std::iota(linalg::begin(h_labels), linalg::end(h_labels), 0);
 
-    auto h_predt = linalg::MakeTensorView(predt.HostSpan(), {kRows, kTargets}, Context::kCpuId)
-                       .Slice(linalg::All(), t);
+    auto h_predt =
+        linalg::MakeTensorView(&ctx, predt.HostSpan(), kRows, kTargets).Slice(linalg::All(), t);
     for (size_t i = 0; i < h_predt.Size(); ++i) {
       h_predt(i) = h_labels(i) + i;
     }
@@ -457,11 +462,16 @@ TEST(Objective, DeclareUnifiedTest(AbsoluteErrorLeaf)) {
     ASSERT_EQ(tree.GetNumLeaves(), 4);
 
     auto empty_leaf = tree[4].LeafValue();
-    obj->UpdateTreeLeaf(position, info, predt, t, &tree);
-    ASSERT_EQ(tree[3].LeafValue(), -5);
-    ASSERT_EQ(tree[4].LeafValue(), empty_leaf);
-    ASSERT_EQ(tree[5].LeafValue(), -10);
-    ASSERT_EQ(tree[6].LeafValue(), -14);
+
+    tree::TrainParam param;
+    param.Init(Args{});
+    auto lr = param.learning_rate;
+
+    obj->UpdateTreeLeaf(position, info, lr, predt, t, &tree);
+    ASSERT_EQ(tree[3].LeafValue(), -5.0f * lr);
+    ASSERT_EQ(tree[4].LeafValue(), empty_leaf * lr);
+    ASSERT_EQ(tree[5].LeafValue(), -10.0f * lr);
+    ASSERT_EQ(tree[6].LeafValue(), -14.0f * lr);
   }
 }
 

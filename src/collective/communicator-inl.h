@@ -1,5 +1,5 @@
-/*!
- * Copyright 2022 XGBoost contributors
+/**
+ * Copyright 2022-2023 by XGBoost contributors
  */
 #pragma once
 #include <string>
@@ -9,7 +9,7 @@
 namespace xgboost {
 namespace collective {
 
-/*!
+/**
  * \brief Initialize the collective communicator.
  *
  *  Currently the communicator API is experimental, function signatures may change in the future
@@ -140,6 +140,19 @@ inline void Broadcast(std::string *sendrecv_data, int root) {
   }
 }
 
+/**
+ * @brief Gathers data from all processes and distributes it to all processes.
+ *
+ * This assumes all ranks have the same size, and input data has been sliced into the
+ * corresponding position.
+ *
+ * @param send_receive_buffer Buffer storing the data.
+ * @param size                Size of the data in bytes.
+ */
+inline void Allgather(void *send_receive_buffer, std::size_t size) {
+  Communicator::Get()->AllGather(send_receive_buffer, size);
+}
+
 /*!
  * \brief Perform in-place allreduce. This function is NOT thread-safe.
  *
@@ -197,7 +210,7 @@ inline void Allreduce(uint64_t *send_receive_buffer, size_t count) {
 template <Operation op, typename T,
           typename = std::enable_if_t<std::is_same<size_t, T>{} && !std::is_same<uint64_t, T>{}> >
 inline void Allreduce(T *send_receive_buffer, size_t count) {
-  static_assert(sizeof(T) == sizeof(uint64_t), "");
+  static_assert(sizeof(T) == sizeof(uint64_t));
   Communicator::Get()->AllReduce(send_receive_buffer, count, DataType::kUInt64, op);
 }
 

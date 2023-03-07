@@ -3,7 +3,7 @@ PKGROOT=../../
 ENABLE_STD_THREAD=0
 # _*_ mode: Makefile; _*_
 
-CXX_STD = CXX14
+CXX_STD = CXX17
 
 XGB_RFLAGS = -DXGBOOST_STRICT_R_MODE=1 -DDMLC_LOG_BEFORE_THROW=0\
            -DDMLC_ENABLE_STD_THREAD=$(ENABLE_STD_THREAD) -DDMLC_DISABLE_STDIN=1\
@@ -36,6 +36,8 @@ OBJECTS= \
     $(PKGROOT)/src/objective/hinge.o \
     $(PKGROOT)/src/objective/aft_obj.o \
     $(PKGROOT)/src/objective/adaptive.o \
+    $(PKGROOT)/src/objective/init_estimation.o \
+    $(PKGROOT)/src/objective/quantile_obj.o \
     $(PKGROOT)/src/gbm/gbm.o \
     $(PKGROOT)/src/gbm/gbtree.o \
     $(PKGROOT)/src/gbm/gbtree_model.o \

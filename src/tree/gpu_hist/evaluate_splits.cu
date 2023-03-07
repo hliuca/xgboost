@@ -97,7 +97,7 @@ class EvaluateSplitAgent {
          idx += kBlockSize) {
       local_sum += LoadGpair(node_histogram + idx);
     }
-    local_sum = SumReduceT(temp_storage->sum_reduce).Sum(local_sum);
+    local_sum = SumReduceT(temp_storage->sum_reduce).Sum(local_sum);  // NOLINT
     // Broadcast result from thread 0
     return {__shfl_sync(0xffffffff, local_sum.GetQuantisedGrad(), 0),
             __shfl_sync(0xffffffff, local_sum.GetQuantisedHess(), 0)};
@@ -359,8 +359,8 @@ void GPUHistEvaluator::LaunchEvaluateSplits(
 
   // One block for each feature
   uint32_t constexpr kBlockThreads = 32;
-  dh::LaunchKernel{static_cast<uint32_t>(combined_num_features), kBlockThreads,
-                   0}(
+  dh::LaunchKernel {static_cast<uint32_t>(combined_num_features), kBlockThreads,
+                    0}(
       EvaluateSplitsKernel<kBlockThreads>, max_active_features, d_inputs,
       shared_inputs,
       this->SortedIdx(d_inputs.size(), shared_inputs.feature_values.size()),
