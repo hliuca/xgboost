@@ -16,6 +16,11 @@ if (USE_CUDA)
   target_sources(objxgboost PRIVATE ${CUDA_SOURCES})
 endif (USE_CUDA)
 
+if (USE_HIP)
+  file(GLOB_RECURSE HIP_SOURCES *.cu *.cuh)
+  target_sources(objxgboost PRIVATE ${HIP_SOURCES})
+endif (USE_HIP)
+
 target_include_directories(objxgboost
   PRIVATE
   ${xgboost_SOURCE_DIR}/include
@@ -33,6 +38,7 @@ msvc_use_static_runtime()
 
 # This grouping organises source files nicely in visual studio
 auto_source_group("${CUDA_SOURCES}")
+auto_source_group("${HIP_SOURCES}")
 auto_source_group("${CPU_SOURCES}")
 
 #-- End object library

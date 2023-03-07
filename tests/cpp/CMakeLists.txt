@@ -13,6 +13,11 @@ if (USE_CUDA)
   list(APPEND TEST_SOURCES ${CUDA_TEST_SOURCES})
 endif (USE_CUDA)
 
+if (USE_HIP)
+  file(GLOB_RECURSE HIP_TEST_SOURCES "*.cu")
+  list(APPEND TEST_SOURCES ${HIP_TEST_SOURCES})
+endif (USE_HIP)
+
 file(GLOB_RECURSE ONEAPI_TEST_SOURCES "plugin/*_oneapi.cc")
 if (NOT PLUGIN_UPDATER_ONEAPI)
   list(REMOVE_ITEM TEST_SOURCES ${ONEAPI_TEST_SOURCES})
@@ -32,6 +37,11 @@ if (USE_CUDA AND PLUGIN_RMM)
   find_package(CUDA)
   target_include_directories(testxgboost PRIVATE ${CUDA_INCLUDE_DIRS})
 endif (USE_CUDA AND PLUGIN_RMM)
+
+if (USE_HIP AND PLUGIN_RMM)
+  find_package(HIP)
+  target_include_directories(testxgboost PRIVATE ${HIP_INCLUDE_DIRS})
+endif (USE_HIP AND PLUGIN_RMM)
 
 target_include_directories(testxgboost
   PRIVATE
