@@ -199,7 +199,7 @@ if (USE_HIP)
   endif()
   set(GEN_CODE "")
   format_gencode_flags("${GPU_COMPUTE_VER}" GEN_CODE)
-  add_subdirectory(${PROJECT_SOURCE_DIR}/gputreeshap)
+  add_subdirectory(${PROJECT_SOURCE_DIR}/rocgputreeshap)
 
   if ((${CMAKE_HIP_COMPILER_VERSION} VERSION_GREATER_EQUAL 11.4) AND (NOT BUILD_WITH_HIP_CUB))
     set(BUILD_WITH_HIP_CUB ON)
