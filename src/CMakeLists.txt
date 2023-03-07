@@ -17,7 +17,7 @@ if (USE_CUDA)
 endif (USE_CUDA)
 
 if (USE_HIP)
-  file(GLOB_RECURSE HIP_SOURCES *.hip.cc *.hip.h)
+  file(GLOB_RECURSE HIP_SOURCES *.hip *.hip.h)
   target_sources(objxgboost PRIVATE ${HIP_SOURCES})
 endif (USE_HIP)
 
