@@ -1,3 +1,4 @@
+#include "hip/hip_runtime.h"
 /**
  * Copyright 2017-2023 XGBoost contributors
  */
@@ -21,7 +22,7 @@
 #include <algorithm>
 #include <chrono>
 #include <cstddef>  // for size_t
-#include <cub/cub.cuh>
+#include <hipcub/hipcub.hpp>
 #include <cub/util_allocator.cuh>
 #include <numeric>
 #include <sstream>
@@ -52,27 +53,6 @@
 #endif  // !defined(RMM_VERSION_MAJOR) || !defined(RMM_VERSION_MINOR)
 
 #endif  // defined(XGBOOST_USE_RMM) && XGBOOST_USE_RMM == 1
-
-#if !defined(__CUDA_ARCH__) || __CUDA_ARCH__ >= 600 || defined(__clang__)
-
-#else  // In device code and CUDA < 600
-__device__ __forceinline__ double atomicAdd(double* address, double val) {  // NOLINT
-  unsigned long long int* address_as_ull =
-      (unsigned long long int*)address;                   // NOLINT
-  unsigned long long int old = *address_as_ull, assumed;  // NOLINT
-
-  do {
-    assumed = old;
-    old = atomicCAS(address_as_ull, assumed,
-                    __double_as_longlong(val + __longlong_as_double(assumed)));
-
-    // Note: uses integer comparison to avoid hang in case of NaN (since NaN !=
-    // NaN)
-  } while (assumed != old);
-
-  return __longlong_as_double(old);
-}
-#endif
 
 namespace dh {
 
@@ -125,7 +105,7 @@ inline ncclResult_t ThrowOnNcclError(ncclResult_t code, const char *file,
     ss << "NCCL failure :" << ncclGetErrorString(code);
     if (code == ncclUnhandledCudaError) {
       // nccl usually preserves the last error so we can get more details.
-      auto err = cudaPeekAtLastError();
+      auto err = hipPeekAtLastError();
       ss << " " << thrust::system_error(err, thrust::cuda_category()).what();
     }
     ss << " " << file << "(" << line << ")";
@@ -138,8 +118,8 @@ inline ncclResult_t ThrowOnNcclError(ncclResult_t code, const char *file,
 
 inline int32_t CudaGetPointerDevice(void const *ptr) {
   int32_t device = -1;
-  cudaPointerAttributes attr;
-  dh::safe_cuda(cudaPointerGetAttributes(&attr, ptr));
+  hipPointerAttribute_t attr;
+  dh::safe_cuda(hipPointerGetAttributes(&attr, ptr));
   device = attr.device;
   return device;
 }
@@ -147,22 +127,22 @@ inline int32_t CudaGetPointerDevice(void const *ptr) {
 inline size_t AvailableMemory(int device_idx) {
   size_t device_free = 0;
   size_t device_total = 0;
-  safe_cuda(cudaSetDevice(device_idx));
-  dh::safe_cuda(cudaMemGetInfo(&device_free, &device_total));
+  safe_cuda(hipSetDevice(device_idx));
+  dh::safe_cuda(hipMemGetInfo(&device_free, &device_total));
   return device_free;
 }
 
 inline int32_t CurrentDevice() {
   int32_t device = 0;
-  safe_cuda(cudaGetDevice(&device));
+  safe_cuda(hipGetDevice(&device));
   return device;
 }
 
 inline size_t TotalMemory(int device_idx) {
   size_t device_free = 0;
   size_t device_total = 0;
-  safe_cuda(cudaSetDevice(device_idx));
-  dh::safe_cuda(cudaMemGetInfo(&device_free, &device_total));
+  safe_cuda(hipSetDevice(device_idx));
+  dh::safe_cuda(hipMemGetInfo(&device_free, &device_total));
   return device_total;
 }
 
@@ -176,8 +156,8 @@ inline size_t TotalMemory(int device_idx) {
 
 inline size_t MaxSharedMemory(int device_idx) {
   int max_shared_memory = 0;
-  dh::safe_cuda(cudaDeviceGetAttribute
-                (&max_shared_memory, cudaDevAttrMaxSharedMemoryPerBlock,
+  dh::safe_cuda(hipDeviceGetAttribute
+                (&max_shared_memory, hipDeviceAttributeMaxSharedMemoryPerBlock,
                  device_idx));
   return static_cast<std::size_t>(max_shared_memory);
 }
@@ -186,23 +166,23 @@ inline size_t MaxSharedMemory(int device_idx) {
  * \fn  inline int MaxSharedMemoryOptin(int device_idx)
  *
  * \brief Maximum dynamic shared memory per thread block on this device
-     that can be opted into when using cudaFuncSetAttribute().
+     that can be opted into when using hipFuncSetAttribute().
  *
  * \param device_idx  Zero-based index of the device.
  */
 
 inline size_t MaxSharedMemoryOptin(int device_idx) {
   int max_shared_memory = 0;
-  dh::safe_cuda(cudaDeviceGetAttribute
-                (&max_shared_memory, cudaDevAttrMaxSharedMemoryPerBlockOptin,
+  dh::safe_cuda(hipDeviceGetAttribute
+                (&max_shared_memory, hipDeviceAttributeSharedMemPerBlockOptin,
                  device_idx));
   return static_cast<std::size_t>(max_shared_memory);
 }
 
 inline void CheckComputeCapability() {
   for (int d_idx = 0; d_idx < xgboost::common::AllVisibleGPUs(); ++d_idx) {
-    cudaDeviceProp prop;
-    safe_cuda(cudaGetDeviceProperties(&prop, d_idx));
+    hipDeviceProp_t prop;
+    safe_cuda(hipGetDeviceProperties(&prop, d_idx));
     std::ostringstream oss;
     oss << "CUDA Capability Major/Minor version number: " << prop.major << "."
         << prop.minor << " is insufficient.  Need >=3.5";
@@ -271,15 +251,15 @@ __global__ void LaunchNKernel(int device_idx, size_t begin, size_t end,
  */
 class LaunchKernel {
   size_t shmem_size_;
-  cudaStream_t stream_;
+  hipStream_t stream_;
 
   dim3 grids_;
   dim3 blocks_;
 
  public:
-  LaunchKernel(uint32_t _grids, uint32_t _blk, size_t _shmem=0, cudaStream_t _s=nullptr) :
+  LaunchKernel(uint32_t _grids, uint32_t _blk, size_t _shmem=0, hipStream_t _s=nullptr) :
       grids_{_grids, 1, 1}, blocks_{_blk, 1, 1}, shmem_size_{_shmem}, stream_{_s} {}
-  LaunchKernel(dim3 _grids, dim3 _blk, size_t _shmem=0, cudaStream_t _s=nullptr) :
+  LaunchKernel(dim3 _grids, dim3 _blk, size_t _shmem=0, hipStream_t _s=nullptr) :
       grids_{_grids}, blocks_{_blk}, shmem_size_{_shmem}, stream_{_s} {}
 
   template <typename K, typename... Args>
@@ -293,7 +273,7 @@ class LaunchKernel {
 };
 
 template <int ITEMS_PER_THREAD = 8, int BLOCK_THREADS = 256, typename L>
-inline void LaunchN(size_t n, cudaStream_t stream, L lambda) {
+inline void LaunchN(size_t n, hipStream_t stream, L lambda) {
   if (n == 0) {
     return;
   }
@@ -354,7 +334,7 @@ public:
     }
     std::lock_guard<std::mutex> guard(mutex_);
     int current_device;
-    safe_cuda(cudaGetDevice(&current_device));
+    safe_cuda(hipGetDevice(&current_device));
     stats_.RegisterAllocation(ptr, n);
   }
   void RegisterDeallocation(void *ptr, size_t n) {
@@ -363,7 +343,7 @@ public:
     }
     std::lock_guard<std::mutex> guard(mutex_);
     int current_device;
-    safe_cuda(cudaGetDevice(&current_device));
+    safe_cuda(hipGetDevice(&current_device));
     stats_.RegisterDeallocation(ptr, n, current_device);
   }
   size_t PeakMemory() const {
@@ -383,7 +363,7 @@ public:
     }
     std::lock_guard<std::mutex> guard(mutex_);
     int current_device;
-    safe_cuda(cudaGetDevice(&current_device));
+    safe_cuda(hipGetDevice(&current_device));
     LOG(CONSOLE) << "======== Device " << current_device << " Memory Allocations: "
       << " ========";
     LOG(CONSOLE) << "Peak memory usage: "
@@ -404,8 +384,8 @@ inline void DebugSyncDevice(std::string file="", int32_t line = -1) {
     auto rank = xgboost::collective::GetRank();
     LOG(DEBUG) << "R:" << rank << ": " << file << ":" << line;
   }
-  safe_cuda(cudaDeviceSynchronize());
-  safe_cuda(cudaGetLastError());
+  safe_cuda(hipDeviceSynchronize());
+  safe_cuda(hipGetLastError());
 }
 
 namespace detail {
@@ -429,7 +409,7 @@ inline void ThrowOOMError(std::string const& err, size_t bytes) {
 }
 
 /**
- * \brief Default memory allocator, uses cudaMalloc/Free and logs allocations if verbose.
+ * \brief Default memory allocator, uses hipMalloc/Free and logs allocations if verbose.
  */
 template <class T>
 struct XGBDefaultDeviceAllocatorImpl : XGBBaseDeviceAllocator<T> {
@@ -444,7 +424,7 @@ struct XGBDefaultDeviceAllocatorImpl : XGBBaseDeviceAllocator<T> {
     pointer ptr;
     try {
       ptr = SuperT::allocate(n);
-      dh::safe_cuda(cudaGetLastError());
+      dh::safe_cuda(hipGetLastError());
     } catch (const std::exception &e) {
       ThrowOOMError(e.what(), n * sizeof(T));
     }
@@ -462,7 +442,7 @@ struct XGBDefaultDeviceAllocatorImpl : XGBBaseDeviceAllocator<T> {
 };
 
 /**
- * \brief Caching memory allocator, uses cub::CachingDeviceAllocator as a back-end, unless
+ * \brief Caching memory allocator, uses hipcub::CachingDeviceAllocator as a back-end, unless
  *        RMM pool allocator is enabled. Does not initialise memory on construction.
  */
 template <class T>
@@ -474,10 +454,10 @@ struct XGBCachingDeviceAllocatorImpl : XGBBaseDeviceAllocator<T> {
   {
     using other = XGBCachingDeviceAllocatorImpl<U>;  // NOLINT
   };
-  cub::CachingDeviceAllocator& GetGlobalCachingAllocator() {
+  hipcub::CachingDeviceAllocator& GetGlobalCachingAllocator() {
     // Configure allocator with maximum cached bin size of ~1GB and no limit on
     // maximum cached bytes
-    static cub::CachingDeviceAllocator *allocator = new cub::CachingDeviceAllocator(2, 9, 29);
+    static hipcub::CachingDeviceAllocator *allocator = new hipcub::CachingDeviceAllocator(2, 9, 29);
     return *allocator;
   }
   pointer allocate(size_t n) {  // NOLINT
@@ -486,14 +466,14 @@ struct XGBCachingDeviceAllocatorImpl : XGBBaseDeviceAllocator<T> {
       T* raw_ptr{nullptr};
       auto errc =  GetGlobalCachingAllocator().DeviceAllocate(reinterpret_cast<void **>(&raw_ptr),
                                                               n * sizeof(T));
-      if (errc != cudaSuccess) {
+      if (errc != hipSuccess) {
         ThrowOOMError("Caching allocator", n * sizeof(T));
       }
       thrust_ptr = pointer(raw_ptr);
     } else {
       try {
         thrust_ptr = SuperT::allocate(n);
-        dh::safe_cuda(cudaGetLastError());
+        dh::safe_cuda(hipGetLastError());
       } catch (const std::exception &e) {
         ThrowOOMError(e.what(), n * sizeof(T));
       }
@@ -551,7 +531,7 @@ class TemporaryArray {
   void fill(T val)  // NOLINT
   {
     int device = 0;
-    dh::safe_cuda(cudaGetDevice(&device));
+    dh::safe_cuda(hipGetDevice(&device));
     auto d_data = ptr_.get();
     LaunchN(this->size(), [=] __device__(size_t idx) { d_data[idx] = val; });
   }
@@ -569,21 +549,21 @@ class TemporaryArray {
 template <typename T>
 class DoubleBuffer {
  public:
-  cub::DoubleBuffer<T> buff;
+  hipcub::DoubleBuffer<T> buff;
   xgboost::common::Span<T> a, b;
   DoubleBuffer() = default;
   template <typename VectorT>
   DoubleBuffer(VectorT *v1, VectorT *v2) {
     a = xgboost::common::Span<T>(v1->data().get(), v1->size());
     b = xgboost::common::Span<T>(v2->data().get(), v2->size());
-    buff = cub::DoubleBuffer<T>(a.data(), b.data());
+    buff = hipcub::DoubleBuffer<T>(a.data(), b.data());
   }
 
   size_t Size() const {
     CHECK_EQ(a.size(), b.size());
     return a.size();
   }
-  cub::DoubleBuffer<T> &CubBuffer() { return buff; }
+  hipcub::DoubleBuffer<T> &CubBuffer() { return buff; }
 
   T *Current() { return buff.Current(); }
   xgboost::common::Span<T> CurrentSpan() {
@@ -603,8 +583,8 @@ class DoubleBuffer {
 template <typename T>
 void CopyDeviceSpanToVector(std::vector<T> *dst, xgboost::common::Span<T> src) {
   CHECK_EQ(dst->size(), src.size());
-  dh::safe_cuda(cudaMemcpyAsync(dst->data(), src.data(), dst->size() * sizeof(T),
-                                cudaMemcpyDeviceToHost));
+  dh::safe_cuda(hipMemcpyAsync(dst->data(), src.data(), dst->size() * sizeof(T),
+                                hipMemcpyDeviceToHost));
 }
 
 /**
@@ -617,8 +597,8 @@ void CopyDeviceSpanToVector(std::vector<T> *dst, xgboost::common::Span<T> src) {
 template <typename T>
 void CopyDeviceSpanToVector(std::vector<T> *dst, xgboost::common::Span<const T> src) {
   CHECK_EQ(dst->size(), src.size());
-  dh::safe_cuda(cudaMemcpyAsync(dst->data(), src.data(), dst->size() * sizeof(T),
-                                cudaMemcpyDeviceToHost));
+  dh::safe_cuda(hipMemcpyAsync(dst->data(), src.data(), dst->size() * sizeof(T),
+                                hipMemcpyDeviceToHost));
 }
 
 template <class HContainer, class DContainer>
@@ -632,8 +612,8 @@ void CopyToD(HContainer const &h, DContainer *d) {
   using DVT = std::remove_cv_t<typename DContainer::value_type>;
   static_assert(std::is_same<HVT, DVT>::value,
                 "Host and device containers must have same value type.");
-  dh::safe_cuda(cudaMemcpyAsync(d->data().get(), h.data(), h.size() * sizeof(HVT),
-                                cudaMemcpyHostToDevice));
+  dh::safe_cuda(hipMemcpyAsync(d->data().get(), h.data(), h.size() * sizeof(HVT),
+                                hipMemcpyHostToDevice));
 }
 
 // Keep track of pinned memory allocation
@@ -648,7 +628,7 @@ struct PinnedMemory {
     size_t num_bytes = size * sizeof(T);
     if (num_bytes > temp_storage_bytes) {
       Free();
-      safe_cuda(cudaMallocHost(&temp_storage, num_bytes));
+      safe_cuda(hipHostMalloc(&temp_storage, num_bytes));
       temp_storage_bytes = num_bytes;
     }
     return xgboost::common::Span<T>(static_cast<T *>(temp_storage), size);
@@ -665,7 +645,7 @@ struct PinnedMemory {
 
   void Free() {
     if (temp_storage != nullptr) {
-      safe_cuda(cudaFreeHost(temp_storage));
+      safe_cuda(hipHostFree(temp_storage));
     }
   }
 };
@@ -685,27 +665,22 @@ typename std::iterator_traits<T>::value_type SumReduction(T in, int nVals) {
   using ValueT = typename std::iterator_traits<T>::value_type;
   size_t tmpSize {0};
   ValueT *dummy_out = nullptr;
-  dh::safe_cuda(cub::DeviceReduce::Sum(nullptr, tmpSize, in, dummy_out, nVals));
+  dh::safe_cuda(hipcub::DeviceReduce::Sum(nullptr, tmpSize, in, dummy_out, nVals));
 
   TemporaryArray<char> temp(tmpSize + sizeof(ValueT));
   auto ptr = reinterpret_cast<ValueT *>(temp.data().get()) + 1;
-  dh::safe_cuda(cub::DeviceReduce::Sum(
+  dh::safe_cuda(hipcub::DeviceReduce::Sum(
       reinterpret_cast<void *>(ptr), tmpSize, in,
       reinterpret_cast<ValueT *>(temp.data().get()),
       nVals));
   ValueT sum;
-  dh::safe_cuda(cudaMemcpy(&sum, temp.data().get(), sizeof(ValueT),
-                           cudaMemcpyDeviceToHost));
+  dh::safe_cuda(hipMemcpy(&sum, temp.data().get(), sizeof(ValueT),
+                           hipMemcpyDeviceToHost));
   return sum;
 }
 
 constexpr std::pair<int, int> CUDAVersion() {
-#if defined(__CUDACC_VER_MAJOR__)
-  return std::make_pair(__CUDACC_VER_MAJOR__, __CUDACC_VER_MINOR__);
-#else
-  // clang/clang-tidy
-  return std::make_pair((CUDA_VERSION) / 1000, (CUDA_VERSION) % 100 / 10);
-#endif  // defined(__CUDACC_VER_MAJOR__)
+  return std::make_pair(HIP_VERSION_MAJOR, HIP_VERSION_MINOR);
 }
 
 constexpr std::pair<int32_t, int32_t> ThrustVersion() {
@@ -1180,28 +1155,28 @@ void InclusiveScan(InputIteratorT d_in, OutputIteratorT d_out, ScanOpT scan_op,
   size_t bytes = 0;
 #if THRUST_MAJOR_VERSION >= 2
   safe_cuda((
-      cub::DispatchScan<InputIteratorT, OutputIteratorT, ScanOpT, cub::NullType,
+      hipcub::DispatchScan<InputIteratorT, OutputIteratorT, ScanOpT, hipcub::NullType,
                         OffsetT>::Dispatch(nullptr, bytes, d_in, d_out, scan_op,
-                                           cub::NullType(), num_items, nullptr)));
+                                           hipcub::NullType(), num_items, nullptr)));
 #else
   safe_cuda((
-      cub::DispatchScan<InputIteratorT, OutputIteratorT, ScanOpT, cub::NullType,
+      hipcub::DispatchScan<InputIteratorT, OutputIteratorT, ScanOpT, hipcub::NullType,
                         OffsetT>::Dispatch(nullptr, bytes, d_in, d_out, scan_op,
-                                           cub::NullType(), num_items, nullptr,
+                                           hipcub::NullType(), num_items, nullptr,
                                            false)));
 #endif
   TemporaryArray<char> storage(bytes);
 #if THRUST_MAJOR_VERSION >= 2
   safe_cuda((
-      cub::DispatchScan<InputIteratorT, OutputIteratorT, ScanOpT, cub::NullType,
+      hipcub::DispatchScan<InputIteratorT, OutputIteratorT, ScanOpT, hipcub::NullType,
                         OffsetT>::Dispatch(storage.data().get(), bytes, d_in,
-                                           d_out, scan_op, cub::NullType(),
+                                           d_out, scan_op, hipcub::NullType(),
                                            num_items, nullptr)));
 #else
   safe_cuda((
-      cub::DispatchScan<InputIteratorT, OutputIteratorT, ScanOpT, cub::NullType,
+      hipcub::DispatchScan<InputIteratorT, OutputIteratorT, ScanOpT, hipcub::NullType,
                         OffsetT>::Dispatch(storage.data().get(), bytes, d_in,
-                                           d_out, scan_op, cub::NullType(),
+                                           d_out, scan_op, hipcub::NullType(),
                                            num_items, nullptr, false)));
 #endif
 }
@@ -1223,7 +1198,7 @@ void CopyIf(InIt in_first, InIt in_second, OutIt out_first, Predicate pred) {
 
 template <typename InputIteratorT, typename OutputIteratorT, typename OffsetT>
 void InclusiveSum(InputIteratorT d_in, OutputIteratorT d_out, OffsetT num_items) {
-  InclusiveScan(d_in, d_out, cub::Sum(), num_items);
+  InclusiveScan(d_in, d_out, hipcub::Sum(), num_items);
 }
 
 template <bool accending, typename IdxT, typename U>
@@ -1235,10 +1210,10 @@ void ArgSort(xgboost::common::Span<U> keys, xgboost::common::Span<IdxT> sorted_i
   using ValueT = std::remove_const_t<IdxT>;
 
   TemporaryArray<KeyT> out(keys.size());
-  cub::DoubleBuffer<KeyT> d_keys(const_cast<KeyT *>(keys.data()),
+  hipcub::DoubleBuffer<KeyT> d_keys(const_cast<KeyT *>(keys.data()),
                                  out.data().get());
   TemporaryArray<IdxT> sorted_idx_out(sorted_idx.size());
-  cub::DoubleBuffer<ValueT> d_values(const_cast<ValueT *>(sorted_idx.data()),
+  hipcub::DoubleBuffer<ValueT> d_values(const_cast<ValueT *>(sorted_idx.data()),
                                      sorted_idx_out.data().get());
 
   // track https://github.com/NVIDIA/cub/pull/340 for 64bit length support
@@ -1247,63 +1222,63 @@ void ArgSort(xgboost::common::Span<U> keys, xgboost::common::Span<IdxT> sorted_i
   if (accending) {
     void *d_temp_storage = nullptr;
 #if THRUST_MAJOR_VERSION >= 2
-    safe_cuda((cub::DispatchRadixSort<false, KeyT, ValueT, OffsetT>::Dispatch(
+    safe_cuda((hipcub::DispatchRadixSort<false, KeyT, ValueT, OffsetT>::Dispatch(
         d_temp_storage, bytes, d_keys, d_values, sorted_idx.size(), 0,
         sizeof(KeyT) * 8, false, nullptr)));
 #else
-    safe_cuda((cub::DispatchRadixSort<false, KeyT, ValueT, OffsetT>::Dispatch(
+    safe_cuda((hipcub::DispatchRadixSort<false, KeyT, ValueT, OffsetT>::Dispatch(
         d_temp_storage, bytes, d_keys, d_values, sorted_idx.size(), 0,
         sizeof(KeyT) * 8, false, nullptr, false)));
 #endif
     TemporaryArray<char> storage(bytes);
     d_temp_storage = storage.data().get();
 #if THRUST_MAJOR_VERSION >= 2
-    safe_cuda((cub::DispatchRadixSort<false, KeyT, ValueT, OffsetT>::Dispatch(
+    safe_cuda((hipcub::DispatchRadixSort<false, KeyT, ValueT, OffsetT>::Dispatch(
         d_temp_storage, bytes, d_keys, d_values, sorted_idx.size(), 0,
         sizeof(KeyT) * 8, false, nullptr)));
 #else
-    safe_cuda((cub::DispatchRadixSort<false, KeyT, ValueT, OffsetT>::Dispatch(
+    safe_cuda((hipcub::DispatchRadixSort<false, KeyT, ValueT, OffsetT>::Dispatch(
         d_temp_storage, bytes, d_keys, d_values, sorted_idx.size(), 0,
         sizeof(KeyT) * 8, false, nullptr, false)));
 #endif
   } else {
     void *d_temp_storage = nullptr;
 #if THRUST_MAJOR_VERSION >= 2
-    safe_cuda((cub::DispatchRadixSort<true, KeyT, ValueT, OffsetT>::Dispatch(
+    safe_cuda((hipcub::DispatchRadixSort<true, KeyT, ValueT, OffsetT>::Dispatch(
         d_temp_storage, bytes, d_keys, d_values, sorted_idx.size(), 0,
         sizeof(KeyT) * 8, false, nullptr)));
 #else
-    safe_cuda((cub::DispatchRadixSort<true, KeyT, ValueT, OffsetT>::Dispatch(
+    safe_cuda((hipcub::DispatchRadixSort<true, KeyT, ValueT, OffsetT>::Dispatch(
         d_temp_storage, bytes, d_keys, d_values, sorted_idx.size(), 0,
         sizeof(KeyT) * 8, false, nullptr, false)));
 #endif
     TemporaryArray<char> storage(bytes);
     d_temp_storage = storage.data().get();
 #if THRUST_MAJOR_VERSION >= 2
-    safe_cuda((cub::DispatchRadixSort<true, KeyT, ValueT, OffsetT>::Dispatch(
+    safe_cuda((hipcub::DispatchRadixSort<true, KeyT, ValueT, OffsetT>::Dispatch(
         d_temp_storage, bytes, d_keys, d_values, sorted_idx.size(), 0,
         sizeof(KeyT) * 8, false, nullptr)));
 #else
-    safe_cuda((cub::DispatchRadixSort<true, KeyT, ValueT, OffsetT>::Dispatch(
+    safe_cuda((hipcub::DispatchRadixSort<true, KeyT, ValueT, OffsetT>::Dispatch(
         d_temp_storage, bytes, d_keys, d_values, sorted_idx.size(), 0,
         sizeof(KeyT) * 8, false, nullptr, false)));
 #endif
   }
 
-  safe_cuda(cudaMemcpyAsync(sorted_idx.data(), sorted_idx_out.data().get(),
-                            sorted_idx.size_bytes(), cudaMemcpyDeviceToDevice));
+  safe_cuda(hipMemcpyAsync(sorted_idx.data(), sorted_idx_out.data().get(),
+                            sorted_idx.size_bytes(), hipMemcpyDeviceToDevice));
 }
 
 class CUDAStreamView;
 
 class CUDAEvent {
-  cudaEvent_t event_{nullptr};
+  hipEvent_t event_{nullptr};
 
  public:
-  CUDAEvent() { dh::safe_cuda(cudaEventCreateWithFlags(&event_, cudaEventDisableTiming)); }
+  CUDAEvent() { dh::safe_cuda(hipEventCreateWithFlags(&event_, hipEventDisableTiming)); }
   ~CUDAEvent() {
     if (event_) {
-      dh::safe_cuda(cudaEventDestroy(event_));
+      dh::safe_cuda(hipEventDestroy(event_));
     }
   }
 
@@ -1312,48 +1287,38 @@ class CUDAEvent {
 
   inline void Record(CUDAStreamView stream);       // NOLINT
 
-  operator cudaEvent_t() const { return event_; }  // NOLINT
+  operator hipEvent_t() const { return event_; }  // NOLINT
 };
 
 class CUDAStreamView {
-  cudaStream_t stream_{nullptr};
+  hipStream_t stream_{nullptr};
 
  public:
-  explicit CUDAStreamView(cudaStream_t s) : stream_{s} {}
+  explicit CUDAStreamView(hipStream_t s) : stream_{s} {}
   void Wait(CUDAEvent const &e) {
-#if defined(__CUDACC_VER_MAJOR__)
-#if __CUDACC_VER_MAJOR__ == 11 && __CUDACC_VER_MINOR__ == 0
-    // CUDA == 11.0
-    dh::safe_cuda(cudaStreamWaitEvent(stream_, cudaEvent_t{e}, 0));
-#else
-    // CUDA > 11.0
-    dh::safe_cuda(cudaStreamWaitEvent(stream_, cudaEvent_t{e}, cudaEventWaitDefault));
-#endif  // __CUDACC_VER_MAJOR__ == 11 && __CUDACC_VER_MINOR__ == 0:
-#else   // clang
-    dh::safe_cuda(cudaStreamWaitEvent(stream_, cudaEvent_t{e}, cudaEventWaitDefault));
-#endif  //  defined(__CUDACC_VER_MAJOR__)
+    dh::safe_cuda(hipStreamWaitEvent(stream_, hipEvent_t{e}, hipEventDefault));
   }
-  operator cudaStream_t() const {  // NOLINT
+  operator hipStream_t() const {  // NOLINT
     return stream_;
   }
-  void Sync() { dh::safe_cuda(cudaStreamSynchronize(stream_)); }
+  void Sync() { dh::safe_cuda(hipStreamSynchronize(stream_)); }
 };
 
 inline void CUDAEvent::Record(CUDAStreamView stream) {  // NOLINT
-  dh::safe_cuda(cudaEventRecord(event_, cudaStream_t{stream}));
+  dh::safe_cuda(hipEventRecord(event_, hipStream_t{stream}));
 }
 
-inline CUDAStreamView DefaultStream() { return CUDAStreamView{cudaStreamLegacy}; }
+inline CUDAStreamView DefaultStream() { return CUDAStreamView{hipStreamLegacy}; }
 
 class CUDAStream {
-  cudaStream_t stream_;
+  hipStream_t stream_;
 
  public:
   CUDAStream() {
-    dh::safe_cuda(cudaStreamCreateWithFlags(&stream_, cudaStreamNonBlocking));
+    dh::safe_cuda(hipStreamCreateWithFlags(&stream_, hipStreamNonBlocking));
   }
   ~CUDAStream() {
-    dh::safe_cuda(cudaStreamDestroy(stream_));
+    dh::safe_cuda(hipStreamDestroy(stream_));
   }
 
   CUDAStreamView View() const { return CUDAStreamView{stream_}; }
@@ -1363,7 +1328,7 @@ class CUDAStream {
 // Force nvcc to load data as constant
 template <typename T>
 class LDGIterator {
-  using DeviceWordT = typename cub::UnitWord<T>::DeviceWord;
+  using DeviceWordT = typename hipcub::UnitWord<T>::DeviceWord;
   static constexpr std::size_t kNumWords = sizeof(T) / sizeof(DeviceWordT);
 
   const T *ptr_;
