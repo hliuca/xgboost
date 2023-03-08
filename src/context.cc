@@ -18,7 +18,7 @@ std::int64_t constexpr Context::kDefaultSeed;
 Context::Context() : cfs_cpu_count_{common::GetCfsCPUCount()} {}
 
 void Context::ConfigureGpuId(bool require_gpu) {
-#if defined(XGBOOST_USE_CUDA)
+#if defined(XGBOOST_USE_CUDA) || defined(XGBOOST_USE_HIP)
   if (gpu_id == kCpuId) {  // 0. User didn't specify the `gpu_id'
     if (require_gpu) {     // 1. `tree_method' or `predictor' or both are using
                            // GPU.
@@ -47,7 +47,7 @@ void Context::ConfigureGpuId(bool require_gpu) {
   // Just set it to CPU, don't think about it.
   this->UpdateAllowUnknown(Args{{"gpu_id", std::to_string(kCpuId)}});
   (void)(require_gpu);
-#endif  // defined(XGBOOST_USE_CUDA)
+#endif  // defined(XGBOOST_USE_CUDA) || defined(XGBOOST_USE_
 
   common::SetDevice(this->gpu_id);
 }
@@ -60,10 +60,10 @@ std::int32_t Context::Threads() const {
   return n_threads;
 }
 
-#if !defined(XGBOOST_USE_CUDA)
+#if !defined(XGBOOST_USE_CUDA) && !defined(XGBOOST_USE_HIP)
 CUDAContext const* Context::CUDACtx() const {
   common::AssertGPUSupport();
   return nullptr;
 }
-#endif  // defined(XGBOOST_USE_CUDA)
+#endif  // defined(XGBOOST_USE_CUDA) || defined(XGBOOST_USE_HIP)
 }  // namespace xgboost

@@ -23,7 +23,7 @@
 #include <chrono>
 #include <cstddef>  // for size_t
 #include <hipcub/hipcub.hpp>
-#include <cub/util_allocator.cuh>
+#include <hipcub/util_allocator.hpp>
 #include <numeric>
 #include <sstream>
 #include <string>

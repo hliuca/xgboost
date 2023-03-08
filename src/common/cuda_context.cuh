@@ -5,7 +5,11 @@
 #define XGBOOST_COMMON_CUDA_CONTEXT_CUH_
 #include <thrust/execution_policy.h>
 
+#if defined(XGBOOST_USE_HIP)
+#include "device_helpers.hip.h"
+#elif defined(XGBOOST_USE_CUDA)
 #include "device_helpers.cuh"
+#endif
 
 namespace xgboost {
 struct CUDAContext {
