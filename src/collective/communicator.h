@@ -98,7 +98,7 @@ class Communicator {
   /** @brief Get the communicator instance. */
   static Communicator *Get() { return communicator_.get(); }
 
-#if defined(XGBOOST_USE_CUDA)
+#if defined(XGBOOST_USE_CUDA) || defined(XGBOOST_USE_HIP)
   /**
    * @brief Get the device communicator.
    *
