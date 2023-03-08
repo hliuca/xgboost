@@ -54,7 +54,7 @@ void GBTree::Configure(Args const& cfg) {
         Predictor::Create("cpu_predictor", this->ctx_));
   }
   cpu_predictor_->Configure(cfg);
-#if defined(XGBOOST_USE_CUDA)
+#if defined(XGBOOST_USE_CUDA) || defined(XGBOOST_USE_HIP)
   auto n_gpus = common::AllVisibleGPUs();
   if (!gpu_predictor_ && n_gpus != 0) {
     gpu_predictor_ = std::unique_ptr<Predictor>(
@@ -63,7 +63,7 @@ void GBTree::Configure(Args const& cfg) {
   if (n_gpus != 0) {
     gpu_predictor_->Configure(cfg);
   }
-#endif  // defined(XGBOOST_USE_CUDA)
+#endif  // defined(XGBOOST_USE_CUDA) || defined(XGBOOST_USE_HIP)
 
 #if defined(XGBOOST_USE_ONEAPI)
   if (!oneapi_predictor_) {
@@ -194,7 +194,7 @@ void GBTree::ConfigureUpdaters() {
 
 void GPUCopyGradient(HostDeviceVector<GradientPair> const*, bst_group_t, bst_group_t,
                      HostDeviceVector<GradientPair>*)
-#if defined(XGBOOST_USE_CUDA)
+#if defined(XGBOOST_USE_CUDA) || defined(XGBOOST_USE_HIP)
     ;  // NOLINT
 #else
 {
@@ -588,13 +588,13 @@ GBTree::GetPredictor(HostDeviceVector<float> const *out_pred,
   CHECK(configured_);
   if (tparam_.predictor != PredictorType::kAuto) {
     if (tparam_.predictor == PredictorType::kGPUPredictor) {
-#if defined(XGBOOST_USE_CUDA)
+#if defined(XGBOOST_USE_CUDA) || defined(XGBOOST_USE_HIP)
       CHECK_GE(common::AllVisibleGPUs(), 1) << "No visible GPU is found for XGBoost.";
       CHECK(gpu_predictor_);
       return gpu_predictor_;
 #else
       common::AssertGPUSupport();
-#endif  // defined(XGBOOST_USE_CUDA)
+#endif  // defined(XGBOOST_USE_CUDA) || defined(XGBOOST_USE_HIP)
     }
     if (tparam_.predictor == PredictorType::kOneAPIPredictor) {
 #if defined(XGBOOST_USE_ONEAPI)
@@ -619,15 +619,15 @@ GBTree::GetPredictor(HostDeviceVector<float> const *out_pred,
 
   // Use GPU Predictor if data is already on device and gpu_id is set.
   if (on_device && ctx_->gpu_id >= 0) {
-#if defined(XGBOOST_USE_CUDA)
+#if defined(XGBOOST_USE_CUDA) || defined(XGBOOST_USE_HIP)
     CHECK_GE(common::AllVisibleGPUs(), 1) << "No visible GPU is found for XGBoost.";
     CHECK(gpu_predictor_);
     return gpu_predictor_;
 #else
     LOG(FATAL) << "Data is on CUDA device, but XGBoost is not compiled with "
-                  "CUDA support.";
+                  "CUDA/HIP support.";
     return cpu_predictor_;
-#endif  // defined(XGBOOST_USE_CUDA)
+#endif  // defined(XGBOOST_USE_CUDA) || defined(XGBOOST_USE_HIP)
   }
 
   // GPU_Hist by default has prediction cache calculated from quantile values,
@@ -645,14 +645,14 @@ GBTree::GetPredictor(HostDeviceVector<float> const *out_pred,
   }
 
   if (tparam_.tree_method == TreeMethod::kGPUHist) {
-#if defined(XGBOOST_USE_CUDA)
+#if defined(XGBOOST_USE_CUDA) || defined(XGBOOST_USE_HIP)
     CHECK_GE(common::AllVisibleGPUs(), 1) << "No visible GPU is found for XGBoost.";
     CHECK(gpu_predictor_);
     return gpu_predictor_;
 #else
     common::AssertGPUSupport();
     return cpu_predictor_;
-#endif  // defined(XGBOOST_USE_CUDA)
+#endif  // defined(XGBOOST_USE_CUDA) || defined(XGBOOST_USE_HIP)
   }
 
   CHECK(cpu_predictor_);
@@ -667,7 +667,7 @@ GBTree::GetPredictor(HostDeviceVector<float> const *out_pred,
  */
 void GPUDartPredictInc(common::Span<float>, common::Span<float>, float, size_t, bst_group_t,
                        bst_group_t)
-#if defined(XGBOOST_USE_CUDA)
+#if defined(XGBOOST_USE_CUDA) || defined(XGBOOST_USE_HIP)
     ;  // NOLINT
 #else
 {
@@ -679,7 +679,7 @@ void GPUDartInplacePredictInc(common::Span<float> /*out_predts*/, common::Span<f
                               float /*tree_w*/, size_t /*n_rows*/,
                               linalg::TensorView<float const, 1> /*base_score*/,
                               bst_group_t /*n_groups*/, bst_group_t /*group*/)
-#if defined(XGBOOST_USE_CUDA)
+#if defined(XGBOOST_USE_CUDA) || defined(XGBOOST_USE_HIP)
     ;  // NOLINT
 #else
 {
@@ -836,7 +836,7 @@ class Dart : public GBTree {
 
     std::vector<Predictor const*> predictors {
       cpu_predictor_.get(),
-#if defined(XGBOOST_USE_CUDA)
+#if defined(XGBOOST_USE_CUDA) || defined(XGBOOST_USE_HIP)
       gpu_predictor_.get()
 #endif  // defined(XGBOOST_USE_CUDA)
     };
