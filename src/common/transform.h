@@ -17,9 +17,9 @@
 #include "xgboost/host_device_vector.h"
 #include "xgboost/span.h"
 
-#if defined (__CUDACC__)
+#if defined (__CUDACC__) || defined(__HIP_PLATFORM_AMD__)
 #include "device_helpers.cuh"
-#endif  // defined (__CUDACC__)
+#endif  // defined (__CUDACC__) || defined(__HIP_PLATFORM_AMD__)
 
 namespace xgboost {
 namespace common {
@@ -28,7 +28,7 @@ constexpr size_t kBlockThreads = 256;
 
 namespace detail {
 
-#if defined(__CUDACC__)
+#if defined(__CUDACC__) || defined(__HIP_PLATFORM_AMD__)
 template <typename Functor, typename... SpanType>
 __global__ void LaunchCUDAKernel(Functor _func, Range _range,
                                  SpanType... _spans) {
@@ -36,7 +36,7 @@ __global__ void LaunchCUDAKernel(Functor _func, Range _range,
     _func(i, _spans...);
   }
 }
-#endif  // defined(__CUDACC__)
+#endif  // defined(__CUDACC__) || defined(__HIP_PLATFORM_AMD__)
 
 }  // namespace detail
 
@@ -127,7 +127,7 @@ class Transform {
       UnpackShard(device, _vectors...);
     }
 
-#if defined(__CUDACC__)
+#if defined(__CUDACC__) || defined(__HIP_PLATFORM_AMD__)
     template <typename std::enable_if<CompiledWithCuda>::type* = nullptr,
               typename... HDV>
     void LaunchCUDA(Functor _func, HDV*... _vectors) const {
@@ -159,7 +159,7 @@ class Transform {
 
       LOG(FATAL) << "Not part of device code. WITH_CUDA: " << WITH_CUDA();
     }
-#endif  // defined(__CUDACC__)
+#endif  // defined(__CUDACC__) || defined(__HIP_PLATFORM_AMD__)
 
     template <typename... HDV>
     void LaunchCPU(Functor func, HDV *...vectors) const {

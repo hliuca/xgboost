@@ -53,7 +53,7 @@
 
 #endif  // defined(XGBOOST_USE_RMM) && XGBOOST_USE_RMM == 1
 
-#if !defined(__CUDA_ARCH__) || __CUDA_ARCH__ >= 600 || defined(__clang__)
+#if !defined(__CUDA_ARCH__) || __CUDA_ARCH__ >= 600 || defined(__clang__) || defined(__HIP_PLATFORM_AMD__)
 
 #else  // In device code and CUDA < 600
 __device__ __forceinline__ double atomicAdd(double* address, double val) {  // NOLINT
@@ -702,6 +702,8 @@ typename std::iterator_traits<T>::value_type SumReduction(T in, int nVals) {
 constexpr std::pair<int, int> CUDAVersion() {
 #if defined(__CUDACC_VER_MAJOR__)
   return std::make_pair(__CUDACC_VER_MAJOR__, __CUDACC_VER_MINOR__);
+#elif defined(__HIP_PLATFORM_AMD__)
+  return std::make_pair(HIP_LIBRARY_MAJOR_VERSION, HIP_VERSION_MINOR);
 #else
   // clang/clang-tidy
   return std::make_pair((CUDA_VERSION) / 1000, (CUDA_VERSION) % 100 / 10);
@@ -1329,6 +1331,9 @@ class CUDAStreamView {
     // CUDA > 11.0
     dh::safe_cuda(cudaStreamWaitEvent(stream_, cudaEvent_t{e}, cudaEventWaitDefault));
 #endif  // __CUDACC_VER_MAJOR__ == 11 && __CUDACC_VER_MINOR__ == 0:
+
+#elif defined(__HIP_PLATFORM_AMD__)
+    dh::safe_cuda(hipStreamWaitEvent(stream_, hipEvent_t{e}, hipEventWaitDefault));
 #else   // clang
     dh::safe_cuda(cudaStreamWaitEvent(stream_, cudaEvent_t{e}, cudaEventWaitDefault));
 #endif  //  defined(__CUDACC_VER_MAJOR__)

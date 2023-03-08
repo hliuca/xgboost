@@ -11,9 +11,9 @@
 
 #include "common.h"
 
-#ifdef __CUDACC__
+#if defined(__CUDACC__) || defined(__HIP_PLATFORM_AMD__)
 #include "device_helpers.cuh"
-#endif  // __CUDACC__
+#endif  // __CUDACC__ || __HIP_PLATFORM_AMD__
 
 namespace xgboost {
 namespace common {
@@ -105,7 +105,7 @@ class CompressedBufferWriter {
     }
   }
 
-#ifdef __CUDACC__
+#if defined(__CUDACC__) || defined(__HIP_PLATFORM_AMD__)
   __device__ void AtomicWriteSymbol
     (CompressedByteT* buffer, uint64_t symbol, size_t offset) {
     size_t ibit_start = offset * symbol_bits_;
@@ -119,7 +119,7 @@ class CompressedBufferWriter {
       symbol >>= 8;
     }
   }
-#endif  // __CUDACC__
+#endif  // __CUDACC__ || __HIP_PLATFORM_AMD__
 
   template <typename IterT>
   void Write(CompressedByteT *buffer, IterT input_begin, IterT input_end) {

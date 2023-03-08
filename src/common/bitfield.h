@@ -13,18 +13,18 @@
 #include <string>
 #include <vector>
 
-#if defined(__CUDACC__)
+#if defined(__CUDACC__) || defined(__HIP_PLATFORM_AMD__)
 #include <thrust/copy.h>
 #include <thrust/device_ptr.h>
 #include "device_helpers.cuh"
-#endif  // defined(__CUDACC__)
+#endif  // defined(__CUDACC__) || defined(__HIP_PLATFORM_AMD__)
 
 #include "xgboost/span.h"
 #include "common.h"
 
 namespace xgboost {
 
-#if defined(__CUDACC__)
+#if defined(__CUDACC__) || defined(__HIP_PLATFORM_AMD__)
 using BitFieldAtomicType = unsigned long long;  // NOLINT
 
 __forceinline__ __device__ BitFieldAtomicType AtomicOr(BitFieldAtomicType* address,
@@ -48,7 +48,7 @@ __forceinline__ __device__ BitFieldAtomicType AtomicAnd(BitFieldAtomicType* addr
 
   return old;
 }
-#endif  // defined(__CUDACC__)
+#endif  // defined(__CUDACC__) || defined(__HIP_PLATFORM_AMD__)
 
 /*!
  * \brief A non-owning type with auxiliary methods defined for manipulating bits.
@@ -100,7 +100,7 @@ struct BitFieldContainer {
   XGBOOST_DEVICE static size_t ComputeStorageSize(index_type size) {
     return common::DivRoundUp(size, kValueSize);
   }
-#if defined(__CUDA_ARCH__)
+#if defined(__CUDA_ARCH__) || defined(__HIP_PLATFORM_AMD__)
   __device__ BitFieldContainer& operator|=(BitFieldContainer const& rhs) {
     auto tid = blockIdx.x * blockDim.x + threadIdx.x;
     size_t min_size = min(bits_.size(), rhs.bits_.size());
@@ -117,9 +117,9 @@ struct BitFieldContainer {
     }
     return *this;
   }
-#endif  // #if defined(__CUDA_ARCH__)
+#endif  // #if defined(__CUDA_ARCH__) || defined(__HIP_PLATFORM_AMD__)
 
-#if defined(__CUDA_ARCH__)
+#if defined(__CUDA_ARCH__) || defined(__HIP_PLATFORM_AMD__)
   __device__ BitFieldContainer& operator&=(BitFieldContainer const& rhs) {
     size_t min_size = min(bits_.size(), rhs.bits_.size());
     auto tid = blockIdx.x * blockDim.x + threadIdx.x;
@@ -138,7 +138,7 @@ struct BitFieldContainer {
   }
 #endif  // defined(__CUDA_ARCH__)
 
-#if defined(__CUDA_ARCH__)
+#if defined(__CUDA_ARCH__) || defined(__HIP_PLATFORM_AMD__)
   __device__ auto Set(index_type pos) {
     Pos pos_v = Direction::Shift(ToBitPos(pos));
     value_type& value = bits_[pos_v.int_pos];
@@ -166,7 +166,7 @@ struct BitFieldContainer {
     value_type clear_bit = ~(kOne << pos_v.bit_pos);
     value &= clear_bit;
   }
-#endif  // defined(__CUDA_ARCH__)
+#endif  // defined(__CUDA_ARCH__) || defined(__HIP_PLATFORM_AMD__)
 
   XGBOOST_DEVICE bool Check(Pos pos_v) const {
     pos_v = Direction::Shift(pos_v);
