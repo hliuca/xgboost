@@ -23,6 +23,15 @@
 #include "../common/device_helpers.cuh"
 #endif  // XGBOOST_USE_CUDA
 
+#if defined(XGBOOST_USE_HIP)
+#include <thrust/execution_policy.h>  // thrust::cuda::par
+#include <thrust/functional.h>        // thrust::plus<>
+#include <thrust/iterator/counting_iterator.h>
+#include <thrust/transform_reduce.h>
+
+#include "../common/device_helpers.hip.h"
+#endif  // XGBOOST_USE_HIP
+
 namespace xgboost {
 namespace metric {
 // tag the this file, used by force static link later.
