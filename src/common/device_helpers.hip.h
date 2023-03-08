@@ -14,7 +14,7 @@
 #include <thrust/logical.h>
 #include <thrust/sequence.h>
 #include <thrust/sort.h>
-#include <thrust/system/cuda/error.h>
+#include <thrust/system/hip/error.h>
 #include <thrust/system_error.h>
 #include <thrust/transform_scan.h>
 #include <thrust/unique.h>
@@ -106,7 +106,7 @@ inline ncclResult_t ThrowOnNcclError(ncclResult_t code, const char *file,
     if (code == ncclUnhandledCudaError) {
       // nccl usually preserves the last error so we can get more details.
       auto err = hipPeekAtLastError();
-      ss << " " << thrust::system_error(err, thrust::cuda_category()).what();
+      ss << " " << thrust::system_error(err, thrust::hip_category()).what();
     }
     ss << " " << file << "(" << line << ")";
     LOG(FATAL) << ss.str();
@@ -925,7 +925,7 @@ class SegmentSorter {
     // Allocator to be used by sort for managing space overhead while sorting
     dh::XGBCachingDeviceAllocator<char> alloc;
 
-    thrust::stable_sort_by_key(thrust::cuda::par(alloc),
+    thrust::stable_sort_by_key(thrust::hip::par(alloc),
                                ditems_.begin(), ditems_.end(),
                                doriginal_pos_.begin(), comp);
 
@@ -943,7 +943,7 @@ class SegmentSorter {
     // in the process also noting the relative changes to the doriginal_pos_ while that happens
     // group_segments_c_:   0 0 0 1 1 2 2 2 3 3
     // doriginal_pos_:      0 2 1 3 4 6 7 5 8 9
-    thrust::stable_sort_by_key(thrust::cuda::par(alloc),
+    thrust::stable_sort_by_key(thrust::hip::par(alloc),
                                group_segments_c.begin(), group_segments_c.end(),
                                doriginal_pos_.begin(), thrust::less<uint32_t>());
 
@@ -1069,7 +1069,7 @@ template <typename... Inputs,
               * = nullptr>
 size_t SegmentedUnique(Inputs &&...inputs) {
   dh::XGBCachingDeviceAllocator<char> alloc;
-  return SegmentedUnique(thrust::cuda::par(alloc),
+  return SegmentedUnique(thrust::hip::par(alloc),
                          std::forward<Inputs &&>(inputs)...,
                          thrust::equal_to<size_t>{});
 }
@@ -1191,7 +1191,7 @@ void CopyIf(InIt in_first, InIt in_second, OutIt out_first, Predicate pred) {
   for (size_t offset = 0; offset < length; offset += kMaxCopySize) {
     auto begin_input = in_first + offset;
     auto end_input = in_first + std::min(offset + kMaxCopySize, length);
-    out_first = thrust::copy_if(thrust::cuda::par(alloc), begin_input,
+    out_first = thrust::copy_if(thrust::hip::par(alloc), begin_input,
                                 end_input, out_first, pred);
   }
 }
@@ -1308,7 +1308,7 @@ inline void CUDAEvent::Record(CUDAStreamView stream) {  // NOLINT
   dh::safe_cuda(hipEventRecord(event_, hipStream_t{stream}));
 }
 
-inline CUDAStreamView DefaultStream() { return CUDAStreamView{hipStreamLegacy}; }
+inline CUDAStreamView DefaultStream() { return CUDAStreamView{hipStreamDefault}; }
 
 class CUDAStream {
   hipStream_t stream_;
