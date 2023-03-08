@@ -39,41 +39,6 @@
 
 #endif  // defined(__CUDACC__)
 
-namespace dh {
-#if defined(__CUDACC__)
-/*
- * Error handling  functions
- */
-#define safe_cuda(ans) ThrowOnCudaError((ans), __FILE__, __LINE__)
-
-inline cudaError_t ThrowOnCudaError(cudaError_t code, const char *file, int line)
-{
-  if (code != cudaSuccess) {
-    LOG(FATAL) << thrust::system_error(code, thrust::cuda_category(),
-                                       std::string{file} + ": " +  // NOLINT
-                                       std::to_string(line)).what();
-  }
-  return code;
-}
-
-#elif defined(__HIP_PLATFORM_AMD__)
-/*
- * Error handling  functions
- */
-#define safe_cuda(ans) ThrowOnCudaError((ans), __FILE__, __LINE__)
-
-inline hipError_t ThrowOnCudaError(hipError_t code, const char *file, int line)
-{
-  if (code != hipSuccess) {
-    LOG(FATAL) << thrust::system_error(code, thrust::hip_category(),
-                                       std::string{file} + ": " +  // NOLINT
-                                       std::to_string(line)).what();
-  }
-  return code;
-}
-#endif
-}  // namespace dh
-
 namespace xgboost {
 namespace common {
 /*!
