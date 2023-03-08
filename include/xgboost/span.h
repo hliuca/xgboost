@@ -114,7 +114,7 @@ namespace common {
 #define HIP_KERNEL_CHECK(cond)           \
   do {                                    \
     if (XGBOOST_EXPECT(!(cond), false)) { \
-      __trap();                           \
+      __builtin_trap();                           \
     }                                     \
   } while (0)
 
@@ -122,10 +122,17 @@ namespace common {
 
 #define __ASSERT_STR_HELPER(x) #x
 
+#if 0  /* need to fix __assert_fail, without __host__ */
 #define HIP_KERNEL_CHECK(cond)  \
   (XGBOOST_EXPECT((cond), true) \
        ? static_cast<void>(0)   \
        : __assert_fail(__ASSERT_STR_HELPER((cond)), __FILE__, __LINE__, __PRETTY_FUNCTION__))
+#else
+#define HIP_KERNEL_CHECK(cond)  \
+  (XGBOOST_EXPECT((cond), true) \
+       ? static_cast<void>(0)   \
+       : __builtin_trap())
+#endif
 
 #endif  // defined(_MSC_VER)
 

@@ -1,7 +1,13 @@
 /*!
  * Copyright 2021 by Contributors
  */
+
+#if defined(XGBOOST_USE_CUDA)
 #include "../common/device_helpers.cuh"
+#elif defined(XGBOOST_USE_HIP)
+#include "../common/device_helpers.hip.h"
+#endif
+
 #include "xgboost/context.h"
 #include "xgboost/linalg.h"
 #include "xgboost/span.h"
