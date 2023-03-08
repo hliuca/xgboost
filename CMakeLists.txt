@@ -196,7 +196,8 @@ if (USE_HIP)
   find_package(rocthrust REQUIRED)
   find_package(hipcub REQUIRED)
 
-  set(CMAKE_HIP_FLAGS "-I${HIP_INCLUDE_DIRS} -I${HIP_INCLUDE_DIRS}/hip")
+  set(CMAKE_HIP_FLAGS "${CMAKE_HIP_FLAGS} -I${HIP_INCLUDE_DIRS} -I${HIP_INCLUDE_DIRS}/hip")
+  set(CMAKE_HIP_FLAGS "${CMAKE_HIP_FLAGS} -Wunused-result")
   add_subdirectory(${PROJECT_SOURCE_DIR}/rocgputreeshap)
 
   set(BUILD_WITH_HIP_CUB ON)
