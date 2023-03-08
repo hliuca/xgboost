@@ -184,6 +184,27 @@ function(xgboost_set_cuda_flags target)
     CUDA_SEPARABLE_COMPILATION OFF)
 endfunction(xgboost_set_cuda_flags)
 
+# Set HIP related flags to target.
+function(xgboost_set_hip_flags target)
+  if (USE_DEVICE_DEBUG)
+    target_compile_options(${target} PRIVATE
+      $<$<AND:$<CONFIG:DEBUG>,$<COMPILE_LANGUAGE:HIP>>:-G>)
+  endif (USE_DEVICE_DEBUG)
+
+  if (NOT BUILD_WITH_HIP_CUB)
+    target_compile_definitions(${target} PRIVATE -DXGBOOST_USE_HIP=1 -DTHRUST_IGNORE_CUB_VERSION_CHECK=1)
+    target_include_directories(${target} PRIVATE ${xgboost_SOURCE_DIR}/rocgputreeshap)
+  else ()
+    target_compile_definitions(${target} PRIVATE -DXGBOOST_USE_HIP=1)
+    target_include_directories(${target} PRIVATE ${xgboost_SOURCE_DIR}/rocgputreeshap)
+  endif (NOT BUILD_WITH_HIP_CUB)
+
+  set_target_properties(${target} PROPERTIES
+    HIP_STANDARD 17
+    HIP_STANDARD_REQUIRED ON
+    HIP_SEPARABLE_COMPILATION OFF)
+endfunction(xgboost_set_hip_flags)
+
 macro(xgboost_link_nccl target)
   if (BUILD_STATIC_LIB)
     target_include_directories(${target} PUBLIC ${NCCL_INCLUDE_DIR})
@@ -217,6 +238,10 @@ macro(xgboost_target_properties target)
       $<IF:$<COMPILE_LANGUAGE:CUDA>,
       -Xcompiler=-Wall -Xcompiler=-Wextra -Xcompiler=-Wno-expansion-to-defined,
       -Wall -Wextra -Wno-expansion-to-defined>
+    )
+    target_compile_options(${target} PUBLIC
+       $<IF:$<COMPILE_LANGUAGE:HIP>,
+      -Wall -Wextra >
     )
   endif(ENABLE_ALL_WARNINGS)
 
@@ -284,6 +309,10 @@ macro(xgboost_target_link_libraries target)
   if (USE_CUDA)
     xgboost_set_cuda_flags(${target})
   endif (USE_CUDA)
+
+  if (USE_HIP)
+    xgboost_set_hip_flags(${target})
+  endif (USE_HIP)
 
   if (PLUGIN_RMM)
     target_link_libraries(${target} PRIVATE rmm::rmm)
