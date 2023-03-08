@@ -72,11 +72,23 @@ class pinned_allocator {
     if (cnt > this->max_size()) { throw std::bad_alloc(); }  // end if
 
     pointer result(nullptr);
+
+#if defined(XGBOOST_USE_HIP)
+    dh::safe_cuda(hipMallocHost(reinterpret_cast<void**>(&result), cnt * sizeof(value_type)));
+#else
     dh::safe_cuda(cudaMallocHost(reinterpret_cast<void**>(&result), cnt * sizeof(value_type)));
+#endif
+
     return result;
   }
 
-  inline void deallocate(pointer p, size_type) { dh::safe_cuda(cudaFreeHost(p)); } // NOLINT
+  inline void deallocate(pointer p, size_type) {
+#if defined(XGBOOST_USE_HIP)
+      dh::safe_cuda(hipFreeHost(p));
+#else
+      dh::safe_cuda(cudaFreeHost(p));
+#endif
+  } // NOLINT
 
   inline size_type max_size() const { return (std::numeric_limits<size_type>::max)() / sizeof(T); } // NOLINT
 
