@@ -46,8 +46,19 @@ namespace dh {
  */
 #define safe_cuda(ans) ThrowOnCudaError((ans), __FILE__, __LINE__)
 
-inline cudaError_t ThrowOnCudaError(cudaError_t code, const char *file,
-                                    int line) {
+#if defined(XGBOOST_USE_HIP)
+inline hipError_t ThrowOnCudaError(hipError_t code, const char *file, int line)
+{
+  if (code != hipSuccess) {
+    LOG(FATAL) << thrust::system_error(code, thrust::hip_category(),
+                                       std::string{file} + ": " +  // NOLINT
+                                       std::to_string(line)).what();
+  }
+  return code;
+}
+#else
+inline cudaError_t ThrowOnCudaError(cudaError_t code, const char *file, int line)
+{
   if (code != cudaSuccess) {
     LOG(FATAL) << thrust::system_error(code, thrust::cuda_category(),
                                        std::string{file} + ": " +  // NOLINT
@@ -55,6 +66,7 @@ inline cudaError_t ThrowOnCudaError(cudaError_t code, const char *file,
   }
   return code;
 }
+#endif
 #endif  // defined(__CUDACC__) || defined(__HIP_PLATFORM_AMD__)
 }  // namespace dh
 
