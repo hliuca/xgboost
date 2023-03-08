@@ -121,7 +121,7 @@ void GetCutsFromRef(std::shared_ptr<DMatrix> ref_, bst_feature_t n_features, Bat
  */
 void GetCutsFromEllpack(EllpackPage const &page, common::HistogramCuts *cuts);
 
-#if !defined(XGBOOST_USE_CUDA)
+#if !defined(XGBOOST_USE_CUDA) && !defined(XGBOOST_USE_HIP)
 inline void IterativeDMatrix::InitFromCUDA(DataIterHandle, float, std::shared_ptr<DMatrix>) {
   // silent the warning about unused variables.
   (void)(proxy_);
@@ -138,7 +138,7 @@ inline BatchSet<EllpackPage> IterativeDMatrix::GetEllpackBatches(const BatchPara
 inline void GetCutsFromEllpack(EllpackPage const &, common::HistogramCuts *) {
   common::AssertGPUSupport();
 }
-#endif  // !defined(XGBOOST_USE_CUDA)
+#endif  // !defined(XGBOOST_USE_CUDA) && !defined(XGBOOST_USE_HIP)
 }  // namespace data
 }  // namespace xgboost
 
