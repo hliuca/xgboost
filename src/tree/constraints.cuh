@@ -15,7 +15,12 @@
 #include "constraints.h"
 #include "xgboost/span.h"
 #include "../common/bitfield.h"
+
+#if defined(XGBOOST_USE_CUDA)
 #include "../common/device_helpers.cuh"
+#elif defined(XGBOOST_USE_HIP)
+#include "../common/device_helpers.hip.h"
+#endif
 
 namespace xgboost {
 // Feature interaction constraints built for GPU Hist updater.
