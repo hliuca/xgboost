@@ -8,7 +8,13 @@
 #include <xgboost/data.h>
 
 #include "../common/compressed_iterator.h"
+
+#if defined(XGBOOST_USE_CUDA)
 #include "../common/device_helpers.cuh"
+#elif defined(XGBOOST_USE_HIP)
+#include "../common/device_helpers.hip.h"
+#endif
+
 #include "../common/hist_util.h"
 #include "../common/categorical.h"
 #include <thrust/binary_search.h>

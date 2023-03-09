@@ -11,8 +11,10 @@
 
 #include "common.h"
 
-#if defined(__CUDACC__) || defined(__HIP_PLATFORM_AMD__)
+#if defined(__CUDACC__)
 #include "device_helpers.cuh"
+#elif defined(__HIP_PLATFORM_AMD__)
+#include "device_helpers.hip.h"
 #endif  // __CUDACC__ || __HIP_PLATFORM_AMD__
 
 namespace xgboost {

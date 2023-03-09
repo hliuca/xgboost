@@ -13,10 +13,14 @@
 #include <string>
 #include <vector>
 
-#if defined(__CUDACC__) || defined(__HIP_PLATFORM_AMD__)
+#if defined(__CUDACC__)
 #include <thrust/copy.h>
 #include <thrust/device_ptr.h>
 #include "device_helpers.cuh"
+#elif defined(__HIP_PLATFORM_AMD__)
+#include <thrust/copy.h>
+#include <thrust/device_ptr.h>
+#include "device_helpers.hip.h"
 #endif  // defined(__CUDACC__) || defined(__HIP_PLATFORM_AMD__)
 
 #include "xgboost/span.h"
