@@ -6,12 +6,22 @@
 #include <limits>
 
 #include "../../common/categorical.h"
+
+#if defined(XGBOOST_USE_CUDA)
 #include "../../common/device_helpers.cuh"
+#elif defined(XGBOOST_USE_HIP)
+#include "../../common/device_helpers.hip.h"
+#endif
+
 #include "../../data/ellpack_page.cuh"
 #include "evaluate_splits.cuh"
 #include "expand_entry.cuh"
 
 namespace xgboost {
+#if defined(XGBOOST_USE_HIP)
+namespace cub = hipcub;
+#endif
+
 namespace tree {
 
 // With constraints
@@ -99,8 +109,13 @@ class EvaluateSplitAgent {
     }
     local_sum = SumReduceT(temp_storage->sum_reduce).Sum(local_sum);  // NOLINT
     // Broadcast result from thread 0
+#if defined(XGBOOST_USE_CUDA)
     return {__shfl_sync(0xffffffff, local_sum.GetQuantisedGrad(), 0),
             __shfl_sync(0xffffffff, local_sum.GetQuantisedHess(), 0)};
+#elif defined(XGBOOST_USE_HIP)
+    return {__shfl(local_sum.GetQuantisedGrad(), 0),
+            __shfl(local_sum.GetQuantisedHess(), 0)};
+#endif
   }
 
   // Load using efficient 128 vector load instruction
@@ -124,10 +139,15 @@ class EvaluateSplitAgent {
                                                      evaluator, missing_left, rounding)
                                  : kNullGain;
       // Find thread with best gain
-      auto best = MaxReduceT(temp_storage->max_reduce).Reduce({threadIdx.x, gain}, cub::ArgMax());
+      auto best = MaxReduceT(temp_storage->max_reduce).Reduce({(int)threadIdx.x, gain}, cub::ArgMax());
+
       // This reduce result is only valid in thread 0
       // broadcast to the rest of the warp
+#if defined(XGBOOST_USE_CUDA)
       auto best_thread = __shfl_sync(0xffffffff, best.key, 0);
+#elif defined(XGBOOST_USE_HIP)
+      auto best_thread = __shfl(best.key, 0);
+#endif
 
       // Best thread updates the split
       if (threadIdx.x == best_thread) {
@@ -157,10 +177,15 @@ class EvaluateSplitAgent {
                                  : kNullGain;
 
       // Find thread with best gain
-      auto best = MaxReduceT(temp_storage->max_reduce).Reduce({threadIdx.x, gain}, cub::ArgMax());
+      auto best = MaxReduceT(temp_storage->max_reduce).Reduce({(int)threadIdx.x, gain}, cub::ArgMax());
       // This reduce result is only valid in thread 0
       // broadcast to the rest of the warp
+#if defined(XGBOOST_USE_CUDA)
       auto best_thread = __shfl_sync(0xffffffff, best.key, 0);
+#elif defined(XGBOOST_USE_HIP)
+      auto best_thread = __shfl(best.key, 0);
+#endif
+
       // Best thread updates the split
       if (threadIdx.x == best_thread) {
         int32_t split_gidx = (scan_begin + threadIdx.x);
@@ -186,10 +211,15 @@ class EvaluateSplitAgent {
                     : kNullGain;
 
     // Find thread with best gain
-    auto best = MaxReduceT(temp_storage->max_reduce).Reduce({threadIdx.x, gain}, cub::ArgMax());
+    auto best = MaxReduceT(temp_storage->max_reduce).Reduce({(int)threadIdx.x, gain}, cub::ArgMax());
     // This reduce result is only valid in thread 0
     // broadcast to the rest of the warp
+#if defined(XGBOOST_USE_CUDA)
     auto best_thread = __shfl_sync(0xffffffff, best.key, 0);
+#elif defined(XGBOOST_USE_HIP)
+    auto best_thread = __shfl(best.key, 0);
+#endif
+
     // Best thread updates the split
     if (threadIdx.x == best_thread) {
       assert(thread_active);
@@ -391,9 +421,16 @@ void GPUHistEvaluator::CopyToHost(const std::vector<bst_node_t> &nidx) {
   event.Record(dh::DefaultStream());
   for (auto idx : nidx) {
     copy_stream_.View().Wait(event);
+
+#if defined(XGBOOST_USE_CUDA)
     dh::safe_cuda(cudaMemcpyAsync(
         h_cats.GetNodeCatStorage(idx).data(), d_cats.GetNodeCatStorage(idx).data(),
         d_cats.GetNodeCatStorage(idx).size_bytes(), cudaMemcpyDeviceToHost, copy_stream_.View()));
+#elif defined(XGBOOST_USE_HIP)
+    dh::safe_cuda(hipMemcpyAsync(
+        h_cats.GetNodeCatStorage(idx).data(), d_cats.GetNodeCatStorage(idx).data(),
+        d_cats.GetNodeCatStorage(idx).size_bytes(), hipMemcpyDeviceToHost, copy_stream_.View()));
+#endif
   }
 }
 
@@ -456,8 +493,14 @@ GPUExpandEntry GPUHistEvaluator::EvaluateSingleSplit(
   this->EvaluateSplits({input.nidx}, input.feature_set.size(), dh::ToSpan(inputs), shared_inputs,
                        dh::ToSpan(out_entries));
   GPUExpandEntry root_entry;
+
+#if defined(XGBOOST_USE_CUDA)
   dh::safe_cuda(cudaMemcpyAsync(&root_entry, out_entries.data().get(), sizeof(GPUExpandEntry),
                                 cudaMemcpyDeviceToHost));
+#elif defined(XGBOOST_USE_HIP)
+  dh::safe_cuda(hipMemcpyAsync(&root_entry, out_entries.data().get(), sizeof(GPUExpandEntry),
+                                hipMemcpyDeviceToHost));
+#endif
   return root_entry;
 }
 

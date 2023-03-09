@@ -4,12 +4,26 @@
 #pragma once
 #include <thrust/random.h>
 #include <cstdio>
+#include <limits>
+#include <float.h>
+
+#if defined(XGBOOST_USE_CUDA)
 #include <cub/cub.cuh>
+#elif defined(XGBOOST_USE_HIP)
+#include <hipcub/hipcub.hpp>
+#endif
+
 #include <stdexcept>
 #include <string>
 #include <vector>
 #include "../common/categorical.h"
+
+#if defined(XGBOOST_USE_CUDA)
 #include "../common/device_helpers.cuh"
+#elif defined(XGBOOST_USE_HIP)
+#include "../common/device_helpers.hip.h"
+#endif
+
 #include "../common/random.h"
 #include "gpu_hist/histogram.cuh"
 #include "param.h"

@@ -121,8 +121,10 @@ class TreeEvaluator {
 
     // Fast floating point division instruction on device
     XGBOOST_DEVICE float Divide(float a, float b) const {
-#if defined(__CUDA_ARCH__) || defined(__HIP_PLATFORM_AMD__)
+#if defined(__CUDA_ARCH__)
       return __fdividef(a, b);
+#elif defined(__HIP_PLATFORM_AMD__)
+      return a / b;
 #else
       return a / b;
 #endif

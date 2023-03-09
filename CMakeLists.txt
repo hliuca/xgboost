@@ -197,7 +197,7 @@ if (USE_HIP)
   find_package(hipcub REQUIRED)
 
   set(CMAKE_HIP_FLAGS "${CMAKE_HIP_FLAGS} -I${HIP_INCLUDE_DIRS} -I${HIP_INCLUDE_DIRS}/hip")
-  set(CMAKE_HIP_FLAGS "${CMAKE_HIP_FLAGS} -Wunused-result")
+  set(CMAKE_HIP_FLAGS "${CMAKE_HIP_FLAGS} -Wunused-result -w")
   set(CMAKE_HIP_FLAGS "${CMAKE_HIP_FLAGS} -D__HIP_PLATFORM_AMD__")
   add_subdirectory(${PROJECT_SOURCE_DIR}/rocgputreeshap)
 

@@ -74,7 +74,7 @@ class pinned_allocator {
     pointer result(nullptr);
 
 #if defined(XGBOOST_USE_HIP)
-    dh::safe_cuda(hipMallocHost(reinterpret_cast<void**>(&result), cnt * sizeof(value_type)));
+    dh::safe_cuda(hipHostMalloc(reinterpret_cast<void**>(&result), cnt * sizeof(value_type)));
 #else
     dh::safe_cuda(cudaMallocHost(reinterpret_cast<void**>(&result), cnt * sizeof(value_type)));
 #endif
@@ -84,7 +84,7 @@ class pinned_allocator {
 
   inline void deallocate(pointer p, size_type) {
 #if defined(XGBOOST_USE_HIP)
-      dh::safe_cuda(hipFreeHost(p));
+      dh::safe_cuda(hipHostFree(p));
 #else
       dh::safe_cuda(cudaFreeHost(p));
 #endif
