@@ -5,4 +5,4 @@
 
 #if !defined(XGBOOST_USE_CUDA) && !defined(XGBOOST_USE_HIP)
 #include "multiclass_metric.cu"
-#endif  // !defined(XGBOOST_USE_CUDA)
+#endif  // !defined(XGBOOST_USE_CUDA) && !defined(XGBOOST_USE_HIP)
