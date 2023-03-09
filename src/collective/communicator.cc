@@ -50,7 +50,7 @@ void Communicator::Init(Json const& config) {
   }
 }
 
-#ifndef XGBOOST_USE_CUDA
+#if !defined(XGBOOST_USE_CUDA) && !defined(XGBOOST_USE_HIP)
 void Communicator::Finalize() {
   communicator_->Shutdown();
   communicator_.reset(new NoOpCommunicator());
