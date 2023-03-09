@@ -34,7 +34,12 @@ struct EvalRankGpu : public GPUMetric, public EvalRankConfig {
     const auto ngroups = static_cast<bst_omp_uint>(gptr.size() - 1);
 
     auto device = ctx_->gpu_id;
+
+#if defined(XGBOOST_USE_CUDA)
     dh::safe_cuda(cudaSetDevice(device));
+#elif defined(XGBOOST_USE_HIP)
+    dh::safe_cuda(hipSetDevice(device));
+#endif
 
     info.labels.SetDevice(device);
     preds.SetDevice(device);
@@ -99,7 +104,13 @@ struct EvalPrecisionGpu {
     auto *dhits = hits.data().get();
 
     int device_id = -1;
+
+#if defined(XGBOOST_USE_CUDA)
     dh::safe_cuda(cudaGetDevice(&device_id));
+#elif defined(XGBOOST_USE_HIP)
+    dh::safe_cuda(hipGetDevice(&device_id));
+#endif
+
     // For each group item compute the aggregated precision
     dh::LaunchN(nitems, nullptr, [=] __device__(uint32_t idx) {
       const auto group_idx = dgroup_idx[idx];
@@ -112,8 +123,14 @@ struct EvalPrecisionGpu {
 
     // Allocator to be used for managing space overhead while performing reductions
     dh::XGBCachingDeviceAllocator<char> alloc;
+
+#if defined(XGBOOST_USE_CUDA)
     return static_cast<double>(thrust::reduce(thrust::cuda::par(alloc),
                                               hits.begin(), hits.end())) / ecfg.topn;
+#elif defined(XGBOOST_USE_HIP)
+    return static_cast<double>(thrust::reduce(thrust::hip::par(alloc),
+                                              hits.begin(), hits.end())) / ecfg.topn;
+#endif
   }
 };
 
@@ -142,7 +159,12 @@ struct EvalNDCGGpu {
     auto *ddcgs = dcgs.data().get();
 
     int device_id = -1;
+
+#if defined(XGBOOST_USE_CUDA)
     dh::safe_cuda(cudaGetDevice(&device_id));
+#elif defined(XGBOOST_USE_HIP)
+    dh::safe_cuda(hipGetDevice(&device_id));
+#endif
 
     // For each group item compute the aggregated precision
     dh::LaunchN(nitems, nullptr, [=] __device__(uint32_t idx) {
@@ -177,7 +199,13 @@ struct EvalNDCGGpu {
     double *didcg = idcg.data().get();
 
     int device_id = -1;
+
+#if defined(XGBOOST_USE_CUDA)
     dh::safe_cuda(cudaGetDevice(&device_id));
+#elif defined(XGBOOST_USE_HIP)
+    dh::safe_cuda(hipGetDevice(&device_id));
+#endif
+
     // Compute the group's DCG and reduce it across all groups
     dh::LaunchN(ngroups, nullptr, [=] __device__(uint32_t gidx) {
       if (didcg[gidx] == 0.0f) {
@@ -189,7 +217,12 @@ struct EvalNDCGGpu {
 
     // Allocator to be used for managing space overhead while performing reductions
     dh::XGBCachingDeviceAllocator<char> alloc;
+
+#if defined(XGBOOST_USE_CUDA)
     return thrust::reduce(thrust::cuda::par(alloc), dcg.begin(), dcg.end());
+#elif defined(XGBOOST_USE_HIP)
+    return thrust::reduce(thrust::hip::par(alloc), dcg.begin(), dcg.end());
+#endif
   }
 };
 
@@ -225,10 +258,17 @@ struct EvalMAPGpu {
     // Next, prefix scan the nontrivial labels that are segmented to accumulate them.
     // This is required for computing the metric sum
     // Data segmented into different groups...
+#if defined(XGBOOST_USE_CUDA)
     thrust::inclusive_scan_by_key(thrust::cuda::par(alloc),
                                   dh::tcbegin(dgroup_idx), dh::tcend(dgroup_idx),
                                   hits.begin(),  // Input value
                                   hits.begin());  // In-place scan
+#elif defined(XGBOOST_USE_HIP)
+    thrust::inclusive_scan_by_key(thrust::hip::par(alloc),
+                                  dh::tcbegin(dgroup_idx), dh::tcend(dgroup_idx),
+                                  hits.begin(),  // Input value
+                                  hits.begin());  // In-place scan
+#endif
 
     // Find each group's metric sum
     dh::caching_device_vector<double> sumap(ngroups, 0);
@@ -236,7 +276,13 @@ struct EvalMAPGpu {
     const auto *dhits = hits.data().get();
 
     int device_id = -1;
+
+#if defined(XGBOOST_USE_CUDA)
     dh::safe_cuda(cudaGetDevice(&device_id));
+#elif defined(XGBOOST_USE_HIP)
+    dh::safe_cuda(hipGetDevice(&device_id));
+#endif
+
     // For each group item compute the aggregated precision
     dh::LaunchN(nitems, nullptr, [=] __device__(uint32_t idx) {
       if (DetermineNonTrivialLabelLambda(idx)) {
@@ -264,7 +310,11 @@ struct EvalMAPGpu {
       }
     });
 
+#if defined(XGBOOST_USE_CUDA)
     return thrust::reduce(thrust::cuda::par(alloc), sumap.begin(), sumap.end());
+#elif defined(XGBOOST_USE_HIP)
+    return thrust::reduce(thrust::hip::par(alloc), sumap.begin(), sumap.end());
+#endif
   }
 };
 
