@@ -10,14 +10,26 @@
 
 #include <cstddef>             // size_t
 #include <cstdint>             // int32_t
+
+#if defined(XGBOOST_USE_HIP)
+#include <hipcub/hipcub.hpp>
+#elif defined(XGBOOST_USE_CUDA)
 #include <cub/cub.cuh>         // DispatchSegmentedRadixSort,NullType,DoubleBuffer
+#endif
+
 #include <iterator>            // distance
 #include <limits>              // numeric_limits
 #include <type_traits>         // conditional_t,remove_const_t
 
 #include "common.h"            // safe_cuda
 #include "cuda_context.cuh"    // CUDAContext
+
+#if defined(XGBOOST_USE_HIP)
+#include "device_helpers.hip.h"
+#elif defined(XGBOOST_USE_CUDA)
 #include "device_helpers.cuh"  // TemporaryArray,SegmentId,LaunchN,Iota,device_vector
+#endif
+
 #include "xgboost/base.h"      // XGBOOST_DEVICE
 #include "xgboost/context.h"   // Context
 #include "xgboost/logging.h"   // CHECK
@@ -39,6 +51,7 @@ static void DeviceSegmentedRadixSortKeys(CUDAContext const *ctx, void *d_temp_st
   using OffsetT = int;
 
   // Null value type
+#if defined(XGBOOST_USE_CUDA)
   cub::DoubleBuffer<KeyT> d_keys(const_cast<KeyT *>(d_keys_in), d_keys_out);
   cub::DoubleBuffer<cub::NullType> d_values;
 
@@ -47,6 +60,20 @@ static void DeviceSegmentedRadixSortKeys(CUDAContext const *ctx, void *d_temp_st
                  OffsetT>::Dispatch(d_temp_storage, temp_storage_bytes, d_keys, d_values, num_items,
                                     num_segments, d_begin_offsets, d_end_offsets, begin_bit,
                                     end_bit, false, ctx->Stream(), debug_synchronous)));
+#elif defined(XGBOOST_USE_HIP)
+  if (IS_DESCENDING) {
+      rocprim::segmented_radix_sort_pairs_desc<KeyT, hipcub::NullType, BeginOffsetIteratorT>(d_temp_storage,
+              temp_storage_bytes, d_keys_in, d_keys_out, nullptr, nullptr, num_items,
+              num_segments, d_begin_offsets, d_end_offsets,
+              begin_bit, end_bit, ctx->Stream(), debug_synchronous);
+  }
+  else {
+      rocprim::segmented_radix_sort_pairs<KeyT, hipcub::NullType, BeginOffsetIteratorT>(d_temp_storage,
+              temp_storage_bytes, d_keys_in, d_keys_out, nullptr, nullptr, num_items,
+              num_segments, d_begin_offsets, d_end_offsets,
+              begin_bit, end_bit, ctx->Stream(), debug_synchronous);
+  }
+#endif
 }
 
 // Wrapper around cub sort for easier `descending` sort.
@@ -60,14 +87,18 @@ void DeviceSegmentedRadixSortPair(void *d_temp_storage,
                                   BeginOffsetIteratorT d_begin_offsets,
                                   EndOffsetIteratorT d_end_offsets, dh::CUDAStreamView stream,
                                   int begin_bit = 0, int end_bit = sizeof(KeyT) * 8) {
+#if defined(XGBOOST_USE_CUDA)
   cub::DoubleBuffer<KeyT> d_keys(const_cast<KeyT *>(d_keys_in), d_keys_out);
   cub::DoubleBuffer<ValueT> d_values(const_cast<ValueT *>(d_values_in), d_values_out);
+#endif
+
   // In old version of cub, num_items in dispatch is also int32_t, no way to change.
   using OffsetT = std::conditional_t<dh::BuildWithCUDACub() && dh::HasThrustMinorVer<13>(),
                                      std::size_t, std::int32_t>;
   CHECK_LE(num_items, std::numeric_limits<OffsetT>::max());
   // For Thrust >= 1.12 or CUDA >= 11.4, we require system cub installation
 
+#if defined(XGBOOST_USE_CUDA)
 #if THRUST_MAJOR_VERSION >= 2
   dh::safe_cuda((cub::DispatchSegmentedRadixSort<
                  descending, KeyT, ValueT, BeginOffsetIteratorT, EndOffsetIteratorT,
@@ -87,6 +118,18 @@ void DeviceSegmentedRadixSortPair(void *d_temp_storage,
                                                           d_keys, d_values, num_items, num_segments,
                                                           d_begin_offsets, d_end_offsets, begin_bit,
                                                           end_bit, false, stream, false)));
+#endif
+#elif defined(XGBOOST_USE_HIP)
+  if (descending) {
+      rocprim::segmented_radix_sort_pairs_desc(d_temp_storage, temp_storage_bytes, d_keys_in, d_keys_out,
+              d_values_in, d_values_out, num_items, num_segments,
+              d_begin_offsets, d_end_offsets, begin_bit, end_bit, stream, false);
+  }
+  else {
+      rocprim::segmented_radix_sort_pairs(d_temp_storage, temp_storage_bytes, d_keys_in, d_keys_out,
+              d_values_in, d_values_out, num_items, num_segments, d_begin_offsets, d_end_offsets,
+              begin_bit, end_bit, stream, false);
+  }
 #endif
 }
 }  // namespace detail

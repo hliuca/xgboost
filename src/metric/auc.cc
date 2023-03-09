@@ -393,7 +393,7 @@ XGBOOST_REGISTER_METRIC(EvalAUC, "auc")
 .describe("Receiver Operating Characteristic Area Under the Curve.")
 .set_body([](const char*) { return new EvalROCAUC(); });
 
-#if !defined(XGBOOST_USE_CUDA)
+#if !defined(XGBOOST_USE_CUDA) && !defined(XGBOOST_USE_HIP)
 std::tuple<double, double, double> GPUBinaryROCAUC(common::Span<float const>, MetaInfo const &,
                                                    std::int32_t,
                                                    std::shared_ptr<DeviceAUCCache> *) {
@@ -414,7 +414,7 @@ std::pair<double, std::uint32_t> GPURankingAUC(Context const *, common::Span<flo
   return {};
 }
 struct DeviceAUCCache {};
-#endif  // !defined(XGBOOST_USE_CUDA)
+#endif  // !defined(XGBOOST_USE_CUDA) && !defined(XGBOOST_USE_HIP)
 
 class EvalPRAUC : public EvalAUC<EvalPRAUC> {
   std::shared_ptr<DeviceAUCCache> d_cache_;
@@ -471,7 +471,7 @@ XGBOOST_REGISTER_METRIC(AUCPR, "aucpr")
     .describe("Area under PR curve for both classification and rank.")
     .set_body([](char const *) { return new EvalPRAUC{}; });
 
-#if !defined(XGBOOST_USE_CUDA)
+#if !defined(XGBOOST_USE_CUDA) && !defined(XGBOOST_USE_HIP)
 std::tuple<double, double, double> GPUBinaryPRAUC(common::Span<float const>, MetaInfo const &,
                                                   std::int32_t, std::shared_ptr<DeviceAUCCache> *) {
   common::AssertGPUSupport();

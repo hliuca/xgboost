@@ -9,7 +9,13 @@
 
 #include "./math.h"            // Sqr
 #include "common.h"
+
+#if defined(XGBOOST_USE_HIP)
+#include "device_helpers.hip.h"
+#elif defined(XGBOOST_USE_CUDA)
 #include "device_helpers.cuh"  // LaunchN
+#endif
+
 #include "xgboost/base.h"      // XGBOOST_DEVICE
 #include "xgboost/span.h"      // Span
 
@@ -67,7 +73,7 @@ SegmentedTrapezoidThreads(xgboost::common::Span<U> group_ptr,
   dh::safe_cuda(hipMemcpy(
       &total, out_group_threads_ptr.data() + out_group_threads_ptr.size() - 1,
       sizeof(total), hipMemcpyDeviceToHost));
-#else
+#elif defined(XGBOOST_USE_CUDA)
   dh::safe_cuda(cudaMemcpy(
       &total, out_group_threads_ptr.data() + out_group_threads_ptr.size() - 1,
       sizeof(total), cudaMemcpyDeviceToHost));
