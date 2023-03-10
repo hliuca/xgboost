@@ -12,6 +12,6 @@ DMLC_REGISTRY_FILE_TAG(rank_obj);
 }  // namespace obj
 }  // namespace xgboost
 
-#ifndef XGBOOST_USE_CUDA
+#if !defined(XGBOOST_USE_CUDA) && !defined(XGBOOST_USE_HIP)
 #include "rank_obj.cu"
-#endif  // XGBOOST_USE_CUDA
+#endif  // XGBOOST_USE_CUDA && XGBOOST_USE_HIP
