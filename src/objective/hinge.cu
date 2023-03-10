@@ -16,9 +16,9 @@
 namespace xgboost {
 namespace obj {
 
-#if defined(XGBOOST_USE_CUDA)
+#if defined(XGBOOST_USE_CUDA) || defined(XGBOOST_USE_HIP)
 DMLC_REGISTRY_FILE_TAG(hinge_obj_gpu);
-#endif  // defined(XGBOOST_USE_CUDA)
+#endif  // defined(XGBOOST_USE_CUDA) || defined(XGBOOST_USE_HIP)
 
 class HingeObj : public ObjFunction {
  public:
