@@ -89,7 +89,7 @@ void GetColumnSizesScan(int device, size_t num_columns, size_t num_cuts_per_feat
                          cuts_ptr->DevicePointer());
   thrust::exclusive_scan(thrust::hip::par(alloc), column_sizes_scan->begin(),
                          column_sizes_scan->end(), column_sizes_scan->begin());
-#else
+#elif defined(XGBOOST_USE_CUDA)
   thrust::exclusive_scan(thrust::cuda::par(alloc), cut_ptr_it,
                          cut_ptr_it + column_sizes_scan->size(),
                          cuts_ptr->DevicePointer());
@@ -198,7 +198,7 @@ void ProcessSlidingWindow(AdapterBatch const &batch, MetaInfo const &info,
 #if defined(XGBOOST_USE_HIP)
   thrust::sort(thrust::hip::par(alloc), sorted_entries.begin(),
                sorted_entries.end(), detail::EntryCompareOp());
-#else
+#elif defined(XGBOOST_USE_CUDA)
   thrust::sort(thrust::cuda::par(alloc), sorted_entries.begin(),
                sorted_entries.end(), detail::EntryCompareOp());
 #endif
@@ -229,7 +229,7 @@ void ProcessWeightedSlidingWindow(Batch batch, MetaInfo const& info,
 
 #if defined(XGBOOST_USE_HIP)
   dh::safe_cuda(hipSetDevice(device));
-#else
+#elif defined(XGBOOST_USE_CUDA)
   dh::safe_cuda(cudaSetDevice(device));
 #endif
 
@@ -272,7 +272,7 @@ void ProcessWeightedSlidingWindow(Batch batch, MetaInfo const& info,
                                  batch_iter + begin,
                                  d_temp_weights.data(),  // output
                                  is_valid);
-#else
+#elif defined(XGBOOST_USE_CUDA)
     auto retit = thrust::copy_if(thrust::cuda::par(alloc),
                                  weight_iter + begin, weight_iter + end,
                                  batch_iter + begin,
@@ -295,7 +295,7 @@ void ProcessWeightedSlidingWindow(Batch batch, MetaInfo const& info,
                                  batch_iter + begin,
                                  d_temp_weights.data(),  // output
                                  is_valid);
-#else
+#elif defined(XGBOOST_USE_CUDA)
     auto retit = thrust::copy_if(thrust::cuda::par(alloc),
                                  weight_iter + begin, weight_iter + end,
                                  batch_iter + begin,
