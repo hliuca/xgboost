@@ -1,7 +1,7 @@
 /*!
  * Copyright 2017 XGBoost contributors
  */
-#ifndef XGBOOST_USE_CUDA
+#if !defined(XGBOOST_USE_CUDA) && !defined(XGBOOST_USE_HIP)
 
 // dummy implementation of HostDeviceVector in case CUDA is not used
 
@@ -197,4 +197,4 @@ template class HostDeviceVector<std::size_t>;
 
 }  // namespace xgboost
 
-#endif  // XGBOOST_USE_CUDA
+#endif  // XGBOOST_USE_CUDA && !defined(XGBOOST_USE_HIP)
