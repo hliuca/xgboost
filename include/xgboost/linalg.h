@@ -134,9 +134,9 @@ int32_t NativePopc(T v) {
 }
 
 inline LINALG_HD int Popc(uint32_t v) {
-#if defined(__CUDA_ARCH__) || defined(__HIP_PLATFORM_AMD__)
+#if defined(__CUDA_ARCH__)
   return __popc(v);
-#elif defined(__GNUC__) || defined(__clang__)
+#elif defined(__GNUC__) || defined(__clang__) || defined(__HIP_PLATFORM_AMD__)
   return __builtin_popcount(v);
 #elif defined(_MSC_VER)
   return __popcnt(v);
@@ -146,9 +146,9 @@ inline LINALG_HD int Popc(uint32_t v) {
 }
 
 inline LINALG_HD int Popc(uint64_t v) {
-#if defined(__CUDA_ARCH__) || defined(__HIP_PLATFORM_AMD__)
+#if defined(__CUDA_ARCH__)
   return __popcll(v);
-#elif defined(__GNUC__) || defined(__clang__)
+#elif defined(__GNUC__) || defined(__clang__) || defined(__HIP_PLATFORM_AMD__)
   return __builtin_popcountll(v);
 #elif defined(_MSC_VER) && _defined(_M_X64)
   return __popcnt64(v);
