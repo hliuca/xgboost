@@ -19,7 +19,13 @@
 
 #include "algorithm.cuh"                           // SegmentedArgMergeSort
 #include "cuda_context.cuh"                        // CUDAContext
+
+#if defined(XGBOOST_USE_CUDA)
 #include "device_helpers.cuh"
+#elif defined(XGBOOST_USE_HIP)
+#include "device_helpers.hip.h"
+#endif
+
 #include "xgboost/context.h"                       // Context
 #include "xgboost/span.h"                          // Span
 
@@ -220,7 +226,7 @@ void SegmentedWeightedQuantile(Context const* ctx, AlphaIt alpha_it, SegIt seg_b
 #if defined(XGBOOST_USE_HIP)
   thrust::inclusive_scan_by_key(thrust::hip::par(caching), scan_key, scan_key + n_weights,
                                 scan_val, weights_cdf.begin());
-#else
+#elif defined(XGBOOST_USE_CUDA)
   thrust::inclusive_scan_by_key(thrust::cuda::par(caching), scan_key, scan_key + n_weights,
                                 scan_val, weights_cdf.begin());
 #endif
