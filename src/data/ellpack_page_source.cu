@@ -10,7 +10,11 @@
 namespace xgboost {
 namespace data {
 void EllpackPageSource::Fetch() {
+#if defined(XGBOOST_USE_CUDA)
   dh::safe_cuda(cudaSetDevice(param_.gpu_id));
+#elif defined(XGBOOST_USE_HIP)
+  dh::safe_cuda(hipSetDevice(param_.gpu_id));
+#endif
   if (!this->ReadCache()) {
     if (count_ != 0 && !sync_) {
       // source is initialized to be the 0th page during construction, so when count_ is 0
