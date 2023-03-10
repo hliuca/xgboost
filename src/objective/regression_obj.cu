@@ -38,7 +38,10 @@
 #if defined(XGBOOST_USE_CUDA)
 #include "../common/device_helpers.cuh"
 #include "../common/linalg_op.cuh"
-#endif  // defined(XGBOOST_USE_CUDA)
+#elif defined(XGBOOST_USE_HIP)
+#include "../common/device_helpers.hip.h"
+#include "../common/linalg_op.cuh"
+#endif  // defined(XGBOOST_USE_CUDA), defined(XGBOOST_USE_HIP)
 
 namespace xgboost {
 namespace obj {
@@ -49,9 +52,9 @@ void CheckRegInputs(MetaInfo const& info, HostDeviceVector<bst_float> const& pre
 }
 }  // anonymous namespace
 
-#if defined(XGBOOST_USE_CUDA)
+#if defined(XGBOOST_USE_CUDA) || defined(XGBOOST_USE_HIP)
 DMLC_REGISTRY_FILE_TAG(regression_obj_gpu);
-#endif  // defined(XGBOOST_USE_CUDA)
+#endif  // defined(XGBOOST_USE_CUDA) || defined(XGBOOST_USE_HIP)
 
 struct RegLossParam : public XGBoostParameter<RegLossParam> {
   float scale_pos_weight;
