@@ -31,6 +31,8 @@ bool ArrayInterfaceHandler::IsCudaPtr(void const* ptr) {
   if (!ptr) {
     return false;
   }
+
+#if defined(XGBOOST_USE_CUDA)
   cudaPointerAttributes attr;
   auto err = cudaPointerGetAttributes(&attr, ptr);
   // reset error
@@ -48,6 +50,9 @@ bool ArrayInterfaceHandler::IsCudaPtr(void const* ptr) {
         return true;
     }
     return true;
+#elif defined(XGBOOST_USE_HIP)
+    return false;
+#endif
   } else {
     // other errors, `cudaErrorNoDevice`, `cudaErrorInsufficientDriver` etc.
     return false;
