@@ -23,11 +23,11 @@ GlobalRandomEngine& GlobalRandom() {
   return RandomThreadLocalStore::Get()->engine;
 }
 
-#if !defined(XGBOOST_USE_CUDA)
+#if !defined(XGBOOST_USE_CUDA) && !defined(XGBOOST_USE_HIP)
 int AllVisibleGPUs() {
   return 0;
 }
-#endif  // !defined(XGBOOST_USE_CUDA)
+#endif  // !defined(XGBOOST_USE_CUDA) && !defined(XGBOOST_USE_HIP)
 
 }  // namespace common
 }  // namespace xgboost
