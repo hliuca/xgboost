@@ -186,15 +186,9 @@ function(xgboost_set_hip_flags target)
       $<$<AND:$<CONFIG:DEBUG>,$<COMPILE_LANGUAGE:HIP>>:-G>)
   endif (USE_DEVICE_DEBUG)
 
-  if (NOT BUILD_WITH_HIP_CUB)
-    target_compile_definitions(${target} PRIVATE -DXGBOOST_USE_HIP=1 -DTHRUST_IGNORE_CUB_VERSION_CHECK=1)
-    target_include_directories(${target} PRIVATE ${xgboost_SOURCE_DIR}/rocgputreeshap)
-    target_include_directories(${target} PRIVATE ${xgboost_SOURCE_DIR}/warp-primitives/include)
-  else ()
-    target_compile_definitions(${target} PRIVATE -DXGBOOST_USE_HIP=1)
-    target_include_directories(${target} PRIVATE ${xgboost_SOURCE_DIR}/rocgputreeshap)
-    target_include_directories(${target} PRIVATE ${xgboost_SOURCE_DIR}/warp-primitives/include)
-  endif (NOT BUILD_WITH_HIP_CUB)
+  target_compile_definitions(${target} PRIVATE -DXGBOOST_USE_HIP=1)
+  target_include_directories(${target} PRIVATE ${xgboost_SOURCE_DIR}/rocgputreeshap)
+  target_include_directories(${target} PRIVATE ${xgboost_SOURCE_DIR}/warp-primitives/include)
 
   set_target_properties(${target} PROPERTIES
     HIP_STANDARD 17

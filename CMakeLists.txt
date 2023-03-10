@@ -55,9 +55,8 @@ set(GPU_COMPUTE_VER "" CACHE STRING
   "Semicolon separated list of compute versions to be built against, e.g. '35;61'")
 ## HIP
 option(USE_HIP  "Build with GPU acceleration" OFF)
-option(USE_RCCL  "Build with RCCL to enable distributed GPU support." OFF)
+option(USE_RCCL "Build with RCCL to enable distributed GPU support." OFF)
 option(BUILD_WITH_SHARED_RCCL "Build with shared RCCL library." OFF)
-option(BUILD_WITH_HIP_CUB "Build with cub in HIP installation" OFF)
 ## Copied From dmlc
 option(USE_HDFS "Build with HDFS support" OFF)
 option(USE_AZURE "Build with AZURE support" OFF)
@@ -188,8 +187,6 @@ if (USE_HIP)
   set(CMAKE_HIP_FLAGS "${CMAKE_HIP_FLAGS} -Wunused-result -w")
   set(CMAKE_HIP_FLAGS "${CMAKE_HIP_FLAGS} -D__HIP_PLATFORM_AMD__")
   add_subdirectory(${PROJECT_SOURCE_DIR}/rocgputreeshap)
-
-  set(BUILD_WITH_HIP_CUB ON)
 endif (USE_HIP)
 
 if (FORCE_COLORED_OUTPUT AND (CMAKE_GENERATOR STREQUAL "Ninja") AND
