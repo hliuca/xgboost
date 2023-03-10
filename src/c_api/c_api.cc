@@ -48,12 +48,14 @@ XGB_DLL void XGBoostVersion(int* major, int* minor, int* patch) {
 
 using GlobalConfigAPIThreadLocalStore = dmlc::ThreadLocalStore<XGBAPIThreadLocalEntry>;
 
-#if !defined(XGBOOST_USE_CUDA)
+#if !defined(XGBOOST_USE_CUDA) && !defined(XGBOOST_USE_HIP)
 namespace xgboost {
 void XGBBuildInfoDevice(Json *p_info) {
   auto &info = *p_info;
   info["USE_CUDA"] = Boolean{false};
   info["USE_NCCL"] = Boolean{false};
+  info["USE_HIP"] = Boolean{false};
+  info["USE_RCCL"] = Boolean{false};
   info["USE_RMM"] = Boolean{false};
 }
 }  // namespace xgboost
@@ -264,7 +266,7 @@ XGB_DLL int XGDMatrixCreateFromDataIter(
   API_END();
 }
 
-#ifndef XGBOOST_USE_CUDA
+#if !defined(XGBOOST_USE_CUDA) && !defined(XGBOOST_USE_HIP)
 XGB_DLL int XGDMatrixCreateFromCudaColumnar(char const *, char const *, DMatrixHandle *) {
   API_BEGIN();
   common::AssertGPUSupport();
@@ -1073,7 +1075,7 @@ XGB_DLL int XGBoosterPredictFromCSR(BoosterHandle handle, char const *indptr, ch
   API_END();
 }
 
-#if !defined(XGBOOST_USE_CUDA)
+#if !defined(XGBOOST_USE_CUDA) && !defined(XGBOOST_USE_HIP)
 XGB_DLL int XGBoosterPredictFromCUDAArray(BoosterHandle handle, char const *, char const *,
                                           DMatrixHandle, xgboost::bst_ulong const **,
                                           xgboost::bst_ulong *, const float **) {

@@ -18,6 +18,7 @@ void XGBBuildInfoDevice(Json *p_info) {
   auto &info = *p_info;
 
   info["USE_CUDA"] = true;
+  info["USE_HIP"] = true;
 
   std::vector<Json> v{Json{Integer{THRUST_MAJOR_VERSION}}, Json{Integer{THRUST_MINOR_VERSION}},
                       Json{Integer{THRUST_SUBMINOR_VERSION}}};
@@ -28,10 +29,12 @@ void XGBBuildInfoDevice(Json *p_info) {
 
 #if defined(XGBOOST_USE_NCCL)
   info["USE_NCCL"] = Boolean{true};
+  info["USE_RCCL"] = Boolean{true};
   v = {Json{Integer{NCCL_MAJOR}}, Json{Integer{NCCL_MINOR}}, Json{Integer{NCCL_PATCH}}};
   info["NCCL_VERSION"] = v;
 #else
   info["USE_NCCL"] = Boolean{false};
+  info["USE_RCCL"] = Boolean{false};
 #endif
 
 #if defined(XGBOOST_USE_RMM)
