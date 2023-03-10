@@ -4,27 +4,54 @@
 #include <thrust/sort.h>
 
 #include <cstdint>                     // std::int32_t
+
+#if defined(XGBOST_USE_CUDA)
 #include <cub/cub.cuh>                 // NOLINT
+#elif defined(XGBOST_USE_HIP)
+#include <hipcub/hipcub.hpp>           // NOLINT
+#endif
 
 #include "../common/cuda_context.cuh"  // CUDAContext
+
+#if defined(XGBOST_USE_CUDA)
 #include "../common/device_helpers.cuh"
+#elif defined(XGBOST_USE_HIP)
+#include "../common/device_helpers.hip.h"
+#endif
+
 #include "../common/stats.cuh"
 #include "adaptive.h"
 #include "xgboost/context.h"
 
 namespace xgboost {
+
+#if defined(XGBOST_USE_HIP)
+namespace cub = hipcub;
+#endif
+
 namespace obj {
 namespace detail {
 void EncodeTreeLeafDevice(Context const* ctx, common::Span<bst_node_t const> position,
                           dh::device_vector<size_t>* p_ridx, HostDeviceVector<size_t>* p_nptr,
                           HostDeviceVector<bst_node_t>* p_nidx, RegTree const& tree) {
   // copy position to buffer
+#if defined(XGBOST_USE_CUDA)
   dh::safe_cuda(cudaSetDevice(ctx->gpu_id));
+#elif defined(XGBOST_USE_HIP)
+  dh::safe_cuda(hipSetDevice(ctx->gpu_id));
+#endif
+
   auto cuctx = ctx->CUDACtx();
   size_t n_samples = position.size();
   dh::device_vector<bst_node_t> sorted_position(position.size());
+
+#if defined(XGBOST_USE_CUDA)
   dh::safe_cuda(cudaMemcpyAsync(sorted_position.data().get(), position.data(),
                                 position.size_bytes(), cudaMemcpyDeviceToDevice, cuctx->Stream()));
+#elif defined(XGBOST_USE_HIP)
+  dh::safe_cuda(hipMemcpyAsync(sorted_position.data().get(), position.data(),
+                                position.size_bytes(), hipMemcpyDeviceToDevice, cuctx->Stream()));
+#endif
 
   p_ridx->resize(position.size());
   dh::Iota(dh::ToSpan(*p_ridx));
@@ -76,10 +103,18 @@ void EncodeTreeLeafDevice(Context const* ctx, common::Span<bst_node_t const> pos
   // flag for whether there's ignored position
   bst_node_t* h_first_unique =
       reinterpret_cast<bst_node_t*>(pinned.subspan(sizeof(size_t), sizeof(bst_node_t)).data());
+
+#if defined(XGBOST_USE_CUDA)
   dh::safe_cuda(cudaMemcpyAsync(h_num_runs, d_num_runs_out.data(), sizeof(size_t),
                                 cudaMemcpyDeviceToHost, copy_stream.View()));
   dh::safe_cuda(cudaMemcpyAsync(h_first_unique, d_unique_out.data(), sizeof(bst_node_t),
                                 cudaMemcpyDeviceToHost, copy_stream.View()));
+#elif defined(XGBOST_USE_HIP)
+  dh::safe_cuda(hipMemcpyAsync(h_num_runs, d_num_runs_out.data(), sizeof(size_t),
+                                hipMemcpyDeviceToHost, copy_stream.View()));
+  dh::safe_cuda(hipMemcpyAsync(h_first_unique, d_unique_out.data(), sizeof(bst_node_t),
+                                hipMemcpyDeviceToHost, copy_stream.View()));
+#endif
 
   /**
    * copy node index (leaf index)
@@ -142,7 +177,12 @@ void EncodeTreeLeafDevice(Context const* ctx, common::Span<bst_node_t const> pos
 void UpdateTreeLeafDevice(Context const* ctx, common::Span<bst_node_t const> position,
                           std::int32_t group_idx, MetaInfo const& info, float learning_rate,
                           HostDeviceVector<float> const& predt, float alpha, RegTree* p_tree) {
+#if defined(XGBOST_USE_CUDA)
   dh::safe_cuda(cudaSetDevice(ctx->gpu_id));
+#elif defined(XGBOST_USE_HIP)
+  dh::safe_cuda(hipSetDevice(ctx->gpu_id));
+#endif
+
   dh::device_vector<size_t> ridx;
   HostDeviceVector<size_t> nptr;
   HostDeviceVector<bst_node_t> nidx;
