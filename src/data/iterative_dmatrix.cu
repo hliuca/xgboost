@@ -44,7 +44,13 @@ void IterativeDMatrix::InitFromCUDA(DataIterHandle iter_handle, float missing,
   bst_feature_t cols = 0;
 
   int32_t current_device;
+
+#if defined(XGBOOST_USE_CUDA)
   dh::safe_cuda(cudaGetDevice(&current_device));
+#elif defined(XGBOOST_USE_HIP)
+  dh::safe_cuda(hipGetDevice(&current_device));
+#endif
+
   auto get_device = [&]() -> int32_t {
     int32_t d = (ctx_.gpu_id == Context::kCpuId) ? current_device : ctx_.gpu_id;
     CHECK_NE(d, Context::kCpuId);
@@ -59,7 +65,13 @@ void IterativeDMatrix::InitFromCUDA(DataIterHandle iter_handle, float missing,
     // We use do while here as the first batch is fetched in ctor
     ctx_.gpu_id = proxy->DeviceIdx();
     CHECK_LT(ctx_.gpu_id, common::AllVisibleGPUs());
+
+#if defined(XGBOOST_USE_CUDA)
     dh::safe_cuda(cudaSetDevice(get_device()));
+#elif defined(XGBOOST_USE_HIP)
+    dh::safe_cuda(hipSetDevice(get_device()));
+#endif
+
     if (cols == 0) {
       cols = num_cols();
       collective::Allreduce<collective::Operation::kMax>(&cols, 1);
@@ -83,7 +95,13 @@ void IterativeDMatrix::InitFromCUDA(DataIterHandle iter_handle, float missing,
     row_stride = std::max(row_stride, Dispatch(proxy, [=](auto const& value) {
                             return GetRowCounts(value, row_counts_span, get_device(), missing);
                           }));
+
+#if defined(XGBOOST_USE_CUDA)
     nnz += thrust::reduce(thrust::cuda::par(alloc), row_counts.begin(), row_counts.end());
+#elif defined(XGBOOST_USE_HIP)
+    nnz += thrust::reduce(thrust::hip::par(alloc), row_counts.begin(), row_counts.end());
+#endif
+
     batches++;
   } while (iter.Next());
   iter.Reset();
@@ -91,7 +109,12 @@ void IterativeDMatrix::InitFromCUDA(DataIterHandle iter_handle, float missing,
   auto n_features = cols;
   CHECK_GE(n_features, 1) << "Data must has at least 1 column.";
 
+#if defined(XGBOOST_USE_CUDA)
   dh::safe_cuda(cudaSetDevice(get_device()));
+#elif defined(XGBOOST_USE_HIP)
+  dh::safe_cuda(hipSetDevice(get_device()));
+#endif
+
   if (!ref) {
     HostDeviceVector<FeatureType> ft;
     common::SketchContainer final_sketch(
@@ -130,7 +153,13 @@ void IterativeDMatrix::InitFromCUDA(DataIterHandle iter_handle, float missing,
   size_t n_batches_for_verification = 0;
   while (iter.Next()) {
     init_page();
+
+#if defined(XGBOOST_USE_CUDA)
     dh::safe_cuda(cudaSetDevice(get_device()));
+#elif defined(XGBOOST_USE_HIP)
+    dh::safe_cuda(hipSetDevice(get_device()));
+#endif
+
     auto rows = num_rows();
     dh::caching_device_vector<size_t> row_counts(rows + 1, 0);
     common::Span<size_t> row_counts_span(row_counts.data().get(), row_counts.size());

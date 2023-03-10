@@ -5,7 +5,13 @@
 
 #include "xgboost/span.h"
 #include "xgboost/data.h"
+
+#if defined(XGBOOST_USE_CUDA)
 #include "device_helpers.cuh"
+#elif defined(XGBOOST_USE_HIP)
+#include "device_helpers.hip.h"
+#endif
+
 #include "quantile.h"
 #include "timer.h"
 #include "categorical.h"
