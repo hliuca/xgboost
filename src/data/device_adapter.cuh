@@ -9,7 +9,12 @@
 #include <memory>
 #include <string>
 
+#if defined(XGBOOST_USE_CUDA)
 #include "../common/device_helpers.cuh"
+#elif defined(XGBOOST_USE_HIP)
+#include "../common/device_helpers.hip.h"
+#endif
+
 #include "../common/math.h"
 #include "adapter.h"
 #include "array_interface.h"
@@ -114,7 +119,7 @@ class CudfAdapter : public detail::SingleBatchDataIter<CudfAdapterBatch> {
 
 #if defined(XGBOOST_USE_HIP)
     dh::safe_cuda(hipSetDevice(device_idx_));
-#else
+#elif defined(XGBOOST_USE_CUDA)
     dh::safe_cuda(cudaSetDevice(device_idx_));
 #endif
 
@@ -204,7 +209,7 @@ size_t GetRowCounts(const AdapterBatchT batch, common::Span<size_t> offset,
 
 #if defined(XGBOOST_USE_HIP)
   dh::safe_cuda(hipSetDevice(device_idx));
-#else
+#elif defined(XGBOOST_USE_CUDA)
   dh::safe_cuda(cudaSetDevice(device_idx));
 #endif
 
@@ -222,10 +227,11 @@ size_t GetRowCounts(const AdapterBatchT batch, common::Span<size_t> offset,
   dh::XGBCachingDeviceAllocator<char> alloc;
 
 #if defined(XGBOOST_USE_HIP)
+  size_t row_stride =
       dh::Reduce(thrust::hip::par(alloc), thrust::device_pointer_cast(offset.data()),
                  thrust::device_pointer_cast(offset.data()) + offset.size(),
                  static_cast<std::size_t>(0), thrust::maximum<size_t>());
-#else
+#elif defined(XGBOOST_USE_CUDA)
   size_t row_stride =
       dh::Reduce(thrust::cuda::par(alloc), thrust::device_pointer_cast(offset.data()),
                  thrust::device_pointer_cast(offset.data()) + offset.size(),
