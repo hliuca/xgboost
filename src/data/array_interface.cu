@@ -23,7 +23,11 @@ void ArrayInterfaceHandler::SyncCudaStream(int64_t stream) {
     case 2:
       // default per-thread stream
     default:
+#if defined(XGBOOST_USE_CUDA)
       dh::safe_cuda(cudaStreamSynchronize(reinterpret_cast<cudaStream_t>(stream)));
+#elif defined(XGBOOST_USE_HIP)
+      dh::safe_cuda(hipStreamSynchronize(reinterpret_cast<hipStream_t>(stream)));
+#endif
   }
 }
 
@@ -50,12 +54,12 @@ bool ArrayInterfaceHandler::IsCudaPtr(void const* ptr) {
         return true;
     }
     return true;
-#elif defined(XGBOOST_USE_HIP)
-    return false;
-#endif
   } else {
     // other errors, `cudaErrorNoDevice`, `cudaErrorInsufficientDriver` etc.
     return false;
   }
+#elif defined(XGBOOST_USE_HIP)
+  return false;
+#endif
 }
 }  // namespace xgboost
