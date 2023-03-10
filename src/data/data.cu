@@ -35,7 +35,11 @@ auto SetDeviceToPtr(void const* ptr) {
   dh::safe_cuda(cudaSetDevice(ptr_device));
   return ptr_device;
 #elif defined(XGBOOST_USE_HIP) /* this is wrong, need to figure out */
-  return 0;
+  hipPointerAttribute_t attr;
+  dh::safe_cuda(hipPointerGetAttributes(&attr, ptr));
+  int32_t ptr_device = attr.device;
+  dh::safe_cuda(hipSetDevice(ptr_device));
+  return ptr_device;
 #endif
 }
 

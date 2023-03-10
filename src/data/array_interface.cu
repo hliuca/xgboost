@@ -59,7 +59,24 @@ bool ArrayInterfaceHandler::IsCudaPtr(void const* ptr) {
     return false;
   }
 #elif defined(XGBOOST_USE_HIP)
-  return false;
+  hipPointerAttribute_t attr;
+  auto err = hipPointerGetAttributes(&attr, ptr);
+  // reset error
+  CHECK_EQ(err, hipGetLastError());
+  if (err == hipErrorInvalidValue) {
+    return false;
+  } else if (err == hipSuccess) {
+    switch (attr.memoryType) {
+      case hipMemoryTypeUnified:
+      case hipMemoryTypeHost:
+        return false;
+      default:
+        return true;
+    }
+    return true;
+  } else {
+    return false;
+  }
 #endif
 }
 }  // namespace xgboost
