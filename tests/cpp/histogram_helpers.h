@@ -1,9 +1,9 @@
-#if defined(__CUDACC__)
+#if defined(__CUDACC__) || defined(__HIP_PLATFORM_AMD__)
 #include "../../src/data/ellpack_page.cuh"
 #endif
 
 namespace xgboost {
-#if defined(__CUDACC__)
+#if defined(__CUDACC__) || defined(__HIP_PLATFORM_AMD__)
 namespace {
 class HistogramCutsWrapper : public common::HistogramCuts {
  public:

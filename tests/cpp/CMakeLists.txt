@@ -14,6 +14,11 @@ if (USE_CUDA)
 endif (USE_CUDA)
 
 if (USE_HIP)
+  file(GLOB_RECURSE HIP_TEST_SOURCES "*.hip")
+  list(APPEND TEST_SOURCES ${HIP_TEST_SOURCES})
+endif (USE_HIP)
+
+if (USE_HIP)
   file(GLOB_RECURSE HIP_TEST_SOURCES "*.cu")
   list(APPEND TEST_SOURCES ${HIP_TEST_SOURCES})
 endif (USE_HIP)
@@ -37,6 +42,11 @@ if (USE_CUDA AND PLUGIN_RMM)
   find_package(CUDA)
   target_include_directories(testxgboost PRIVATE ${CUDA_INCLUDE_DIRS})
 endif (USE_CUDA AND PLUGIN_RMM)
+
+if (USE_HIP AND PLUGIN_RMM)
+  find_package(HIP)
+  target_include_directories(testxgboost PRIVATE ${HIP_INCLUDE_DIRS})
+endif (USE_HIP AND PLUGIN_RMM)
 
 if (USE_HIP AND PLUGIN_RMM)
   find_package(HIP)

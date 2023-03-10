@@ -116,9 +116,9 @@ TEST_F(TestL1MultiTarget, Exact) { this->RunTest("exact"); }
 
 TEST_F(TestL1MultiTarget, Approx) { this->RunTest("approx"); }
 
-#if defined(XGBOOST_USE_CUDA)
+#if defined(XGBOOST_USE_CUDA) || defined(XGBOOST_USE_HIP)
 TEST_F(TestL1MultiTarget, GpuHist) { this->RunTest("gpu_hist"); }
-#endif  // defined(XGBOOST_USE_CUDA)
+#endif  // defined(XGBOOST_USE_CUDA) || defined(XGBOOST_USE_HIP)
 
 TEST(MultiStrategy, Configure) {
   auto p_fmat = RandomDataGenerator{12ul, 3ul, 0.0}.GenerateDMatrix();

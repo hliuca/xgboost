@@ -26,13 +26,13 @@
 #include "filesystem.h"  // dmlc::TemporaryDirectory
 #include "xgboost/linalg.h"
 
-#if defined(__CUDACC__)
+#if defined(__CUDACC__) || defined(__HIP_PLATFORM_AMD__)
 #define DeclareUnifiedTest(name) GPU ## name
 #else
 #define DeclareUnifiedTest(name) name
 #endif
 
-#if defined(__CUDACC__)
+#if defined(__CUDACC__) || defined(__HIP_PLATFORM_AMD__)
 #define GPUIDX 0
 #else
 #define GPUIDX -1
@@ -294,7 +294,7 @@ class RandomDataGenerator {
 
   std::shared_ptr<DMatrix> GenerateDMatrix(bool with_label = false, bool float_label = true,
                                            size_t classes = 1) const;
-#if defined(XGBOOST_USE_CUDA)
+#if defined(XGBOOST_USE_CUDA) || defined(XGBOOST_USE_HIP)
   std::shared_ptr<DMatrix> GenerateDeviceDMatrix();
 #endif
   std::shared_ptr<DMatrix> GenerateQuantileDMatrix();

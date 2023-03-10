@@ -146,7 +146,11 @@ TEST(GpuPredictor, LesserFeatures) {
 
 // Very basic test of empty model
 TEST(GPUPredictor, ShapStump) {
+#if defined(XGBOOST_USE_CUDA)
   cudaSetDevice(0);
+#elif defined(XGBOOST_USE_HIP)
+  hipSetDevice(0);
+#endif
 
   Context ctx;
   ctx.gpu_id = 0;

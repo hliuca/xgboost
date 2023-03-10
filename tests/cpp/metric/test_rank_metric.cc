@@ -3,7 +3,7 @@
 
 #include "../helpers.h"
 
-#if !defined(__CUDACC__)
+#if !defined(__CUDACC__) && !defined(__HIP_PLATFORM_AMD__)
 TEST(Metric, AMS) {
   auto ctx = xgboost::CreateEmptyGenericParam(GPUIDX);
   EXPECT_ANY_THROW(xgboost::Metric::Create("ams", &ctx));

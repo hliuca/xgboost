@@ -170,7 +170,7 @@ void TestPredictionWithLesserFeatures(std::string predictor_name) {
   auto m_invalid = RandomDataGenerator(kRows, kTrainCols + 1, 0.5).GenerateDMatrix(false);
   ASSERT_THROW({learner->Predict(m_invalid, false, &prediction, 0, 0);}, dmlc::Error);
 
-#if defined(XGBOOST_USE_CUDA)
+#if defined(XGBOOST_USE_CUDA) || defined(XGBOOST_USE_HIP)
   HostDeviceVector<float> from_cpu;
   learner->SetParam("predictor", "cpu_predictor");
   learner->Predict(m_test, false, &from_cpu, 0, 0);
@@ -184,7 +184,7 @@ void TestPredictionWithLesserFeatures(std::string predictor_name) {
   for (size_t i = 0; i < h_cpu.size(); ++i) {
     ASSERT_NEAR(h_cpu[i], h_gpu[i], kRtEps);
   }
-#endif  // defined(XGBOOST_USE_CUDA)
+#endif  // defined(XGBOOST_USE_CUDA) || defined(XGBOOST_USE_HIP)
 }
 
 void GBTreeModelForTest(gbm::GBTreeModel *model, uint32_t split_ind,
