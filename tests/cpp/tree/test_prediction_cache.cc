@@ -106,7 +106,7 @@ TEST_F(TestPredictionCache, Approx) { this->RunTest("grow_histmaker"); }
 
 TEST_F(TestPredictionCache, Hist) { this->RunTest("grow_quantile_histmaker"); }
 
-#if defined(XGBOOST_USE_CUDA)
+#if defined(XGBOOST_USE_CUDA) || defined(XGBOOST_USE_HIP)
 TEST_F(TestPredictionCache, GpuHist) { this->RunTest("grow_gpu_hist"); }
-#endif  // defined(XGBOOST_USE_CUDA)
+#endif  // defined(XGBOOST_USE_CUDA) || defined(XGBOOST_USE_HIP)
 }  // namespace xgboost

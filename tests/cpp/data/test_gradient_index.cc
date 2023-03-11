@@ -133,7 +133,7 @@ TEST(GradientIndex, PushBatch) {
   test(0.9f);
 }
 
-#if defined(XGBOOST_USE_CUDA)
+#if defined(XGBOOST_USE_CUDA) || defined(XGBOOST_USE_HIP)
 
 namespace {
 class GHistIndexMatrixTest : public testing::TestWithParam<std::tuple<float, float>> {
@@ -207,6 +207,6 @@ INSTANTIATE_TEST_SUITE_P(GHistIndexMatrix, GHistIndexMatrixTest,
                                          std::make_tuple(.5f, .6),    // sparse columns
                                          std::make_tuple(.6f, .4)));  // dense columns
 
-#endif  // defined(XGBOOST_USE_CUDA)
+#endif  // defined(XGBOOST_USE_CUDA) || defined(XGBOOST_USE_HIP)
 }  // namespace data
 }  // namespace xgboost

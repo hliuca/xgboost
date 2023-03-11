@@ -40,9 +40,15 @@ void TestDeterministicHistogram(bool is_dense, int shm_size) {
                            quantiser);
 
     std::vector<GradientPairInt64> histogram_h(num_bins);
+#if defined(XGBOOST_USE_CUDA)
     dh::safe_cuda(cudaMemcpy(histogram_h.data(), d_histogram.data(),
                              num_bins * sizeof(GradientPairInt64),
                              cudaMemcpyDeviceToHost));
+#elif defined(XGBOOST_USE_HIP)
+    dh::safe_cuda(hipMemcpy(histogram_h.data(), d_histogram.data(),
+                             num_bins * sizeof(GradientPairInt64),
+                             hipMemcpyDeviceToHost));
+#endif
 
     for (size_t i = 0; i < kRounds; ++i) {
       dh::device_vector<GradientPairInt64> new_histogram(num_bins);
@@ -54,9 +60,15 @@ void TestDeterministicHistogram(bool is_dense, int shm_size) {
                              d_new_histogram, quantiser);
 
       std::vector<GradientPairInt64> new_histogram_h(num_bins);
+#if defined(XGBOOST_USE_CUDA)
       dh::safe_cuda(cudaMemcpy(new_histogram_h.data(), d_new_histogram.data(),
                                num_bins * sizeof(GradientPairInt64),
                                cudaMemcpyDeviceToHost));
+#elif defined(XGBOOST_USE_HIP)
+      dh::safe_cuda(hipMemcpy(new_histogram_h.data(), d_new_histogram.data(),
+                               num_bins * sizeof(GradientPairInt64),
+                               hipMemcpyDeviceToHost));
+#endif
       for (size_t j = 0; j < new_histogram_h.size(); ++j) {
         ASSERT_EQ(new_histogram_h[j].GetQuantisedGrad(), histogram_h[j].GetQuantisedGrad());
         ASSERT_EQ(new_histogram_h[j].GetQuantisedHess(), histogram_h[j].GetQuantisedHess());
@@ -76,9 +88,15 @@ void TestDeterministicHistogram(bool is_dense, int shm_size) {
                              dh::ToSpan(baseline), quantiser);
 
       std::vector<GradientPairInt64> baseline_h(num_bins);
+#if defined(XGBOOST_USE_CUDA)
       dh::safe_cuda(cudaMemcpy(baseline_h.data(), baseline.data().get(),
                                num_bins * sizeof(GradientPairInt64),
                                cudaMemcpyDeviceToHost));
+#elif defined(XGBOOST_USE_HIP)
+      dh::safe_cuda(hipMemcpy(baseline_h.data(), baseline.data().get(),
+                               num_bins * sizeof(GradientPairInt64),
+                               hipMemcpyDeviceToHost));
+#endif
 
       for (size_t i = 0; i < baseline.size(); ++i) {
         EXPECT_NEAR(baseline_h[i].GetQuantisedGrad(), histogram_h[i].GetQuantisedGrad(),

@@ -6,7 +6,12 @@
 #include <xgboost/data.h>
 #include <xgboost/json.h>
 
+#if defined(XGBOOST_USE_CUDA)
 #include "../../../src/common/device_helpers.cuh"
+#elif defined(XGBOOST_USE_HIP)
+#include "../../../src/common/device_helpers.hip.h"
+#endif
+
 #include "test_array_interface.h"
 #include "test_metainfo.h"
 
@@ -43,7 +48,12 @@ std::string PrepareData(std::string typestr, thrust::device_vector<T>* out, cons
 }
 
 TEST(MetaInfo, FromInterface) {
+#if defined(XGBOOST_USE_CUDA)
   cudaSetDevice(0);
+#elif defined(XGBOOST_USE_HIP)
+  hipSetDevice(0);
+#endif
+
   Context ctx;
   thrust::device_vector<float> d_data;
 
@@ -87,7 +97,12 @@ TEST(MetaInfo, GPUStridedData) {
 }
 
 TEST(MetaInfo, Group) {
+#if defined(XGBOOST_USE_CUDA)
   cudaSetDevice(0);
+#elif defined(XGBOOST_USE_HIP)
+  hipSetDevice(0);
+#endif
+
   MetaInfo info;
   Context ctx;
 
@@ -141,7 +156,12 @@ TEST(MetaInfo, GPUQid) {
 
 
 TEST(MetaInfo, DeviceExtend) {
+#if defined(XGBOOST_USE_CUDA)
   dh::safe_cuda(cudaSetDevice(0));
+#elif defined(XGBOOST_USE_HIP)
+  dh::safe_cuda(hipSetDevice(0));
+#endif
+
   size_t const kRows = 100;
   MetaInfo lhs, rhs;
   Context ctx;

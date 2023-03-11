@@ -3,7 +3,13 @@
 #include "../../../src/data/simple_dmatrix.h"
 
 #include <thrust/sequence.h>
+
+#if defined(XGBOOST_USE_CUDA)
 #include "../../../src/data/device_adapter.cuh"
+#elif defined(XGBOOST_USE_HIP)
+#include "../../../src/data/device_adapter.hip.h"
+#endif
+
 #include "../helpers.h"
 #include "test_array_interface.h"
 #include "../../../src/data/array_interface.h"
@@ -109,8 +115,14 @@ TEST(SimpleDMatrix, FromColumnarWithEmptyRows) {
     auto& data = columns_data[i];
     data.resize(kRows);
     thrust::sequence(data.begin(), data.end(), 0);
+
+#if defined(XGBOOST_USE_CUDA)
     dh::safe_cuda(cudaDeviceSynchronize());
     dh::safe_cuda(cudaGetLastError());
+#elif defined(XGBOOST_USE_HIP)
+    dh::safe_cuda(hipDeviceSynchronize());
+    dh::safe_cuda(hipGetLastError());
+#endif
 
     ASSERT_EQ(data.size(), kRows);
 

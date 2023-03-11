@@ -146,12 +146,12 @@ TEST_F(TestGrowPolicy, Hist) {
   this->TestCombination("hist");
 }
 
-#if defined(XGBOOST_USE_CUDA)
+#if defined(XGBOOST_USE_CUDA) || defined(XGBOOST_USE_HIP)
 TEST_F(TestGrowPolicy, GpuHist) {
   this->TestTreeGrowPolicy("gpu_hist", "depthwise");
   this->TestTreeGrowPolicy("gpu_hist", "lossguide");
 
   this->TestCombination("gpu_hist");
 }
-#endif  // defined(XGBOOST_USE_CUDA)
+#endif  // defined(XGBOOST_USE_CUDA) || defined(XGBOOST_USE_HIP)
 }  // namespace xgboost

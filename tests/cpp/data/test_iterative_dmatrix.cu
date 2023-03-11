@@ -3,7 +3,12 @@
  */
 #include <gtest/gtest.h>
 
+#if defined(XGBOOST_USE_CUDA)
 #include "../../../src/data/device_adapter.cuh"
+#elif defined(XGBOOST_USE_HIP)
+#include "../../../src/data/device_adapter.hip.h"
+#endif
+
 #include "../../../src/data/ellpack_page.cuh"
 #include "../../../src/data/iterative_dmatrix.h"
 #include "../helpers.h"

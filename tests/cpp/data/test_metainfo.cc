@@ -258,7 +258,7 @@ TEST(MetaInfo, Validate) {
   EXPECT_THROW(info.SetInfo(ctx, "group", groups.data(), xgboost::DataType::kUInt32, groups.size()),
                dmlc::Error);
 
-#if defined(XGBOOST_USE_CUDA)
+#if defined(XGBOOST_USE_CUDA) || defined(XGBOOST_USE_HIP)
   info.group_ptr_.clear();
   labels.resize(info.num_row_);
   info.SetInfo(ctx, "label", labels.data(), xgboost::DataType::kFloat32, info.num_row_);
@@ -271,7 +271,7 @@ TEST(MetaInfo, Validate) {
   std::string arr_interface_str{ArrayInterfaceStr(
       xgboost::linalg::MakeVec(d_groups.ConstDevicePointer(), d_groups.Size(), 0))};
   EXPECT_THROW(info.SetInfo(ctx, "group", xgboost::StringView{arr_interface_str}), dmlc::Error);
-#endif  // defined(XGBOOST_USE_CUDA)
+#endif  // defined(XGBOOST_USE_CUDA) || defined(XGBOOST_USE_HIP)
 }
 
 TEST(MetaInfo, HostExtend) {

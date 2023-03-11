@@ -52,9 +52,9 @@ class UpdaterTreeStatTest : public ::testing::Test {
   }
 };
 
-#if defined(XGBOOST_USE_CUDA)
+#if defined(XGBOOST_USE_CUDA) || defined(XGBOOST_USE_HIP)
 TEST_F(UpdaterTreeStatTest, GpuHist) { this->RunTest("grow_gpu_hist"); }
-#endif  // defined(XGBOOST_USE_CUDA)
+#endif  // defined(XGBOOST_USE_CUDA) || defined(XGBOOST_USE_HIP)
 
 TEST_F(UpdaterTreeStatTest, Hist) { this->RunTest("grow_quantile_histmaker"); }
 
@@ -124,9 +124,9 @@ TEST_F(UpdaterEtaTest, Exact) { this->RunTest("grow_colmaker"); }
 
 TEST_F(UpdaterEtaTest, Approx) { this->RunTest("grow_histmaker"); }
 
-#if defined(XGBOOST_USE_CUDA)
+#if defined(XGBOOST_USE_CUDA) || defined(XGBOOST_USE_HIP)
 TEST_F(UpdaterEtaTest, GpuHist) { this->RunTest("grow_gpu_hist"); }
-#endif  // defined(XGBOOST_USE_CUDA)
+#endif  // defined(XGBOOST_USE_CUDA) || defined(XGBOOST_USE_HIP)
 
 class TestMinSplitLoss : public ::testing::Test {
   std::shared_ptr<DMatrix> dmat_;
@@ -194,7 +194,7 @@ class TestMinSplitLoss : public ::testing::Test {
 TEST_F(TestMinSplitLoss, Approx) { this->RunTest("grow_histmaker"); }
 
 TEST_F(TestMinSplitLoss, Hist) { this->RunTest("grow_quantile_histmaker"); }
-#if defined(XGBOOST_USE_CUDA)
+#if defined(XGBOOST_USE_CUDA) || defined(XGBOOST_USE_HIP)
 TEST_F(TestMinSplitLoss, GpuHist) { this->RunTest("grow_gpu_hist"); }
-#endif  // defined(XGBOOST_USE_CUDA)
+#endif  // defined(XGBOOST_USE_CUDA) || defined(XGBOOST_USE_HIP)
 }  // namespace xgboost

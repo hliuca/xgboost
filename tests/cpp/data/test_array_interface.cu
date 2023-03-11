@@ -22,8 +22,13 @@ TEST(ArrayInterface, Stream) {
   HostDeviceVector<float> storage;
   auto arr_str = RandomDataGenerator{kRows, kCols, 0}.GenerateArrayInterface(&storage);
 
+#if defined(XGBOOST_USE_CUDA)
   cudaStream_t stream;
   cudaStreamCreate(&stream);
+#elif defined(XGBOOST_USE_HIP)
+  hipStream_t stream;
+  hipStreamCreate(&stream);
+#endif
 
   auto j_arr =Json::Load(StringView{arr_str});
   j_arr["stream"] = Integer(reinterpret_cast<int64_t>(stream));
@@ -37,19 +42,35 @@ TEST(ArrayInterface, Stream) {
   auto t = out[0];
   CHECK_GE(t, dur);
 
+#if defined(XGBOOST_USE_CUDA)
   cudaStreamDestroy(stream);
+#elif defined(XGBOOST_USE_HIP)
+  hipStreamDestroy(stream);
+#endif
 }
 
 TEST(ArrayInterface, Ptr) {
   std::vector<float> h_data(10);
   ASSERT_FALSE(ArrayInterfaceHandler::IsCudaPtr(h_data.data()));
+#if defined(XGBOOST_USE_CUDA)
   dh::safe_cuda(cudaGetLastError());
+#elif defined(XGBOOST_USE_HIP)
+  dh::safe_cuda(hipGetLastError());
+#endif
 
   dh::device_vector<float> d_data(10);
   ASSERT_TRUE(ArrayInterfaceHandler::IsCudaPtr(d_data.data().get()));
+#if defined(XGBOOST_USE_CUDA)
   dh::safe_cuda(cudaGetLastError());
+#elif defined(XGBOOST_USE_HIP)
+  dh::safe_cuda(hipGetLastError());
+#endif
 
   ASSERT_FALSE(ArrayInterfaceHandler::IsCudaPtr(nullptr));
+#if defined(XGBOOST_USE_CUDA)
   dh::safe_cuda(cudaGetLastError());
+#elif defined(XGBOOST_USE_HIP)
+  dh::safe_cuda(hipGetLastError());
+#endif
 }
 }  // namespace xgboost

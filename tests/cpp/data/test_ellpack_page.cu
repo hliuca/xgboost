@@ -223,7 +223,11 @@ TEST(EllpackPage, Compact) {
 
       dh::LaunchN(kCols, ReadRowFunction(impl->GetDeviceAccessor(0),
                                          current_row, row_d.data().get()));
+#if defined(XGBOOST_USE_CUDA)
       dh::safe_cuda(cudaDeviceSynchronize());
+#elif defined(XGBOOST_USE_HIP)
+      dh::safe_cuda(hipDeviceSynchronize());
+#endif
       thrust::copy(row_d.begin(), row_d.end(), row.begin());
 
       dh::LaunchN(kCols,

@@ -37,12 +37,12 @@ TEST(InitEstimation, FitStump) {
   TestFitStump(&ctx);
 }
 
-#if defined(XGBOOST_USE_CUDA)
+#if defined(XGBOOST_USE_CUDA) || defined(XGBOOST_USE_HIP)
 TEST(InitEstimation, GPUFitStump) {
   Context ctx;
   ctx.UpdateAllowUnknown(Args{{"gpu_id", "0"}});
   TestFitStump(&ctx);
 }
-#endif  // defined(XGBOOST_USE_CUDA)
+#endif  // defined(XGBOOST_USE_CUDA) || defined(XGBOOST_USE_HIP)
 }  // namespace tree
 }  // namespace xgboost
