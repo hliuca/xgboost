@@ -1386,5 +1386,5 @@ class LDGIterator {
 }  // namespace dh
 
 #elif defined(XGBOOST_USE_HIP)
-#include" device_helpers.hip.h"
+#include "device_helpers.hip.h"
 #endif
