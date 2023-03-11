@@ -278,7 +278,7 @@ TEST(Objective, DeclareUnifiedTest(TweedieRegressionGPair)) {
   ASSERT_EQ(obj->DefaultEvalMetric(), std::string{"tweedie-nloglik@1.1"});
 }
 
-#if defined(__CUDACC__)
+#if defined(__CUDACC__) || defined(__HIP_PLATFORM_AMD__)
 TEST(Objective, CPU_vs_CUDA) {
   Context ctx = CreateEmptyGenericParam(GPUIDX);
 
@@ -358,7 +358,7 @@ TEST(Objective, DeclareUnifiedTest(TweedieRegressionBasic)) {
 }
 
 // CoxRegression not implemented in GPU code, no need for testing.
-#if !defined(__CUDACC__)
+#if !defined(__CUDACC__) && !defined(__HIP_PLATFORM_AMD__)
 TEST(Objective, CoxRegressionGPair) {
   Context ctx = CreateEmptyGenericParam(GPUIDX);
   std::vector<std::pair<std::string, std::string>> args;
