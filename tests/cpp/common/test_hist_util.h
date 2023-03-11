@@ -15,13 +15,10 @@
 #include "../filesystem.h"  // dmlc::TemporaryDirectory
 #include "../helpers.h"
 
-#ifdef __CUDACC__
+#if defined(__CUDACC__) || defined(__HIP_PLATFORM_AMD__)
 #include <xgboost/json.h>
 #include "../../../src/data/device_adapter.cuh"
-#elif defined(__HIP_PLATFORM_AMD__)
-#include <xgboost/json.h>
-#include "../../../src/data/device_adapter.hip.h"
-#endif  // __CUDACC__
+#endif  // __CUDACC__, __HIP_PLATFORM_AMD__
 
 // Some helper functions used to test both GPU and CPU algorithms
 //

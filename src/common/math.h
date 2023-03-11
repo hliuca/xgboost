@@ -155,16 +155,20 @@ bool CheckNAN(double v);
 #else
 
 XGBOOST_DEVICE bool inline CheckNAN(float x) {
-#if defined(__CUDA_ARCH__) || defined(__HIP_PLATFORM_AMD__)
+#if defined(__CUDA_ARCH__)
   return isnan(x);
+#elif defined(__HIP_PLATFORM_AMD__)
+  return __builtin_isnan(x);
 #else
   return std::isnan(x);
 #endif  // defined(__CUDA_ARCH__) || defined(__HIP_PLATFORM_AMD__)
 }
 
 XGBOOST_DEVICE bool inline CheckNAN(double x) {
-#if defined(__CUDA_ARCH__) || defined(__HIP_PLATFORM_AMD__)
+#if defined(__CUDA_ARCH__)
   return isnan(x);
+#elif defined(__HIP_PLATFORM_AMD__)
+  return __builtin_isnan(x);
 #else
   return std::isnan(x);
 #endif  // defined(__CUDA_ARCH__) || defined(__HIP_PLATFORM_AMD__)
