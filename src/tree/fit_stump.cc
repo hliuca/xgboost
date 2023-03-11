@@ -61,7 +61,7 @@ inline void FitStump(Context const*, linalg::TensorView<GradientPair const, 2>,
                      linalg::VectorView<float>) {
   common::AssertGPUSupport();
 }
-#endif  // !defined(XGBOOST_USE_CUDA) && !defined(XGBOOST_USE_C
+#endif  // !defined(XGBOOST_USE_CUDA) && !defined(XGBOOST_USE_HIP)
 }  // namespace cuda_impl
 
 void FitStump(Context const* ctx, HostDeviceVector<GradientPair> const& gpair,

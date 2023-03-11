@@ -124,7 +124,7 @@ void SortPositionBatch(common::Span<const PerNodeData<OpDataT>> d_batch_info,
                        dh::device_vector<int8_t>* tmp,
 #if defined(XGBOOST_USE_HIP)
                        hipStream_t stream
-#else
+#elif defined(XGBOOST_USE_CUDA)
                        cudaStream_t stream
 #endif
                        ) {
