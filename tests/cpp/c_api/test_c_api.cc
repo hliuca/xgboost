@@ -364,6 +364,8 @@ TEST(CAPI, BuildInfo) {
   ASSERT_TRUE(get<Object const>(loaded).find("USE_OPENMP") != get<Object const>(loaded).cend());
   ASSERT_TRUE(get<Object const>(loaded).find("USE_CUDA") != get<Object const>(loaded).cend());
   ASSERT_TRUE(get<Object const>(loaded).find("USE_NCCL") != get<Object const>(loaded).cend());
+  ASSERT_TRUE(get<Object const>(loaded).find("USE_HIP") != get<Object const>(loaded).cend());
+  ASSERT_TRUE(get<Object const>(loaded).find("USE_RCCL") != get<Object const>(loaded).cend());
 }
 
 TEST(CAPI, NullPtr) {

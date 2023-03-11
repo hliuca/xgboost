@@ -70,13 +70,13 @@ TEST(Stats, Median) {
     auto m = out(0);
     ASSERT_EQ(m, .5f);
 
-#if defined(XGBOOST_USE_CUDA)
+#if defined(XGBOOST_USE_CUDA) || defined(XGBOOST_USE_HIP)
     ctx.gpu_id = 0;
     ASSERT_FALSE(ctx.IsCPU());
     Median(&ctx, values, weights, &out);
     m = out(0);
     ASSERT_EQ(m, .5f);
-#endif  // defined(XGBOOST_USE_CUDA)
+#endif  // defined(XGBOOST_USE_CUDA) || defined(XGBOOST_USE_HIP)
   }
 
   {
@@ -89,12 +89,12 @@ TEST(Stats, Median) {
     ASSERT_EQ(out(0), .5f);
     ASSERT_EQ(out(1), .5f);
 
-#if defined(XGBOOST_USE_CUDA)
+#if defined(XGBOOST_USE_CUDA) || defined(XGBOOST_USE_HIP)
     ctx.gpu_id = 0;
     Median(&ctx, values, weights, &out);
     ASSERT_EQ(out(0), .5f);
     ASSERT_EQ(out(1), .5f);
-#endif  // defined(XGBOOST_USE_CUDA)
+#endif  // defined(XGBOOST_USE_CUDA) || defined(XGBOOST_USE_HIP)
   }
 }
 
@@ -121,12 +121,12 @@ TEST(Stats, Mean) {
   TestMean(&ctx);
 }
 
-#if defined(XGBOOST_USE_CUDA)
+#if defined(XGBOOST_USE_CUDA) || defined(XGBOOST_USE_HIP)
 TEST(Stats, GPUMean) {
   Context ctx;
   ctx.UpdateAllowUnknown(Args{{"gpu_id", "0"}});
   TestMean(&ctx);
 }
-#endif  // defined(XGBOOST_USE_CUDA)
+#endif  // defined(XGBOOST_USE_CUDA) || defined(XGBOOST_USE_HIP)
 }  // namespace common
 }  // namespace xgboost

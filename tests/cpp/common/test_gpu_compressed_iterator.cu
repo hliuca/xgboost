@@ -32,7 +32,11 @@ struct ReadSymbolFunction {
 };
 
 TEST(CompressedIterator, TestGPU) {
+#if defined(XGBOOST_USE_CUDA)
   dh::safe_cuda(cudaSetDevice(0));
+#elif defined(XGBOOST_USE_HIP)
+  dh::safe_cuda(hipSetDevice(0));
+#endif
   std::vector<int> test_cases = {1, 3, 426, 21, 64, 256, 100000, INT32_MAX};
   int num_elements = 1000;
   int repetitions = 1000;

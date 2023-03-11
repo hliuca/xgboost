@@ -18,6 +18,9 @@
 #ifdef __CUDACC__
 #include <xgboost/json.h>
 #include "../../../src/data/device_adapter.cuh"
+#elif defined(__HIP_PLATFORM_AMD__)
+#include <xgboost/json.h>
+#include "../../../src/data/device_adapter.hip.h"
 #endif  // __CUDACC__
 
 // Some helper functions used to test both GPU and CPU algorithms
@@ -47,7 +50,7 @@ inline std::vector<float> GenerateRandomWeights(int num_rows) {
   return w;
 }
 
-#ifdef __CUDACC__
+#if defined(__CUDACC__) || defined(__HIP_PLATFORM_AMD__)
 inline data::CupyAdapter AdapterFromData(const thrust::device_vector<float> &x,
   int num_rows, int num_columns) {
   Json array_interface{Object()};

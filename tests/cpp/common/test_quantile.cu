@@ -80,7 +80,11 @@ TEST(GPUQuantile, Unique) {
 // if with_error is true, the test tolerates floating point error
 void TestQuantileElemRank(int32_t device, Span<SketchEntry const> in,
                           Span<bst_row_t const> d_columns_ptr, bool with_error = false) {
+#if defined(XGBOOST_USE_CUDA)
   dh::safe_cuda(cudaSetDevice(device));
+#elif defined(XGBOOST_USE_HIP)
+  dh::safe_cuda(hipSetDevice(device));
+#endif
   std::vector<SketchEntry> h_in(in.size());
   dh::CopyDeviceSpanToVector(&h_in, in);
   std::vector<bst_row_t> h_columns_ptr(d_columns_ptr.size());

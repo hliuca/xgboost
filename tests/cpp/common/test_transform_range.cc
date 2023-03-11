@@ -11,7 +11,7 @@
 #include "../../../src/common/transform.h"
 #include "../helpers.h"
 
-#if defined(__CUDACC__)
+#if defined(__CUDACC__) || defined(__HIP_PLATFORM_AMD__)
 
 #define TRANSFORM_GPU 0
 
@@ -53,7 +53,7 @@ TEST(Transform, DeclareUnifiedTest(Basic)) {
   ASSERT_TRUE(std::equal(h_sol.begin(), h_sol.end(), res.begin()));
 }
 
-#if !defined(__CUDACC__)
+#if !defined(__CUDACC__) && !defined(__HIP_PLATFORM_AMD__)
 TEST(TransformDeathTest, Exception) {
   size_t const kSize {16};
   std::vector<bst_float> h_in(kSize);

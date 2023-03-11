@@ -40,13 +40,13 @@ TEST(GBTree, SelectTreeMethod) {
   gbtree.Configure({{"booster", "dart"}, {"tree_method", "hist"}});
   ASSERT_EQ(tparam.updater_seq, "grow_quantile_histmaker");
 
-#ifdef XGBOOST_USE_CUDA
+#if defined(XGBOOST_USE_CUDA) || defined(XGBOOST_USE_HIP)
   ctx.UpdateAllowUnknown(Args{{"gpu_id", "0"}});
   gbtree.Configure({{"tree_method", "gpu_hist"}});
   ASSERT_EQ(tparam.updater_seq, "grow_gpu_hist");
   gbtree.Configure({{"booster", "dart"}, {"tree_method", "gpu_hist"}});
   ASSERT_EQ(tparam.updater_seq, "grow_gpu_hist");
-#endif  // XGBOOST_USE_CUDA
+#endif  // XGBOOST_USE_CUDA, XGBOOST_USE_HIP
 }
 
 TEST(GBTree, PredictionCache) {
@@ -110,7 +110,7 @@ TEST(GBTree, WrongUpdater) {
   ASSERT_THROW(learner->UpdateOneIter(0, p_dmat), dmlc::Error);
 }
 
-#ifdef XGBOOST_USE_CUDA
+#if defined(XGBOOST_USE_CUDA) || defined(XGBOOST_USE_HIP)
 TEST(GBTree, ChoosePredictor) {
   // The test ensures data don't get pulled into device.
   size_t constexpr kRows = 17;
@@ -162,7 +162,7 @@ TEST(GBTree, ChoosePredictor) {
   // data is not pulled back into host
   ASSERT_FALSE(data.HostCanWrite());
 }
-#endif  // XGBOOST_USE_CUDA
+#endif  // XGBOOST_USE_CUDA || XGBOOST_USE_HIP
 
 // Some other parts of test are in `Tree.JsonIO'.
 TEST(GBTree, JsonIO) {
@@ -294,12 +294,12 @@ class Dart : public testing::TestWithParam<char const*> {
 
 TEST_P(Dart, Prediction) { this->Run(GetParam()); }
 
-#if defined(XGBOOST_USE_CUDA)
+#if defined(XGBOOST_USE_CUDA) || defined(XGBOOST_USE_HIP)
 INSTANTIATE_TEST_SUITE_P(PredictorTypes, Dart,
                          testing::Values("auto", "cpu_predictor", "gpu_predictor"));
 #else
 INSTANTIATE_TEST_SUITE_P(PredictorTypes, Dart, testing::Values("auto", "cpu_predictor"));
-#endif  // defined(XGBOOST_USE_CUDA)
+#endif  // defined(XGBOOST_USE_CUDA) || defined(XGBOOST_USE_HIP)
 
 
 std::pair<Json, Json> TestModelSlice(std::string booster) {

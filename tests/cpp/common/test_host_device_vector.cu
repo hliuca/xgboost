@@ -6,7 +6,12 @@
 #include <thrust/equal.h>
 #include <thrust/iterator/counting_iterator.h>
 
+#if defined(XGBOOST_USE_CUDA)
 #include "../../../src/common/device_helpers.cuh"
+#elif defined(XGBOOST_USE_HIP)
+#include "../../../src/common/device_helpers.hip.h"
+#endif
+
 #include <xgboost/host_device_vector.h>
 
 namespace xgboost {
@@ -14,9 +19,16 @@ namespace common {
 namespace {
 void SetDeviceForTest(int device) {
   int n_devices;
+
+#if defined(XGBOOST_USE_CUDA)
   dh::safe_cuda(cudaGetDeviceCount(&n_devices));
   device %= n_devices;
   dh::safe_cuda(cudaSetDevice(device));
+#elif defined(XGBOOST_USE_HIP)
+  dh::safe_cuda(hipGetDeviceCount(&n_devices));
+  device %= n_devices;
+  dh::safe_cuda(hipSetDevice(device));
+#endif
 }
 }  // namespace
 
