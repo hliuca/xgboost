@@ -1282,7 +1282,7 @@ void ArgSort(xgboost::common::Span<U> keys, xgboost::common::Span<IdxT> sorted_i
 #endif
 #endif
 
-    safe_cuda((rocprim::radix_sort_pairs(d_temp_storage,
+    safe_cuda((rocprim::radix_sort_pairs_desc(d_temp_storage,
                     bytes, keys.data(), out.data().get(), sorted_idx.data(), sorted_idx_out.data().get(), sorted_idx.size(), 0,
                     sizeof(KeyT) * 8)));
 
@@ -1300,7 +1300,7 @@ void ArgSort(xgboost::common::Span<U> keys, xgboost::common::Span<IdxT> sorted_i
         sizeof(KeyT) * 8, false, nullptr, false)));
 #endif
 #endif
-   safe_cuda((rocprim::radix_sort_pairs(d_temp_storage,
+   safe_cuda((rocprim::radix_sort_pairs_desc(d_temp_storage,
                     bytes, keys.data(), out.data().get(), sorted_idx.data(), sorted_idx_out.data().get(), sorted_idx.size(), 0,
                     sizeof(KeyT) * 8)));
   }
