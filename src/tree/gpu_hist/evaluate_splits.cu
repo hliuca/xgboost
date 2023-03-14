@@ -11,6 +11,7 @@
 #include "../../common/device_helpers.cuh"
 #elif defined(XGBOOST_USE_HIP)
 #include "../../common/device_helpers.hip.h"
+#include <hip/hip_cooperative_groups.h>
 #endif
 
 #include "../../data/ellpack_page.cuh"
@@ -96,7 +97,11 @@ class EvaluateSplitAgent {
         param(shared_inputs.param), evaluator(evaluator),
         missing(parent_sum - ReduceFeature()) {
     static_assert(
+#if defined(XGBOOST_USE_HIP)
+        kBlockSize == WAVEFRONT_SIZE,
+#elif defined(XGBOOST_USE_CUDA)
         kBlockSize == 32,
+#endif
         "This kernel relies on the assumption block_size == warp_size");
     // There should be no missing value gradients for a dense matrix
     KERNEL_CHECK(!shared_inputs.is_dense || missing.GetQuantisedHess() == 0);
@@ -388,7 +393,11 @@ void GPUHistEvaluator::LaunchEvaluateSplits(
       combined_num_features, DeviceSplitCandidate());
 
   // One block for each feature
+#if defined(XGBOOST_USE_HIP)
+  uint32_t constexpr kBlockThreads = WAVEFRONT_SIZE;
+#elif defined(XGBOOST_USE_CUDA)
   uint32_t constexpr kBlockThreads = 32;
+#endif
   dh::LaunchKernel {static_cast<uint32_t>(combined_num_features), kBlockThreads,
                     0}(
       EvaluateSplitsKernel<kBlockThreads>, max_active_features, d_inputs,
