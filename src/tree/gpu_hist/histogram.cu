@@ -294,7 +294,7 @@ void BuildGradientHistogram(CUDAContext const* ctx, EllpackDeviceAccessor const&
 #if defined(XGBOOST_USE_CUDA)
       dh::safe_cuda(cudaFuncSetAttribute(kernel, cudaFuncAttributeMaxDynamicSharedMemorySize,
                                          max_shared_memory));
-#elif defined(XGBOOST_USE_HIP)
+#elif defined(XGBOOST_USE_HIP) && 0 /* CUDA Only */
       dh::safe_cuda(hipFuncSetAttribute((const void *)kernel, hipFuncAttributeMaxDynamicSharedMemorySize,
                                          max_shared_memory));
 #endif
