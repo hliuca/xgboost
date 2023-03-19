@@ -278,7 +278,11 @@ void BuildGradientHistogram(CUDAContext const* ctx, EllpackDeviceAccessor const&
 #endif
 
   // opt into maximum shared memory for the kernel if necessary
+#if defined(XGBOOST_USE_CUDA)
   size_t max_shared_memory = dh::MaxSharedMemoryOptin(device);
+#elif defined(XGBOOST_USE_HIP)
+  size_t max_shared_memory = dh::MaxSharedMemory(device);
+#endif
 
   size_t smem_size =
       sizeof(GradientPairInt64) * feature_groups.max_group_bins;
