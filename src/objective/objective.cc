@@ -42,7 +42,7 @@ void ObjFunction::InitEstimation(MetaInfo const&, linalg::Tensor<float, 1>* base
 namespace xgboost {
 namespace obj {
 // List of files that will be force linked in static links.
-#if !defined(XGBOOST_USE_CUDA) && !defined(XGBOOST_USE_HIP)
+#if defined(XGBOOST_USE_CUDA) || defined(XGBOOST_USE_HIP)
 DMLC_REGISTRY_LINK_TAG(regression_obj_gpu);
 DMLC_REGISTRY_LINK_TAG(quantile_obj_gpu);
 DMLC_REGISTRY_LINK_TAG(hinge_obj_gpu);

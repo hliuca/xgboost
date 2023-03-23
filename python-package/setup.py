@@ -23,6 +23,8 @@ USER_OPTIONS = {
     "use-cuda": (None, "Build with GPU acceleration.", 0),
     "use-nccl": (None, "Build with NCCL to enable distributed GPU support.", 0),
     "build-with-shared-nccl": (None, "Build with shared NCCL library.", 0),
+    "use-hip": (None, "Build with GPU acceleration.", 0),
+    "use-rccl": (None, "Build with RCCL to enable distributed GPU support.", 0),
     "hide-cxx-symbols": (None, "Hide all C++ symbols during build.", 1),
     "use-hdfs": (None, "Build with HDFS support", 0),
     "use-azure": (None, "Build with AZURE support.", 0),
@@ -65,6 +67,8 @@ def copy_tree(src_dir: str, target_dir: str) -> None:
     inc = os.path.join(src_dir, "include")
     dmlc_core = os.path.join(src_dir, "dmlc-core")
     gputreeshap = os.path.join(src_dir, "gputreeshap")
+    rocgputreeshap = os.path.join(src_dir, "rocgputreeshap")
+    warpprim= os.path.join(src_dir, "warp-primitives")
     rabit = os.path.join(src_dir, "rabit")
     cmake = os.path.join(src_dir, "cmake")
     plugin = os.path.join(src_dir, "plugin")
@@ -73,6 +77,8 @@ def copy_tree(src_dir: str, target_dir: str) -> None:
     clean_copy_tree(inc, os.path.join(target_dir, "include"))
     clean_copy_tree(dmlc_core, os.path.join(target_dir, "dmlc-core"))
     clean_copy_tree(gputreeshap, os.path.join(target_dir, "gputreeshap"))
+    clean_copy_tree(rocgputreeshap, os.path.join(target_dir, "rocgputreeshap"))
+    clean_copy_tree(warpprim, os.path.join(target_dir, "warp-primitives"))
     clean_copy_tree(rabit, os.path.join(target_dir, "rabit"))
     clean_copy_tree(cmake, os.path.join(target_dir, "cmake"))
     clean_copy_tree(plugin, os.path.join(target_dir, "plugin"))
@@ -306,6 +312,8 @@ class Install(install.install):  # pylint: disable=too-many-instance-attributes
         self.use_cuda = 0
         self.use_nccl = 0
         self.build_with_shared_nccl = 0
+        self.use_hip= 0
+        self.use_rccl = 0
         self.hide_cxx_symbols = 1
 
         self.use_hdfs = 0
