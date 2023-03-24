@@ -144,7 +144,6 @@ TEST(GpuPredictor, LesserFeatures) {
   TestPredictionWithLesserFeatures("gpu_predictor");
 }
 
-#if 0
 // Very basic test of empty model
 TEST(GPUPredictor, ShapStump) {
 #if defined(XGBOOST_USE_CUDA)
@@ -213,7 +212,6 @@ TEST(GPUPredictor, Shap) {
 TEST(GPUPredictor, IterationRange) {
   TestIterationRange("gpu_predictor");
 }
-#endif
 
 TEST(GPUPredictor, CategoricalPrediction) {
   TestCategoricalPrediction("gpu_predictor");
