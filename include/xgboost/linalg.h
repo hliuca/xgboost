@@ -30,11 +30,11 @@
 
 // decouple it from xgboost.
 #ifndef LINALG_HD
-#if defined(__CUDA__) || defined(__NVCC__) || defined(__HIP_PLATFORM_AMD__)
+#if defined(__CUDA__) || defined(__NVCC__)
 #define LINALG_HD __host__ __device__
 #else
 #define LINALG_HD
-#endif  // defined (__CUDA__) || defined(__NVCC__) || defined(__HIP_PLATFORM_AMD__)
+#endif  // defined (__CUDA__) || defined(__NVCC__)
 #endif  // LINALG_HD
 
 namespace xgboost::linalg {
@@ -118,9 +118,9 @@ using IndexToTag = std::conditional_t<std::is_integral<RemoveCRType<S>>::value, 
 
 template <int32_t n, typename Fn>
 LINALG_HD constexpr auto UnrollLoop(Fn fn) {
-#if defined(__CUDA_ARCH__) || defined(__HIP_PLATFORM_AMD__)
+#if defined __CUDA_ARCH__
 #pragma unroll n
-#endif  // defined __CUDA_ARCH__ || defined(__HIP_PLATFORM_AMD__)
+#endif  // defined __CUDA_ARCH__
   for (int32_t i = 0; i < n; ++i) {
     fn(i);
   }
@@ -136,7 +136,7 @@ int32_t NativePopc(T v) {
 inline LINALG_HD int Popc(uint32_t v) {
 #if defined(__CUDA_ARCH__)
   return __popc(v);
-#elif defined(__GNUC__) || defined(__clang__) || defined(__HIP_PLATFORM_AMD__)
+#elif defined(__GNUC__) || defined(__clang__)
   return __builtin_popcount(v);
 #elif defined(_MSC_VER)
   return __popcnt(v);
@@ -148,7 +148,7 @@ inline LINALG_HD int Popc(uint32_t v) {
 inline LINALG_HD int Popc(uint64_t v) {
 #if defined(__CUDA_ARCH__)
   return __popcll(v);
-#elif defined(__GNUC__) || defined(__clang__) || defined(__HIP_PLATFORM_AMD__)
+#elif defined(__GNUC__) || defined(__clang__)
   return __builtin_popcountll(v);
 #elif defined(_MSC_VER) && _defined(_M_X64)
   return __popcnt64(v);
@@ -530,17 +530,17 @@ class TensorView {
   /**
    * \brief Number of items in the tensor.
    */
-  LINALG_HD std::size_t Size() const { return size_; }
+  [[nodiscard]] LINALG_HD std::size_t Size() const { return size_; }
   /**
    * \brief Whether this is a contiguous array, both C and F contiguous returns true.
    */
-  LINALG_HD bool Contiguous() const {
+  [[nodiscard]] LINALG_HD bool Contiguous() const {
     return data_.size() == this->Size() || this->CContiguous() || this->FContiguous();
   }
   /**
    * \brief Whether it's a c-contiguous array.
    */
-  LINALG_HD bool CContiguous() const {
+  [[nodiscard]] LINALG_HD bool CContiguous() const {
     StrideT stride;
     static_assert(std::is_same<decltype(stride), decltype(stride_)>::value);
     // It's contiguous if the stride can be calculated from shape.
@@ -550,7 +550,7 @@ class TensorView {
   /**
    * \brief Whether it's a f-contiguous array.
    */
-  LINALG_HD bool FContiguous() const {
+  [[nodiscard]] LINALG_HD bool FContiguous() const {
     StrideT stride;
     static_assert(std::is_same<decltype(stride), decltype(stride_)>::value);
     // It's contiguous if the stride can be calculated from shape.
