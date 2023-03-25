@@ -1,7 +1,6 @@
 /**
  * Copyright 2017-2023 by XGBoost Contributors
  */
-#include <amd_warp_primitives.h>
 #include <GPUTreeShap/gpu_treeshap.h>
 #include <thrust/copy.h>
 #include <thrust/device_ptr.h>
