@@ -1,7 +1,6 @@
 /**
  * Copyright 2017-2023 by XGBoost Contributors
  */
-#include <amd_warp_primitives.h>
 #include <GPUTreeShap/gpu_treeshap.h>
 #include <thrust/copy.h>
 #include <thrust/device_ptr.h>
@@ -19,6 +18,7 @@
 #if defined(XGBOOST_USE_CUDA)
 #include "../common/device_helpers.cuh"
 #elif defined(XGBOOST_USE_HIP)
+#include <amd_warp_primitives.h>
 #include "../common/device_helpers.hip.h"
 #endif
 
