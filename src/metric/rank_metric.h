@@ -23,7 +23,7 @@ PackedReduceResult MAPScore(Context const *ctx, MetaInfo const &info,
                             HostDeviceVector<float> const &predt, bool minus,
                             std::shared_ptr<ltr::MAPCache> p_cache);
 
-#if !defined(XGBOOST_USE_CUDA)
+#if !defined(XGBOOST_USE_CUDA) && !defined(XGBOOST_USE_HIP)
 inline PackedReduceResult NDCGScore(Context const *, MetaInfo const &,
                                     HostDeviceVector<float> const &, bool,
                                     std::shared_ptr<ltr::NDCGCache>) {

@@ -62,7 +62,7 @@ common::Span<std::size_t const> RankingCache::MakeRankOnCPU(Context const* ctx,
   return rank;
 }
 
-#if !defined(XGBOOST_USE_CUDA)
+#if !defined(XGBOOST_USE_CUDA) && !defined(XGBOOST_USE_HIP)
 void RankingCache::InitOnCUDA(Context const*, MetaInfo const&) { common::AssertGPUSupport(); }
 common::Span<std::size_t const> RankingCache::MakeRankOnCUDA(Context const*,
                                                              common::Span<float const>) {
@@ -108,9 +108,9 @@ void NDCGCache::InitOnCPU(Context const* ctx, MetaInfo const& info) {
   });
 }
 
-#if !defined(XGBOOST_USE_CUDA)
+#if !defined(XGBOOST_USE_CUDA) && !defined(XGBOOST_USE_HIP)
 void NDCGCache::InitOnCUDA(Context const*, MetaInfo const&) { common::AssertGPUSupport(); }
-#endif  // !defined(XGBOOST_USE_CUDA)
+#endif  // !defined(XGBOOST_USE_CUDA) && !defined(XGBOOST_USE_HIP)
 
 DMLC_REGISTER_PARAMETER(LambdaRankParam);
 
@@ -119,9 +119,9 @@ void MAPCache::InitOnCPU(Context const*, MetaInfo const& info) {
   CheckMapLabels(h_label, [](auto beg, auto end, auto op) { return std::all_of(beg, end, op); });
 }
 
-#if !defined(XGBOOST_USE_CUDA)
+#if !defined(XGBOOST_USE_CUDA) && !defined(XGBOOST_USE_HIP)
 void MAPCache::InitOnCUDA(Context const*, MetaInfo const&) { common::AssertGPUSupport(); }
-#endif  // !defined(XGBOOST_USE_CUDA)
+#endif  // !defined(XGBOOST_USE_CUDA) && !defined(XGBOOST_USE_HIP)
 
 std::string ParseMetricName(StringView name, StringView param, position_t* topn, bool* minus) {
   std::string out_name;
