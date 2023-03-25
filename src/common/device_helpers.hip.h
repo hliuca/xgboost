@@ -3,8 +3,6 @@
  */
 #pragma once
 
-#if defined(XGBOOST_USE_CUDA)
-
 #include <thrust/binary_search.h>  // thrust::upper_bound
 #include <thrust/device_malloc_allocator.h>
 #include <thrust/device_ptr.h>
