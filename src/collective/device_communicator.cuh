@@ -4,11 +4,7 @@
 #pragma once
 #include <vector>
 
-#if defined(XGBOOST_USE_HIP)
-#include "../common/device_helpers.hip.h"
-#elif defined(XGBOOST_USE_CUDA)
 #include "../common/device_helpers.cuh"
-#endif
 
 namespace xgboost {
 namespace collective {

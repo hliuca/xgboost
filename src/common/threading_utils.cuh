@@ -9,13 +9,7 @@
 
 #include "./math.h"            // Sqr
 #include "common.h"
-
-#if defined(XGBOOST_USE_HIP)
-#include "device_helpers.hip.h"
-#elif defined(XGBOOST_USE_CUDA)
 #include "device_helpers.cuh"  // LaunchN
-#endif
-
 #include "xgboost/base.h"      // XGBOOST_DEVICE
 #include "xgboost/span.h"      // Span
 

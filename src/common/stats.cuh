@@ -19,13 +19,7 @@
 
 #include "algorithm.cuh"                           // SegmentedArgMergeSort
 #include "cuda_context.cuh"                        // CUDAContext
-
-#if defined(XGBOOST_USE_CUDA)
 #include "device_helpers.cuh"
-#elif defined(XGBOOST_USE_HIP)
-#include "device_helpers.hip.h"
-#endif
-
 #include "xgboost/context.h"                       // Context
 #include "xgboost/span.h"                          // Span
 
