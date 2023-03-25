@@ -9,13 +9,7 @@
 #include <limits>
 
 #include "../../common/deterministic.cuh"
-
-#if defined(XGBOOST_USE_CUDA)
 #include "../../common/device_helpers.cuh"
-#elif defined(XGBOOST_USE_HIP)
-#include "../../common/device_helpers.hip.h"
-#endif
-
 #include "../../data/ellpack_page.cuh"
 #include "histogram.cuh"
 #include "row_partitioner.cuh"

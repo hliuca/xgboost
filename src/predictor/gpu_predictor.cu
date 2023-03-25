@@ -14,13 +14,7 @@
 #include "../common/bitfield.h"
 #include "../common/categorical.h"
 #include "../common/common.h"
-
-#if defined(XGBOOST_USE_CUDA)
 #include "../common/device_helpers.cuh"
-#elif defined(XGBOOST_USE_HIP)
-#include "../common/device_helpers.hip.h"
-#endif
-
 #include "../data/device_adapter.cuh"
 #include "../data/ellpack_page.cuh"
 #include "../data/proxy_dmatrix.h"

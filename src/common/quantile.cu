@@ -16,13 +16,7 @@
 #include "../collective/device_communicator.cuh"
 #include "categorical.h"
 #include "common.h"
-
-#if defined(XGBOOST_USE_CUDA)
 #include "device_helpers.cuh"
-#elif defined(XGBOOST_USE_HIP)
-#include "device_helpers.hip.h"
-#endif
-
 #include "hist_util.h"
 #include "quantile.cuh"
 #include "quantile.h"

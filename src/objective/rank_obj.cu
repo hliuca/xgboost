@@ -15,27 +15,20 @@
 #include "../common/math.h"
 #include "../common/random.h"
 
-#if defined(__CUDACC__)
+#if defined(__CUDACC__) || defined(__HIP_PLATFORM_AMD__)
 #include <thrust/sort.h>
 #include <thrust/gather.h>
 #include <thrust/iterator/discard_iterator.h>
 #include <thrust/random/uniform_int_distribution.h>
 #include <thrust/random/linear_congruential_engine.h>
 
+#if defined(__CUDACC__)
 #include <cub/util_allocator.cuh>
+#elif defined(__HIP_PLATFORM_AMD__)
+#include <hipcub/util_allocator.hpp>
+#endif
 
 #include "../common/device_helpers.cuh"
-#elif defined(__HIP_PLATFORM_AMD__)
-
-#include <thrust/sort.h>
-#include <thrust/gather.h>
-#include <thrust/iterator/discard_iterator.h>
-#include <thrust/random/uniform_int_distribution.h>
-#include <thrust/random/linear_congruential_engine.h>
-
-#include <hipcub/util_allocator.hpp>
-
-#include "../common/device_helpers.hip.h"
 #endif
 
 namespace xgboost {

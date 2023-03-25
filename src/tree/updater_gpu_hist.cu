@@ -17,13 +17,7 @@
 #include "../common/categorical.h"
 
 #include "../common/cuda_context.cuh"  // CUDAContext
-
-#if defined(XGBOOST_USE_CUDA)
 #include "../common/device_helpers.cuh"
-#elif defined(XGBOOST_USE_HIP)
-#include "../common/device_helpers.hip.h"
-#endif
-
 #include "../common/hist_util.h"
 #include "../common/io.h"
 #include "../common/timer.h"

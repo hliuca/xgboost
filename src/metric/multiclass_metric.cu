@@ -14,23 +14,14 @@
 #include "../common/threading_utils.h"
 #include "metric_common.h"  // MetricNoCache
 
-#if defined(XGBOOST_USE_CUDA)
+#if defined(XGBOOST_USE_CUDA) || defined(XGBOOST_USE_HIP)
 #include <thrust/execution_policy.h>  // thrust::cuda::par
 #include <thrust/functional.h>        // thrust::plus<>
 #include <thrust/iterator/counting_iterator.h>
 #include <thrust/transform_reduce.h>
 
 #include "../common/device_helpers.cuh"
-#endif  // XGBOOST_USE_CUDA
-
-#if defined(XGBOOST_USE_HIP)
-#include <thrust/execution_policy.h>  // thrust::hip::par
-#include <thrust/functional.h>        // thrust::plus<>
-#include <thrust/iterator/counting_iterator.h>
-#include <thrust/transform_reduce.h>
-
-#include "../common/device_helpers.hip.h"
-#endif  // XGBOOST_USE_HIP
+#endif  // XGBOOST_USE_CUDA || XGBOOST_USE_HIP
 
 namespace xgboost {
 namespace metric {

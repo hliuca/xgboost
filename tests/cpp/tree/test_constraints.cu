@@ -10,12 +10,7 @@
 #include <set>
 #include "../../../src/tree/constraints.cuh"
 #include "../../../src/tree/param.h"
-
-#if defined(XGBOOST_USE_CUDA)
 #include "../../../src/common/device_helpers.cuh"
-#elif defined(XGBOOST_USE_HIP)
-#include "../../../src/common/device_helpers.hip.h"
-#endif
 
 namespace xgboost {
 namespace {

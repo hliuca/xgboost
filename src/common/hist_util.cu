@@ -19,13 +19,7 @@
 #include <vector>
 
 #include "categorical.h"
-
-#if defined(XGBOOST_USE_CUDA)
 #include "device_helpers.cuh"
-#elif defined(XGBOOST_USE_HIP)
-#include "device_helpers.hip.h"
-#endif
-
 #include "hist_util.cuh"
 #include "hist_util.h"
 #include "math.h"  // NOLINT
