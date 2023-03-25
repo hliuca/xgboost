@@ -3,12 +3,7 @@
  */
 #include <thrust/execution_policy.h>
 
-#if defined(XGBOOST_USE_CUDA)
 #include "device_helpers.cuh"            // dh::Reduce, dh::XGBCachingDeviceAllocator
-#elif defined(XGBOOST_USE_HIP)
-#include "device_helpers.hip.h"          // dh::Reduce, dh::XGBCachingDeviceAllocator
-#endif
-
 #include "numeric.h"
 #include "xgboost/context.h"             // Context
 #include "xgboost/host_device_vector.h"  // HostDeviceVector

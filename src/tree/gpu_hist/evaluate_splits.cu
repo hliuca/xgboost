@@ -6,19 +6,14 @@
 #include <limits>
 
 #include "../../common/categorical.h"
-
-#if defined(XGBOOST_USE_CUDA)
 #include "../../common/device_helpers.cuh"
-#elif defined(XGBOOST_USE_HIP)
-#include "../../common/device_helpers.hip.h"
-#include <hip/hip_cooperative_groups.h>
-#endif
-
 #include "../../data/ellpack_page.cuh"
 #include "evaluate_splits.cuh"
 #include "expand_entry.cuh"
 
 #if defined(XGBOOST_USE_HIP)
+#include <hip/hip_cooperative_groups.h>
+
 #define WARP_SIZE WAVEFRONT_SIZE
 #elif defined(XGBOOST_USE_CUDA)
 #define WARP_SIZE 32

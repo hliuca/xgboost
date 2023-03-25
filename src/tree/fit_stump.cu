@@ -12,13 +12,7 @@
 #include <cstddef>                                // std::size_t
 
 #include "../collective/device_communicator.cuh"  // DeviceCommunicator
-
-#if defined(XGBOOST_USE_CUDA)
 #include "../common/device_helpers.cuh"           // dh::MakeTransformIterator
-#elif defined(XGBOOST_USE_HIP)
-#include "../common/device_helpers.hip.h"         // dh::MakeTransformIterator
-#endif
-
 #include "fit_stump.h"
 #include "xgboost/base.h"     // GradientPairPrecise, GradientPair, XGBOOST_DEVICE
 #include "xgboost/context.h"  // Context

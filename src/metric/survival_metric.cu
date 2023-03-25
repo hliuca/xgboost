@@ -19,15 +19,10 @@
 #include "xgboost/json.h"
 #include "xgboost/metric.h"
 
-#if defined(XGBOOST_USE_CUDA)
+#if defined(XGBOOST_USE_CUDA) || defined(XGBOOST_USE_HIP)
 #include <thrust/execution_policy.h>  // thrust::cuda::par
 #include "../common/device_helpers.cuh"
-#endif  // XGBOOST_USE_CUDA
-
-#if defined(XGBOOST_USE_HIP)
-#include <thrust/execution_policy.h>  // thrust::hip::par
-#include "../common/device_helpers.hip.h"
-#endif  // XGBOOST_USE_HIP
+#endif  // XGBOOST_USE_CUDA || XGBOOST_USE_HIP
 
 using AFTParam = xgboost::common::AFTParam;
 using ProbabilityDistributionType = xgboost::common::ProbabilityDistributionType;

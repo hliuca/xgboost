@@ -7,13 +7,7 @@
 #include <cstddef>                              // size_t
 
 #include "cuda_context.cuh"                     // CUDAContext
-
-#if defined(XGBOOST_USE_CUDA)
 #include "device_helpers.cuh"                   // dh::MakeTransformIterator, tcbegin, tcend
-#elif defined(XGBOOST_USE_HIP)
-#include "device_helpers.hip.h"                 // dh::MakeTransformIterator, tcbegin, tcend
-#endif
-
 #include "optional_weight.h"                    // common::OptionalWeights
 #include "stats.cuh"          // common::SegmentedQuantile, common::SegmentedWeightedQuantile
 #include "xgboost/base.h"     // XGBOOST_DEVICE

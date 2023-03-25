@@ -7,12 +7,7 @@
 #include <thrust/logical.h>  // thrust::any_of
 #include <thrust/sort.h>     // thrust::stable_sort
 
-#if defined(XGBOOST_USE_CUDA)
 #include "../../common/device_helpers.cuh"
-#elif defined(XGBOOST_USE_HIP)
-#include "../../common/device_helpers.hip.h"
-#endif
-
 #include "../../common/hist_util.h"  // common::HistogramCuts
 #include "evaluate_splits.cuh"
 #include "xgboost/data.h"

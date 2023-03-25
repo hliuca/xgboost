@@ -4,12 +4,7 @@
 #ifndef XGBOOST_COMMON_LINALG_OP_CUH_
 #define XGBOOST_COMMON_LINALG_OP_CUH_
 
-#if defined(XGBOOST_USE_CUDA)
 #include "device_helpers.cuh"
-#elif defined(XGBOOST_USE_HIP)
-#include "device_helpers.hip.h"
-#endif
-
 #include "linalg_op.h"
 #include "xgboost/context.h"
 #include "xgboost/linalg.h"

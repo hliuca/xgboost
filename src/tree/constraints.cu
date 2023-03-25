@@ -14,12 +14,7 @@
 #include "xgboost/span.h"
 #include "constraints.cuh"
 #include "param.h"
-
-#if defined(XGBOOST_USE_CUDA)
 #include "../common/device_helpers.cuh"
-#elif defined(XGBOOST_USE_HIP)
-#include "../common/device_helpers.hip.h"
-#endif
 
 namespace xgboost {
 

@@ -35,11 +35,8 @@
 #include "xgboost/span.h"
 #include "xgboost/tree_model.h"  // RegTree
 
-#if defined(XGBOOST_USE_CUDA)
+#if defined(XGBOOST_USE_CUDA) || defined(XGBOOST_USE_HIP)
 #include "../common/device_helpers.cuh"
-#include "../common/linalg_op.cuh"
-#elif defined(XGBOOST_USE_HIP)
-#include "../common/device_helpers.hip.h"
 #include "../common/linalg_op.cuh"
 #endif  // defined(XGBOOST_USE_CUDA), defined(XGBOOST_USE_HIP)
 

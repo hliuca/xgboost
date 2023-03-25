@@ -11,12 +11,7 @@
 #include "xgboost/data.h"
 #include "xgboost/host_device_vector.h"
 #include "xgboost/tree_model.h"
-
-#if defined(XGBOOST_USE_CUDA)
 #include "device_helpers.cuh"
-#elif defined(XGBOOST_USE_HIP)
-#include "device_helpers.hip.h"
-#endif
 
 namespace xgboost {
 

@@ -23,13 +23,7 @@
 
 #include "common.h"            // safe_cuda
 #include "cuda_context.cuh"    // CUDAContext
-
-#if defined(XGBOOST_USE_HIP)
-#include "device_helpers.hip.h"
-#elif defined(XGBOOST_USE_CUDA)
 #include "device_helpers.cuh"  // TemporaryArray,SegmentId,LaunchN,Iota,device_vector
-#endif
-
 #include "xgboost/base.h"      // XGBOOST_DEVICE
 #include "xgboost/context.h"   // Context
 #include "xgboost/logging.h"   // CHECK
