@@ -4,7 +4,10 @@
  */
 #ifndef XGBOOST_DATA_DEVICE_ADAPTER_H_
 #define XGBOOST_DATA_DEVICE_ADAPTER_H_
-#include <cstddef>  // for size_t
+#include <thrust/iterator/counting_iterator.h>  // for make_counting_iterator
+#include <thrust/logical.h>                     // for none_of
+
+#include <cstddef>                              // for size_t
 #include <limits>
 #include <memory>
 #include <string>
@@ -239,6 +242,20 @@ size_t GetRowCounts(const AdapterBatchT batch, common::Span<size_t> offset,
 #endif
 
   return row_stride;
+}
+
+/**
+ * \brief Check there's no inf in data.
+ */
+template <typename AdapterBatchT>
+bool HasInfInData(AdapterBatchT const& batch, IsValidFunctor is_valid) {
+  auto counting = thrust::make_counting_iterator(0llu);
+  auto value_iter = dh::MakeTransformIterator<float>(
+      counting, [=] XGBOOST_DEVICE(std::size_t idx) { return batch.GetElement(idx).value; });
+  auto valid =
+      thrust::none_of(value_iter, value_iter + batch.Size(),
+                      [is_valid] XGBOOST_DEVICE(float v) { return is_valid(v) && std::isinf(v); });
+  return valid;
 }
 };  // namespace data
 }  // namespace xgboost
