@@ -325,8 +325,13 @@ void BuildGradientHistogram(CUDAContext const* ctx, EllpackDeviceAccessor const&
 
     // Allocate number of blocks such that each block has about kMinItemsPerBlock work
     // Up to a maximum where the device is saturated
+#if defined(XGBOOST_USE_CUDA)
     grid_size = std::min(grid_size, static_cast<std::uint32_t>(
                                         common::DivRoundUp(items_per_group, kMinItemsPerBlock)));
+#elif defined(XGBOOST_USE_HIP)
+    grid_size = std::min(common::DivRoundUp(grid_size, num_groups), static_cast<std::uint32_t>(
+                                        common::DivRoundUp(items_per_group, kMinItemsPerBlock)));
+#endif
 
     dh::LaunchKernel {dim3(grid_size, num_groups), static_cast<uint32_t>(kBlockThreads), smem_size,
                      ctx->Stream()} (kernel, matrix, feature_groups, d_ridx, histogram.data(),
