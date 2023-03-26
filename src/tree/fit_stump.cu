@@ -45,13 +45,7 @@ void FitStump(Context const* ctx, linalg::TensorView<GradientPair const, 2> gpai
   CHECK(d_sum.CContiguous());
 
   dh::XGBCachingDeviceAllocator<char> alloc;
-
-#if defined(XGBOOST_USE_CUDA)
   auto policy = thrust::cuda::par(alloc);
-#elif defined(XGBOOST_USE_HIP)
-  auto policy = thrust::hip::par(alloc);
-#endif
-
   thrust::reduce_by_key(policy, key_it, key_it + gpair.Size(), grad_it,
                         thrust::make_discard_iterator(), dh::tbegin(d_sum.Values()));
 

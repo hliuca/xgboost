@@ -9,7 +9,11 @@
 #include <algorithm>
 #include <vector>
 
+#if defined(XGBOOST_USE_CUDA)
 #include "../../../../src/tree/gpu_hist/row_partitioner.cuh"
+#elif defined(XGBOOST_USE_HIP)
+#include "../../../../src/tree/gpu_hist/row_partitioner.hip.h"
+#endif
 #include "../../helpers.h"
 #include "xgboost/base.h"
 #include "xgboost/context.h"

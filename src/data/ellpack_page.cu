@@ -13,10 +13,6 @@
 #include "gradient_index.h"
 #include "xgboost/data.h"
 
-#if defined(XGBOOST_USE_HIP)
-#include <rocprim/rocprim.hpp>
-#endif
-
 namespace xgboost {
 
 EllpackPage::EllpackPage() : impl_{new EllpackPageImpl()} {}
@@ -91,12 +87,7 @@ EllpackPageImpl::EllpackPageImpl(int device, common::HistogramCuts cuts,
       row_stride(row_stride),
       n_rows(n_rows) {
   monitor_.Init("ellpack_page");
-
-#if defined(XGBOOST_USE_CUDA)
   dh::safe_cuda(cudaSetDevice(device));
-#elif defined(XGBOOST_USE_HIP)
-  dh::safe_cuda(hipSetDevice(device));
-#endif
 
   monitor_.Start("InitCompressedData");
   InitCompressedData(device);
@@ -117,12 +108,7 @@ EllpackPageImpl::EllpackPageImpl(int device, common::HistogramCuts cuts,
 EllpackPageImpl::EllpackPageImpl(DMatrix* dmat, const BatchParam& param)
     : is_dense(dmat->IsDense()) {
   monitor_.Init("ellpack_page");
-
-#if defined(XGBOOST_USE_CUDA)
   dh::safe_cuda(cudaSetDevice(param.gpu_id));
-#elif defined(XGBOOST_USE_HIP)
-  dh::safe_cuda(hipSetDevice(param.gpu_id));
-#endif
 
   n_rows = dmat->Info().num_row_;
 
@@ -251,8 +237,6 @@ void CopyDataToEllpack(const AdapterBatchT& batch, common::Span<FeatureType cons
   // Go one level down into cub::DeviceScan API to set OffsetT as 64 bit
   // So we don't crash on n > 2^31
   size_t temp_storage_bytes = 0;
-
-#if defined(__CUDACC__)
   using DispatchScan =
       cub::DispatchScan<decltype(key_value_index_iter), decltype(out),
                         TupleScanOp<Tuple>, cub::NullType, int64_t>;
@@ -274,17 +258,6 @@ void CopyDataToEllpack(const AdapterBatchT& batch, common::Span<FeatureType cons
   DispatchScan::Dispatch(temp_storage.data().get(), temp_storage_bytes,
                          key_value_index_iter, out, TupleScanOp<Tuple>(),
                          cub::NullType(), batch.Size(), nullptr, false);
-#endif
-
-#elif defined (__HIP_PLATFORM_AMD__)
-
-  rocprim::inclusive_scan(nullptr, temp_storage_bytes, key_value_index_iter, out, batch.Size(), TupleScanOp<Tuple>());
-
-  dh::TemporaryArray<char> temp_storage(temp_storage_bytes);
-
-  rocprim::inclusive_scan(temp_storage.data().get(), temp_storage_bytes, key_value_index_iter, out, batch.Size(),
-       TupleScanOp<Tuple>());
-
 #endif
 }
 
@@ -312,11 +285,7 @@ EllpackPageImpl::EllpackPageImpl(AdapterBatch batch, float missing, int device, 
                                  common::Span<size_t> row_counts_span,
                                  common::Span<FeatureType const> feature_types, size_t row_stride,
                                  size_t n_rows, common::HistogramCuts const& cuts) {
-#if defined(XGBOOST_USE_CUDA)
   dh::safe_cuda(cudaSetDevice(device));
-#elif defined(XGBOOST_USE_HIP)
-  dh::safe_cuda(hipSetDevice(device));
-#endif
 
   *this = EllpackPageImpl(device, cuts, is_dense, row_stride, n_rows);
   CopyDataToEllpack(batch, feature_types, this, device, missing);
@@ -543,28 +512,14 @@ void EllpackPageImpl::CreateHistIndices(int device,
     // copy data entries to device.
     if (row_batch.data.DeviceCanRead()) {
       auto const& d_data = row_batch.data.ConstDeviceSpan();
-
-#if defined(XGBOOST_USE_CUDA)
       dh::safe_cuda(cudaMemcpyAsync(
           entries_d.data().get(), d_data.data() + ent_cnt_begin,
           n_entries * sizeof(Entry), cudaMemcpyDefault));
-#elif defined(XGBOOST_USE_HIP)
-      dh::safe_cuda(hipMemcpyAsync(
-          entries_d.data().get(), d_data.data() + ent_cnt_begin,
-          n_entries * sizeof(Entry), hipMemcpyDefault));
-#endif
     } else {
       const std::vector<Entry>& data_vec = row_batch.data.ConstHostVector();
-
-#if defined(XGBOOST_USE_CUDA)
       dh::safe_cuda(cudaMemcpyAsync(
           entries_d.data().get(), data_vec.data() + ent_cnt_begin,
           n_entries * sizeof(Entry), cudaMemcpyDefault));
-#elif defined(XGBOOST_USE_HIP)
-      dh::safe_cuda(hipMemcpyAsync(
-          entries_d.data().get(), data_vec.data() + ent_cnt_begin,
-          n_entries * sizeof(Entry), hipMemcpyDefault));
-#endif
     }
 
     const dim3 block3(32, 8, 1);  // 256 threads

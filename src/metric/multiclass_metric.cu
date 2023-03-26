@@ -14,14 +14,14 @@
 #include "../common/threading_utils.h"
 #include "metric_common.h"  // MetricNoCache
 
-#if defined(XGBOOST_USE_CUDA) || defined(XGBOOST_USE_HIP)
+#if defined(XGBOOST_USE_CUDA)
 #include <thrust/execution_policy.h>  // thrust::cuda::par
 #include <thrust/functional.h>        // thrust::plus<>
 #include <thrust/iterator/counting_iterator.h>
 #include <thrust/transform_reduce.h>
 
 #include "../common/device_helpers.cuh"
-#endif  // XGBOOST_USE_CUDA || XGBOOST_USE_HIP
+#endif  // XGBOOST_USE_CUDA
 
 namespace xgboost {
 namespace metric {
@@ -81,7 +81,7 @@ class MultiClassMetricsReduction {
     return res;
   }
 
-#if defined(XGBOOST_USE_CUDA) || defined(XGBOOST_USE_HIP)
+#if defined(XGBOOST_USE_CUDA)
 
   PackedReduceResult DeviceReduceMetrics(
       const HostDeviceVector<bst_float>& weights,
@@ -102,8 +102,6 @@ class MultiClassMetricsReduction {
     s_label_error[0] = 0;
 
     dh::XGBCachingDeviceAllocator<char> alloc;
-
-#if defined(XGBOOST_USE_CUDA)
     PackedReduceResult result = thrust::transform_reduce(
         thrust::cuda::par(alloc),
         begin, end,
@@ -121,32 +119,12 @@ class MultiClassMetricsReduction {
         },
         PackedReduceResult(),
         thrust::plus<PackedReduceResult>());
-#elif defined(XGBOOST_USE_HIP)
-    PackedReduceResult result = thrust::transform_reduce(
-        thrust::hip::par(alloc),
-        begin, end,
-        [=] XGBOOST_DEVICE(size_t idx) {
-          bst_float weight = is_null_weight ? 1.0f : s_weights[idx];
-          bst_float residue = 0;
-          auto label = static_cast<int>(s_labels[idx]);
-          if (label >= 0 && label < static_cast<int32_t>(n_class)) {
-            residue = EvalRowPolicy::EvalRow(
-                label, &s_preds[idx * n_class], n_class) * weight;
-          } else {
-            s_label_error[0] = label;
-          }
-          return PackedReduceResult{ residue, weight };
-        },
-        PackedReduceResult(),
-        thrust::plus<PackedReduceResult>());
-#endif
-
     CheckLabelError(s_label_error[0], n_class);
 
     return result;
   }
 
-#endif  // XGBOOST_USE_CUDA || defined(XGBOOST_USE_HIP)
+#endif  // XGBOOST_USE_CUDA
 
   PackedReduceResult Reduce(const Context& tparam, int device, size_t n_class,
                             const HostDeviceVector<bst_float>& weights,
@@ -158,30 +136,25 @@ class MultiClassMetricsReduction {
       result =
           CpuReduceMetrics(weights, labels, preds, n_class, tparam.Threads());
     }
-#if defined(XGBOOST_USE_CUDA) || defined(XGBOOST_USE_HIP)
+#if defined(XGBOOST_USE_CUDA)
     else {  // NOLINT
       device_ = tparam.gpu_id;
       preds.SetDevice(device_);
       labels.SetDevice(device_);
       weights.SetDevice(device_);
 
-#if defined(XGBOOST_USE_CUDA)
       dh::safe_cuda(cudaSetDevice(device_));
-#elif defined(XGBOOST_USE_HIP)
-      dh::safe_cuda(hipSetDevice(device_));
-#endif
-
       result = DeviceReduceMetrics(weights, labels, preds, n_class);
     }
-#endif  // defined(XGBOOST_USE_CUDA) || defined(XGBOOST_USE_HIP)
+#endif  // defined(XGBOOST_USE_CUDA)
     return result;
   }
 
  private:
-#if defined(XGBOOST_USE_CUDA) || defined(XGBOOST_USE_HIP)
+#if defined(XGBOOST_USE_CUDA)
   dh::PinnedMemory label_error_;
   int device_{-1};
-#endif  // defined(XGBOOST_USE_CUDA) || defined(XGBOOST_USE_HIP)
+#endif  // defined(XGBOOST_USE_CUDA)
 };
 
 /*!

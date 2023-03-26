@@ -24,9 +24,9 @@
 namespace xgboost {
 namespace obj {
 
-#if defined(XGBOOST_USE_CUDA) || defined(XGBOOST_USE_HIP)
+#if defined(XGBOOST_USE_CUDA)
 DMLC_REGISTRY_FILE_TAG(multiclass_obj_gpu);
-#endif  // defined(XGBOOST_USE_CUDA) || defined(XGBOOST_USE_HIP)
+#endif  // defined(XGBOOST_USE_CUDA)
 
 struct SoftmaxMultiClassParam : public XGBoostParameter<SoftmaxMultiClassParam> {
   int num_class;

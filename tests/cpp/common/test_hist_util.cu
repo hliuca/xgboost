@@ -9,12 +9,22 @@
 #include <algorithm>
 #include <cmath>
 
+#if defined(XGBOOST_USE_CUDA)
 #include "../../../include/xgboost/logging.h"
 #include "../../../src/common/device_helpers.cuh"
 #include "../../../src/common/hist_util.cuh"
 #include "../../../src/common/hist_util.h"
 #include "../../../src/common/math.h"
 #include "../../../src/data/device_adapter.cuh"
+#elif defined(XGBOOST_USE_HIP)
+#include "../../../include/xgboost/logging.h"
+#include "../../../src/common/device_helpers.hip.h"
+#include "../../../src/common/hist_util.hip.h"
+#include "../../../src/common/hist_util.h"
+#include "../../../src/common/math.h"
+#include "../../../src/data/device_adapter.hip.h"
+#endif
+
 #include "../../../src/data/simple_dmatrix.h"
 #include "../data/test_array_interface.h"
 #include "../filesystem.h"  // dmlc::TemporaryDirectory
