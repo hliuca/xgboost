@@ -5,7 +5,7 @@
 #include "device_communicator.cuh"
 #include "device_communicator_adapter.cuh"
 #include "noop_communicator.h"
-#ifdef XGBOOST_USE_NCCL
+#if defined(XGBOOST_USE_NCCL) || defined(XGBOOST_USE_RCCL)
 #include "nccl_device_communicator.cuh"
 #endif
 
@@ -25,7 +25,7 @@ void Communicator::Finalize() {
 DeviceCommunicator* Communicator::GetDevice(int device_ordinal) {
   if (!device_communicator_ || device_ordinal_ != device_ordinal) {
     device_ordinal_ = device_ordinal;
-#ifdef XGBOOST_USE_NCCL
+#if defined(XGBOOST_USE_NCCL) || defined(XGBOOST_USE_RCCL)
     if (type_ != CommunicatorType::kFederated) {
       device_communicator_.reset(new NcclDeviceCommunicator(device_ordinal, Get()));
     } else {
