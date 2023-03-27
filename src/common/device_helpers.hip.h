@@ -38,9 +38,9 @@
 #include "xgboost/logging.h"
 #include "xgboost/span.h"
 
-#ifdef XGBOOST_USE_NCCL
-#include "nccl.h"
-#endif  // XGBOOST_USE_NCCL
+#ifdef XGBOOST_USE_RCCL
+#include "rccl.h"
+#endif  // XGBOOST_USE_RCCL
 
 #if defined(XGBOOST_USE_RMM) && XGBOOST_USE_RMM == 1
 #include "rmm/mr/device/per_device_resource.hpp"
@@ -110,7 +110,7 @@ inline ncclResult_t ThrowOnNcclError(ncclResult_t code, const char *file, int li
       ss << "  CUDA error: " << thrust::system_error(err, thrust::cuda_category()).what() << "\n";
     } else if (code == ncclSystemError) {
       ss << "  This might be caused by a network configuration issue. Please consider specifying "
-            "the network interface for NCCL via environment variables listed in its reference: "
+            "the network interface for RCCL via environment variables listed in its reference: "
             "`https://docs.nvidia.com/deeplearning/nccl/user-guide/docs/env.html`.\n";
     }
     LOG(FATAL) << ss.str();

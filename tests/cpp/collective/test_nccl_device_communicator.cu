@@ -1,13 +1,17 @@
 /**
  * Copyright 2022-2023, XGBoost contributors
  */
-#ifdef XGBOOST_USE_NCCL
+#if defined(XGBOOST_USE_NCCL) ||defined(XGBOOST_USE_RCCL)
 
 #include <gtest/gtest.h>
 
 #include <string>  // for string
 
+#if defined(XGBOOST_USE_NCCL)
 #include "../../../src/collective/nccl_device_communicator.cuh"
+#elif defined(XGBOOST_USE_RCCL)
+#include "../../../src/collective/nccl_device_communicator.hip.h"
+#endif
 
 namespace xgboost {
 namespace collective {
@@ -33,4 +37,4 @@ TEST(NcclDeviceCommunicatorSimpleTest, SystemError) {
 }  // namespace collective
 }  // namespace xgboost
 
-#endif  // XGBOOST_USE_NCCL
+#endif  // XGBOOST_USE_NCCL || XGBOOST_USE_RCCL
