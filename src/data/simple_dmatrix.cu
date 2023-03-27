@@ -22,12 +22,7 @@ SimpleDMatrix::SimpleDMatrix(AdapterT* adapter, float missing, int32_t /*nthread
   auto device = (adapter->DeviceIdx() < 0 || adapter->NumRows() == 0) ? dh::CurrentDevice()
                                                                       : adapter->DeviceIdx();
   CHECK_GE(device, 0);
-
-#if defined(XGBOOST_USE_CUDA)
   dh::safe_cuda(cudaSetDevice(device));
-#elif defined(XGBOOST_USE_HIP)
-  dh::safe_cuda(hipSetDevice(device));
-#endif
 
   CHECK(adapter->NumRows() != kAdapterUnknownSize);
   CHECK(adapter->NumColumns() != kAdapterUnknownSize);

@@ -60,12 +60,7 @@ class GPUCoordinateUpdater : public LinearUpdater {  // NOLINT
       return;
     }
 
-#if defined(XGBOOST_USE_CUDA)
     dh::safe_cuda(cudaSetDevice(ctx_->gpu_id));
-#elif defined(XGBOOST_USE_HIP)
-    dh::safe_cuda(hipSetDevice(ctx_->gpu_id));
-#endif
-
     // The begin and end indices for the section of each column associated with
     // this device
     std::vector<std::pair<bst_uint, bst_uint>> column_segments;
@@ -91,18 +86,10 @@ class GPUCoordinateUpdater : public LinearUpdater {  // NOLINT
     for (size_t fidx = 0; fidx < batch.Size(); fidx++) {
       auto col = page[fidx];
       auto seg = column_segments[fidx];
-
-#if defined(XGBOOST_USE_CUDA)
       dh::safe_cuda(cudaMemcpy(
           data_.data().get() + row_ptr_[fidx],
           col.data() + seg.first,
           sizeof(Entry) * (seg.second - seg.first), cudaMemcpyHostToDevice));
-#elif defined(XGBOOST_USE_HIP)
-      dh::safe_cuda(hipMemcpy(
-          data_.data().get() + row_ptr_[fidx],
-          col.data() + seg.first,
-          sizeof(Entry) * (seg.second - seg.first), hipMemcpyHostToDevice));
-#endif
     }
   }
 
@@ -183,12 +170,7 @@ class GPUCoordinateUpdater : public LinearUpdater {  // NOLINT
 
   // This needs to be public because of the __device__ lambda.
   GradientPair GetBiasGradient(int group_idx, int num_group) {
-#if defined(XGBOOST_USE_CUDA)
     dh::safe_cuda(cudaSetDevice(ctx_->gpu_id));
-#elif defined(XGBOOST_USE_HIP)
-    dh::safe_cuda(hipSetDevice(ctx_->gpu_id));
-#endif
-
     auto counting = thrust::make_counting_iterator(0ull);
     auto f = [=] __device__(size_t idx) {
       return idx * num_group + group_idx;
@@ -212,12 +194,7 @@ class GPUCoordinateUpdater : public LinearUpdater {  // NOLINT
 
   // This needs to be public because of the __device__ lambda.
   GradientPair GetGradient(int group_idx, int num_group, int fidx) {
-#if defined(XGBOOST_USE_CUDA)
     dh::safe_cuda(cudaSetDevice(ctx_->gpu_id));
-#elif defined(XGBOOST_USE_HIP)
-    dh::safe_cuda(hipSetDevice(ctx_->gpu_id));
-#endif
-
     common::Span<xgboost::Entry> d_col = dh::ToSpan(data_).subspan(row_ptr_[fidx]);
     size_t col_size = row_ptr_[fidx + 1] - row_ptr_[fidx];
     common::Span<GradientPair> d_gpair = dh::ToSpan(gpair_);
@@ -250,17 +227,10 @@ class GPUCoordinateUpdater : public LinearUpdater {  // NOLINT
   }
 
   void UpdateGpair(const std::vector<GradientPair> &host_gpair) {
-#if defined(XGBOOST_USE_CUDA)
     dh::safe_cuda(cudaMemcpyAsync(
         gpair_.data().get(),
         host_gpair.data(),
         gpair_.size() * sizeof(GradientPair), cudaMemcpyHostToDevice));
-#elif defined(XGBOOST_USE_HIP)
-    dh::safe_cuda(hipMemcpyAsync(
-        gpair_.data().get(),
-        host_gpair.data(),
-        gpair_.size() * sizeof(GradientPair), hipMemcpyHostToDevice));
-#endif
   }
 
   // training parameter
