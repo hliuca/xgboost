@@ -346,7 +346,6 @@ class DeviceModel {
     dh::safe_cuda(hipSetDevice(gpu_id));
 #endif
 
-    CHECK_EQ(model.param.size_leaf_vector, 0);
     // Copy decision trees to device
     tree_segments = std::move(HostDeviceVector<size_t>({}, gpu_id));
     auto& h_tree_segments = tree_segments.HostVector();
