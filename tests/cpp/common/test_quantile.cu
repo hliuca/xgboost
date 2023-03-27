@@ -1,9 +1,15 @@
 #include <gtest/gtest.h>
 #include "test_quantile.h"
 #include "../helpers.h"
+#if defined(XGBOOST_USE_CUDA)
 #include "../../../src/collective/device_communicator.cuh"
 #include "../../../src/common/hist_util.cuh"
 #include "../../../src/common/quantile.cuh"
+#elif defined(XGBOOST_USE_HIP)
+#include "../../../src/collective/device_communicator.hip.h"
+#include "../../../src/common/hist_util.hip.h"
+#include "../../../src/common/quantile.hip.h"
+#endif
 
 namespace xgboost {
 namespace {
