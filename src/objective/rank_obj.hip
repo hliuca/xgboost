@@ -23,7 +23,7 @@
 #include <thrust/random/linear_congruential_engine.h>
 
 #if defined(__CUDACC__)
-#include <cub/util_allocator.hip.h>
+#include <cub/util_allocator.cuh>
 #elif defined(__HIP_PLATFORM_AMD__)
 #include <hipcub/util_allocator.hpp>
 #endif

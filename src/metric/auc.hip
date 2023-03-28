@@ -9,7 +9,7 @@
 #if defined(XGBOOST_USE_HIP)
 #include <hipcub/hipcub.hpp>  // NOLINT
 #elif defined(XGBOOST_USE_CUDA)
-#include <cub/cub.hip.h>  // NOLINT
+#include <cub/cub.cuh>  // NOLINT
 #endif
 
 #include <limits>
