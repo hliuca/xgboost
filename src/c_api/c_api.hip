@@ -37,7 +37,7 @@ void XGBBuildInfoDevice(Json *p_info) {
 #elif defined(XGBOOST_USE_RCCL)
   info["USE_RCCL"] = Boolean{true};
   v = {Json{Integer{NCCL_MAJOR}}, Json{Integer{NCCL_MINOR}}, Json{Integer{NCCL_PATCH}}};
-  info["NCCL_VERSION"] = v;
+  info["RCCL_VERSION"] = v;
 #else
   info["USE_NCCL"] = Boolean{false};
   info["USE_RCCL"] = Boolean{false};

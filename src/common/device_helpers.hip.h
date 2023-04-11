@@ -110,7 +110,7 @@ inline ncclResult_t ThrowOnNcclError(ncclResult_t code, const char *file, int li
       ss << "  CUDA error: " << thrust::system_error(err, thrust::cuda_category()).what() << "\n";
     } else if (code == ncclSystemError) {
       ss << "  This might be caused by a network configuration issue. Please consider specifying "
-            "the network interface for NCCL via environment variables listed in its reference: "
+            "the network interface for RCCL via environment variables listed in its reference: "
             "`https://docs.nvidia.com/deeplearning/nccl/user-guide/docs/env.html`.\n";
     }
     LOG(FATAL) << ss.str();
