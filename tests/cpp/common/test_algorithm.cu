@@ -16,7 +16,6 @@
 #include "../../../src/common/algorithm.hip.h"
 #include "../../../src/common/device_helpers.hip.h"
 #endif
-
 #include "../helpers.h"  // CreateEmptyGenericParam
 
 namespace xgboost {

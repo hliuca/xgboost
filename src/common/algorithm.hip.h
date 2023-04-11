@@ -14,7 +14,7 @@
 #if defined(XGBOOST_USE_HIP)
 #include <hipcub/hipcub.hpp>
 #elif defined(XGBOOST_USE_CUDA)
-#include <cub/cub.hip.h>         // DispatchSegmentedRadixSort,NullType,DoubleBuffer
+#include <cub/cub.cuh>         // DispatchSegmentedRadixSort,NullType,DoubleBuffer
 #endif
 
 #include <iterator>            // distance

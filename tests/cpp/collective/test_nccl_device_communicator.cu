@@ -1,7 +1,7 @@
 /**
  * Copyright 2022-2023, XGBoost contributors
  */
-#if defined(XGBOOST_USE_NCCL) ||defined(XGBOOST_USE_RCCL)
+#if defined(XGBOOST_USE_NCCL) || defined(XGBOOST_USE_RCCL)
 
 #include <gtest/gtest.h>
 

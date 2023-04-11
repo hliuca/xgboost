@@ -1,3 +1,4 @@
+#
 # Copyright (c) 2023 Advanced Micro Devices, Inc. All rights reserved.
 # 
 # Build instructions: https://confluence.amd.com/display/DCGPUAIST/XGBOOST+ROCm+Build
@@ -9,9 +10,9 @@
 #
 # git clone --recursive git@github.com:AMD-AI/xgboost.git
 # cd xgboost
-# git checkout amd-sep
+# git checkout amd-condition
 # git submodule update --init --recursive
-# docker build --build-arg GITHUB_TOKEN=${GITHUB_TOKEN} -t mun-node-0.acp.amd.com:8001/xgboost:amd-sep -f Dockerfile .
+# docker build --build-arg GITHUB_TOKEN=${GITHUB_TOKEN} -t mun-node-0.acp.amd.com:8001/xgboost:amd-condition -f Dockerfile .
 
 FROM rocm/dev-ubuntu-20.04:5.4.2
 
@@ -49,7 +50,7 @@ ENV CMAKE_PREFIX_PATH=/opt/rocm/lib/cmake:/opt/rocm/lib/cmake/AMDDeviceLibs:${CM
 #RUN git config --global user.name $USER
 RUN git config --global url."https://${GITHUB_TOKEN}@github.com/".insteadOf "https://github.com/"
 RUN git config --global --unset url."https://${GITHUB_TOKEN}@github.com/".insteadOf
-#RUN git clone https://${GITHUB_TOKEN}@github.com/AMD-AI/xgboost.git -b amd-sep --recurse-submodules \
+#RUN git clone https://${GITHUB_TOKEN}@github.com/AMD-AI/xgboost.git -b amd-condition --recurse-submodules \
 # && cd xgboost \
 RUN rm -fr build \
  && mkdir build \

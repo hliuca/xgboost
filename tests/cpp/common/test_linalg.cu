@@ -8,7 +8,6 @@
 #elif defined(XGBOOST_USE_HIP)
 #include "../../../src/common/linalg_op.hip.h"
 #endif
-
 #include "xgboost/context.h"
 #include "xgboost/linalg.h"
 

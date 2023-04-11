@@ -8,7 +8,7 @@
 #include <float.h>
 
 #if defined(XGBOOST_USE_CUDA)
-#include <cub/cub.hip.h>
+#include <cub/cub.cuh>
 #elif defined(XGBOOST_USE_HIP)
 #include <hipcub/hipcub.hpp>
 #endif
