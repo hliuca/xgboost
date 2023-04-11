@@ -1,6 +1,10 @@
 #include <gtest/gtest.h>
 #include "../../../../src/tree/driver.h"
+#if defined(XGBOOST_USE_CUDA)
 #include "../../../../src/tree/gpu_hist/expand_entry.cuh"
+#elif defined(XGBOOST_USE_HIP)
+#include "../../../../src/tree/gpu_hist/expand_entry.hip.h"
+#endif
 
 namespace xgboost {
 namespace tree {

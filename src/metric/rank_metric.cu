@@ -24,12 +24,6 @@
 #include "xgboost/logging.h"             // for CHECK
 #include "xgboost/metric.h"
 
-#if defined(XGBOOST_USE_HIP)
-#include <hipcub/hipcub.hpp>
-
-namespace cub = hipcub;
-#endif
-
 namespace xgboost::metric {
 // tag the this file, used by force static link later.
 DMLC_REGISTRY_FILE_TAG(rank_metric_gpu);
@@ -47,12 +41,7 @@ struct EvalRankGpu : public GPUMetric, public EvalRankConfig {
     const auto ngroups = static_cast<bst_omp_uint>(gptr.size() - 1);
 
     auto device = ctx_->gpu_id;
-
-#if defined(XGBOOST_USE_CUDA)
     dh::safe_cuda(cudaSetDevice(device));
-#elif defined(XGBOOST_USE_HIP)
-    dh::safe_cuda(hipSetDevice(device));
-#endif
 
     info.labels.SetDevice(device);
     preds.SetDevice(device);
@@ -117,13 +106,7 @@ struct EvalPrecisionGpu {
     auto *dhits = hits.data().get();
 
     int device_id = -1;
-
-#if defined(XGBOOST_USE_CUDA)
     dh::safe_cuda(cudaGetDevice(&device_id));
-#elif defined(XGBOOST_USE_HIP)
-    dh::safe_cuda(hipGetDevice(&device_id));
-#endif
-
     // For each group item compute the aggregated precision
     dh::LaunchN(nitems, nullptr, [=] __device__(uint32_t idx) {
       const auto group_idx = dgroup_idx[idx];
@@ -136,16 +119,11 @@ struct EvalPrecisionGpu {
 
     // Allocator to be used for managing space overhead while performing reductions
     dh::XGBCachingDeviceAllocator<char> alloc;
-
-#if defined(XGBOOST_USE_CUDA)
     return static_cast<double>(thrust::reduce(thrust::cuda::par(alloc),
                                               hits.begin(), hits.end())) / ecfg.topn;
-#elif defined(XGBOOST_USE_HIP)
-    return static_cast<double>(thrust::reduce(thrust::hip::par(alloc),
-                                              hits.begin(), hits.end())) / ecfg.topn;
-#endif
   }
 };
+
 
 XGBOOST_REGISTER_GPU_METRIC(PrecisionGpu, "pre")
 .describe("precision@k for rank computed on GPU.")
@@ -174,6 +152,7 @@ PackedReduceResult NDCGScore(Context const *ctx, MetaInfo const &info,
 
   ltr::cuda_impl::CalcQueriesDCG(ctx, d_label, d_sorted_idx, p.ndcg_exp_gain, d_group_ptr, p.TopK(),
                                  d_out_dcg);
+
   auto it = dh::MakeTransformIterator<PackedReduceResult>(
       thrust::make_counting_iterator(0ul), [=] XGBOOST_DEVICE(std::size_t i) {
         if (d_inv_idcg(i) <= 0.0) {

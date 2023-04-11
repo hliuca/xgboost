@@ -35,10 +35,10 @@
 #include "xgboost/span.h"
 #include "xgboost/tree_model.h"  // RegTree
 
-#if defined(XGBOOST_USE_CUDA) || defined(XGBOOST_USE_HIP)
+#if defined(XGBOOST_USE_CUDA)
 #include "../common/device_helpers.cuh"
 #include "../common/linalg_op.cuh"
-#endif  // defined(XGBOOST_USE_CUDA), defined(XGBOOST_USE_HIP)
+#endif  // defined(XGBOOST_USE_CUDA)
 
 namespace xgboost {
 namespace obj {
@@ -49,9 +49,9 @@ void CheckRegInputs(MetaInfo const& info, HostDeviceVector<bst_float> const& pre
 }
 }  // anonymous namespace
 
-#if defined(XGBOOST_USE_CUDA) || defined(XGBOOST_USE_HIP)
+#if defined(XGBOOST_USE_CUDA)
 DMLC_REGISTRY_FILE_TAG(regression_obj_gpu);
-#endif  // defined(XGBOOST_USE_CUDA) || defined(XGBOOST_USE_HIP)
+#endif  // defined(XGBOOST_USE_CUDA)
 
 struct RegLossParam : public XGBoostParameter<RegLossParam> {
   float scale_pos_weight;

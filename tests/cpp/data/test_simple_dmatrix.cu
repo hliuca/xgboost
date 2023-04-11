@@ -4,7 +4,11 @@
 
 #include <thrust/sequence.h>
 
+#if defined(XGBOOST_USE_CUDA)
 #include "../../../src/data/device_adapter.cuh"
+#elif defined(XGBOOST_USE_HIP)
+#include "../../../src/data/device_adapter.hip.h"
+#endif
 #include "../helpers.h"
 #include "test_array_interface.h"
 #include "../../../src/data/array_interface.h"

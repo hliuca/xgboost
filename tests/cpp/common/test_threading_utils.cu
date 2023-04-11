@@ -4,8 +4,13 @@
 #include <gtest/gtest.h>
 #include <thrust/copy.h>  // thrust::copy
 
+#if defined(XGBOOST_USE_CUDA)
 #include "../../../src/common/device_helpers.cuh"
 #include "../../../src/common/threading_utils.cuh"
+#elif defined(XGBOOST_USE_HIP)
+#include "../../../src/common/device_helpers.hip.h"
+#include "../../../src/common/threading_utils.hip.h"
+#endif
 
 namespace xgboost {
 namespace common {

@@ -12,18 +12,8 @@
 namespace xgboost {
 namespace linalg {
 template <typename T, int32_t D, typename Fn>
-#if defined(XGBOOST_USE_HIP)
-void ElementWiseKernelDevice(linalg::TensorView<T, D> t, Fn&& fn, hipStream_t s = nullptr)
-#elif defined(XGBOOST_USE_CUDA)
-void ElementWiseKernelDevice(linalg::TensorView<T, D> t, Fn&& fn, cudaStream_t s = nullptr)
-#endif
-{
-#if defined(XGBOOST_USE_HIP)
-  dh::safe_cuda(hipSetDevice(t.DeviceIdx()));
-#elif defined(XGBOOST_USE_CUDA)
+void ElementWiseKernelDevice(linalg::TensorView<T, D> t, Fn&& fn, cudaStream_t s = nullptr) {
   dh::safe_cuda(cudaSetDevice(t.DeviceIdx()));
-#endif
-
   static_assert(std::is_void<std::result_of_t<Fn(size_t, T&)>>::value,
                 "For function with return, use transform instead.");
   if (t.Contiguous()) {
@@ -38,12 +28,7 @@ void ElementWiseKernelDevice(linalg::TensorView<T, D> t, Fn&& fn, cudaStream_t s
 }
 
 template <typename T, int32_t D, typename Fn>
-#if defined(XGBOOST_USE_HIP)
-void ElementWiseTransformDevice(linalg::TensorView<T, D> t, Fn&& fn, hipStream_t s = nullptr)
-#elif defined(XGBOOST_USE_CUDA)
-void ElementWiseTransformDevice(linalg::TensorView<T, D> t, Fn&& fn, cudaStream_t s = nullptr)
-#endif
-{
+void ElementWiseTransformDevice(linalg::TensorView<T, D> t, Fn&& fn, cudaStream_t s = nullptr) {
   if (t.Contiguous()) {
     auto ptr = t.Values().data();
     dh::LaunchN(t.Size(), s, [=] __device__(size_t i) { ptr[i] = fn(i, ptr[i]); });

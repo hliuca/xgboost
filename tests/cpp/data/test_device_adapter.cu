@@ -7,7 +7,11 @@
 #include "../helpers.h"
 #include <thrust/device_vector.h>
 
+#if defined(XGBOOST_USE_CUDA)
 #include "../../../src/data/device_adapter.cuh"
+#elif defined(XGBOOST_USE_HIP)
+#include "../../../src/data/device_adapter.hip.h"
+#endif
 #include "test_array_interface.h"
 
 using namespace xgboost;  // NOLINT
