@@ -320,8 +320,8 @@ class RowPartitioner {
         total_rows, op, &tmp_, stream_);
 
 #if defined(XGBOOST_USE_HIP)
-    dh::safe_cuda(hipMemcpyAsync(h_counts.data(), d_counts.data().get(), h_counts.size_bytes(),
-                                  hipMemcpyDefault, stream_));
+    dh::safe_cuda(hipMemcpy(h_counts.data(), d_counts.data().get(), h_counts.size_bytes(),
+                                  hipMemcpyDefault));
 #else
     dh::safe_cuda(cudaMemcpyAsync(h_counts.data(), d_counts.data().get(), h_counts.size_bytes(),
                                   cudaMemcpyDefault, stream_));
@@ -330,7 +330,7 @@ class RowPartitioner {
     // TODO(Rory): this synchronisation hurts performance a lot
     // Future optimisation should find a way to skip this
 #if defined(XGBOOST_USE_HIP)
-    dh::safe_cuda(hipStreamSynchronize(stream_));
+    //dh::safe_cuda(hipStreamSynchronize(stream_));
 #else
     dh::safe_cuda(cudaStreamSynchronize(stream_));
 #endif

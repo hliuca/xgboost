@@ -28,7 +28,8 @@ RowPartitioner::RowPartitioner(int device_idx, size_t num_rows)
 #if defined(XGBOOST_USE_CUDA)
   dh::safe_cuda(cudaStreamCreate(&stream_));
 #elif defined(XGBOOST_USE_HIP)
-  dh::safe_cuda(hipStreamCreate(&stream_));
+  //dh::safe_cuda(hipStreamCreate(&stream_));
+  stream_ = NULL;
 #endif
 }
 
@@ -38,7 +39,7 @@ RowPartitioner::~RowPartitioner() {
   dh::safe_cuda(cudaStreamDestroy(stream_));
 #elif defined(XGBOOST_USE_HIP)
   dh::safe_cuda(hipSetDevice(device_idx_));
-  dh::safe_cuda(hipStreamDestroy(stream_));
+  //dh::safe_cuda(hipStreamDestroy(stream_));
 #endif
 }
 
