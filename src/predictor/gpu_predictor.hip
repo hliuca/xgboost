@@ -429,7 +429,7 @@ class DeviceModel {
 };
 
 #define ShapSplitMagic 99999
-#
+
 struct ShapSplitCondition {
   XGBOOST_DEVICE ShapSplitCondition() = default;
   XGBOOST_DEVICE
