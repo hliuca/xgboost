@@ -12,6 +12,24 @@
 #include "test_lambdarank_obj.h"
 
 namespace xgboost::obj {
+TEST(LambdaRank, GPUNDCGJsonIO) {
+  Context ctx;
+  ctx.gpu_id = 0;
+  TestNDCGJsonIO(&ctx);
+}
+
+TEST(LambdaRank, GPUMAPStat) {
+  Context ctx;
+  ctx.gpu_id = 0;
+  TestMAPStat(&ctx);
+}
+
+TEST(LambdaRank, GPUNDCGGPair) {
+  Context ctx;
+  ctx.gpu_id = 0;
+  TestNDCGGPair(&ctx);
+}
+
 void TestGPUMakePair() {
   Context ctx;
   ctx.gpu_id = 0;
@@ -107,6 +125,12 @@ void TestGPUMakePair() {
 
 TEST(LambdaRank, GPUMakePair) { TestGPUMakePair(); }
 
+TEST(LambdaRank, GPUUnbiasedNDCG) {
+  Context ctx;
+  ctx.gpu_id = 0;
+  TestUnbiasedNDCG(&ctx);
+}
+
 template <typename CountFunctor>
 void RankItemCountImpl(std::vector<std::uint32_t> const &sorted_items, CountFunctor f,
                        std::uint32_t find_val, std::uint32_t exp_val) {
@@ -134,5 +158,11 @@ TEST(LambdaRank, RankItemCountOnRight) {
   RankItemCountImpl(sorted_items, wrapper, 4, static_cast<uint32_t>(6));
   RankItemCountImpl(sorted_items, wrapper, 1, static_cast<uint32_t>(1));
   RankItemCountImpl(sorted_items, wrapper, 0, static_cast<uint32_t>(0));
+}
+
+TEST(LambdaRank, GPUMAPGPair) {
+  Context ctx;
+  ctx.gpu_id = 0;
+  TestMAPGPair(&ctx);
 }
 }  // namespace xgboost::obj

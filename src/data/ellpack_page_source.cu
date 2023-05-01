@@ -1,5 +1,5 @@
-/*!
- * Copyright 2019-2022 XGBoost contributors
+/**
+ * Copyright 2019-2023, XGBoost contributors
  */
 #include <memory>
 #include <utility>
@@ -11,9 +11,9 @@ namespace xgboost {
 namespace data {
 void EllpackPageSource::Fetch() {
 #if defined(XGBOOST_USE_CUDA)
-  dh::safe_cuda(cudaSetDevice(param_.gpu_id));
+  dh::safe_cuda(cudaSetDevice(device_));
 #elif defined(XGBOOST_USE_HIP)
-  dh::safe_cuda(hipSetDevice(param_.gpu_id));
+  dh::safe_cuda(hipSetDevice(device_));
 #endif
   if (!this->ReadCache()) {
     if (count_ != 0 && !sync_) {
@@ -26,8 +26,7 @@ void EllpackPageSource::Fetch() {
     auto const &csr = source_->Page();
     this->page_.reset(new EllpackPage{});
     auto *impl = this->page_->Impl();
-    *impl = EllpackPageImpl(param_.gpu_id, *cuts_, *csr, is_dense_, row_stride_,
-                            feature_types_);
+    *impl = EllpackPageImpl(device_, *cuts_, *csr, is_dense_, row_stride_, feature_types_);
     page_->SetBaseRowId(csr->base_rowid);
     this->WriteCache();
   }
