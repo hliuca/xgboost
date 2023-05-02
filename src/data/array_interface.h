@@ -603,7 +603,7 @@ void DispatchDType(ArrayInterface<D> const array, std::int32_t device, Fn fn) {
   };
   switch (array.type) {
     case ArrayInterfaceHandler::kF2: {
-#if defined(__CUDA_ARCH__) && __CUDA_ARCH__ >= 600
+#if (defined(__CUDA_ARCH__) && __CUDA_ARCH__ >= 600) || defined(__HIP_PLATFORM_AMD__)
       dispatch(__half{});
 #endif
       break;
