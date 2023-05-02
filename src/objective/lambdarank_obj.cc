@@ -414,7 +414,7 @@ class LambdaRankNDCG : public LambdaRankObj<LambdaRankNDCG, ltr::NDCGCache> {
 };
 
 namespace cuda_impl {
-#if !defined(XGBOOST_USE_CUDA)
+#if !defined(XGBOOST_USE_CUDA) && !defined(XGBOOST_USE_HIP)
 void LambdaRankGetGradientNDCG(Context const*, std::int32_t, HostDeviceVector<float> const&,
                                const MetaInfo&, std::shared_ptr<ltr::NDCGCache>,
                                linalg::VectorView<double const>,  // input bias ratio
@@ -430,7 +430,7 @@ void LambdaRankUpdatePositionBias(Context const*, linalg::VectorView<double cons
                                   linalg::Vector<double>*, std::shared_ptr<ltr::RankingCache>) {
   common::AssertGPUSupport();
 }
-#endif  // !defined(XGBOOST_USE_CUDA)
+#endif  // !defined(XGBOOST_USE_CUDA) && !defined(XGBOOST_USE_HIP)
 }  // namespace cuda_impl
 
 namespace cpu_impl {
@@ -533,7 +533,7 @@ class LambdaRankMAP : public LambdaRankObj<LambdaRankMAP, ltr::MAPCache> {
   }
 };
 
-#if !defined(XGBOOST_USE_CUDA)
+#if !defined(XGBOOST_USE_CUDA) && !defined(XGBOOST_USE_HIP)
 namespace cuda_impl {
 void MAPStat(Context const*, MetaInfo const&, common::Span<std::size_t const>,
              std::shared_ptr<ltr::MAPCache>) {
@@ -549,7 +549,7 @@ void LambdaRankGetGradientMAP(Context const*, std::int32_t, HostDeviceVector<flo
   common::AssertGPUSupport();
 }
 }  // namespace cuda_impl
-#endif  // !defined(XGBOOST_USE_CUDA)
+#endif  // !defined(XGBOOST_USE_CUDA) && !defined(XGBOOST_USE_HIP)
 
 /**
  * \brief The RankNet loss.
@@ -604,7 +604,7 @@ class LambdaRankPairwise : public LambdaRankObj<LambdaRankPairwise, ltr::Ranking
   }
 };
 
-#if !defined(XGBOOST_USE_CUDA)
+#if !defined(XGBOOST_USE_CUDA) && !defined(XGBOOST_USE_HIP)
 namespace cuda_impl {
 void LambdaRankGetGradientPairwise(Context const*, std::int32_t, HostDeviceVector<float> const&,
                                    const MetaInfo&, std::shared_ptr<ltr::RankingCache>,
@@ -615,7 +615,7 @@ void LambdaRankGetGradientPairwise(Context const*, std::int32_t, HostDeviceVecto
   common::AssertGPUSupport();
 }
 }  // namespace cuda_impl
-#endif  // !defined(XGBOOST_USE_CUDA)
+#endif  // !defined(XGBOOST_USE_CUDA) && !defined(XGBOOST_USE_HIP)
 
 XGBOOST_REGISTER_OBJECTIVE(LambdaRankNDCG, LambdaRankNDCG::Name())
     .describe("LambdaRank with NDCG loss as objective")

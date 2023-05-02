@@ -518,9 +518,9 @@ void LambdaRankGetGradientPairwise(Context const* ctx, std::int32_t iter,
   Launch(ctx, iter, predt, info, p_cache, delta, ti_plus, tj_minus, li, lj, out_gpair);
 }
 
-struct ReduceOp : thrust::binary_function<thrust::tuple<double, double> const&, thrust::tuple<double, double>
-                  const&, thrust::tuple<double, double>> {
-    thrust::tuple<double, double> __host__ XGBOOST_DEVICE operator()(thrust::tuple<double, double> const& l, thrust::tuple<double, double> const& r) {
+struct ReduceOp {
+    template <typename Tup>
+    Tup XGBOOST_DEVICE operator()(Tup const& l, Tup const& r) const {
     return thrust::make_tuple(thrust::get<0>(l) + thrust::get<0>(r),
                               thrust::get<1>(l) + thrust::get<1>(r));
   }
