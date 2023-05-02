@@ -66,7 +66,7 @@ void IterativeDMatrix::InitFromCUDA(Context const* ctx, BatchParam const& p,
   do {
     // We use do while here as the first batch is fetched in ctor
     // ctx_.gpu_id = proxy->DeviceIdx();
-    CHECK_LT(ctx_.gpu_id, common::AllVisibleGPUs());
+    CHECK_LT(ctx->gpu_id, common::AllVisibleGPUs());
 
 #if defined(XGBOOST_USE_CUDA)
     dh::safe_cuda(cudaSetDevice(get_device()));
