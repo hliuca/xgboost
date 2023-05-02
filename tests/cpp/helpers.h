@@ -39,13 +39,13 @@
 #define GPUIDX -1
 #endif
 
-#if defined(__CUDACC__)
+#if defined(__CUDACC__) || defined(__HIP_PLATFORM_AMD__)
 #define DeclareUnifiedDistributedTest(name) MGPU ## name
 #else
 #define DeclareUnifiedDistributedTest(name) name
 #endif
 
-#if defined(__CUDACC__)
+#if defined(__CUDACC__) || defined(__HIP_PLATFORM_AMD__)
 #define WORLD_SIZE_FOR_TEST (xgboost::common::AllVisibleGPUs())
 #else
 #define WORLD_SIZE_FOR_TEST (3)
