@@ -1,11 +1,15 @@
-/*!
- * Copyright 2021 by Contributors
+/**
+ * Copyright 2021-2023, XGBoost Contributors
  */
+#include <cstdint>  // for int64_t
+
 #include "../common/common.h"
+#include "../common/device_helpers.cuh"  // for DefaultStream, CUDAEvent
 #include "array_interface.h"
+#include "xgboost/logging.h"
 
 namespace xgboost {
-void ArrayInterfaceHandler::SyncCudaStream(int64_t stream) {
+void ArrayInterfaceHandler::SyncCudaStream(std::int64_t stream) {
   switch (stream) {
     case 0:
       /**
@@ -22,12 +26,15 @@ void ArrayInterfaceHandler::SyncCudaStream(int64_t stream) {
       break;
     case 2:
       // default per-thread stream
-    default:
+    default: {
+      dh::CUDAEvent e;
 #if defined(XGBOOST_USE_CUDA)
-      dh::safe_cuda(cudaStreamSynchronize(reinterpret_cast<cudaStream_t>(stream)));
+      e.Record(dh::CUDAStreamView{reinterpret_cast<cudaStream_t>(stream)});
 #elif defined(XGBOOST_USE_HIP)
-      dh::safe_cuda(hipStreamSynchronize(reinterpret_cast<hipStream_t>(stream)));
+      e.Record(dh::CUDAStreamView{reinterpret_cast<hipStream_t>(stream)});
 #endif
+      dh::DefaultStream().Wait(e);
+    }
   }
 }
 
