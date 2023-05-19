@@ -59,14 +59,8 @@ GradientQuantiser::GradientQuantiser(common::Span<GradientPair const> gpair) {
 
   thrust::device_ptr<GradientPair const> gpair_beg{gpair.data()};
   auto beg = thrust::make_transform_iterator(gpair_beg, Clip());
-#if defined(XGBOOST_USE_CUDA)
   Pair p =
       dh::Reduce(thrust::cuda::par(alloc), beg, beg + gpair.size(), Pair{}, thrust::plus<Pair>{});
-#elif defined(XGBOOST_USE_HIP)
-  Pair p =
-      dh::Reduce(thrust::hip::par(alloc), beg, beg + gpair.size(), Pair{}, thrust::plus<Pair>{});
-#endif
-
   // Treat pair as array of 4 primitive types to allreduce
   using ReduceT = typename decltype(p.first)::ValueT;
   static_assert(sizeof(Pair) == sizeof(ReduceT) * 4, "Expected to reduce four elements.");
@@ -264,19 +258,9 @@ void BuildGradientHistogram(CUDAContext const* ctx, EllpackDeviceAccessor const&
                             bool force_global_memory) {
   // decide whether to use shared memory
   int device = 0;
-
-#if defined(XGBOOST_USE_CUDA)
   dh::safe_cuda(cudaGetDevice(&device));
-#elif defined(XGBOOST_USE_HIP)
-  dh::safe_cuda(hipGetDevice(&device));
-#endif
-
   // opt into maximum shared memory for the kernel if necessary
-#if defined(XGBOOST_USE_CUDA)
   size_t max_shared_memory = dh::MaxSharedMemoryOptin(device);
-#elif defined(XGBOOST_USE_HIP)
-  size_t max_shared_memory = dh::MaxSharedMemory(device);
-#endif
 
   size_t smem_size =
       sizeof(GradientPairInt64) * feature_groups.max_group_bins;
@@ -289,31 +273,17 @@ void BuildGradientHistogram(CUDAContext const* ctx, EllpackDeviceAccessor const&
 
   auto runit = [&, kMinItemsPerBlock = kItemsPerTile](auto kernel) {
     if (shared) {
-#if defined(XGBOOST_USE_CUDA)
       dh::safe_cuda(cudaFuncSetAttribute(kernel, cudaFuncAttributeMaxDynamicSharedMemorySize,
                                          max_shared_memory));
-#elif defined(XGBOOST_USE_HIP) && 0 /* CUDA Only */
-      dh::safe_cuda(hipFuncSetAttribute((const void *)kernel, hipFuncAttributeMaxDynamicSharedMemorySize,
-                                         max_shared_memory));
-#endif
     }
 
     // determine the launch configuration
     int num_groups = feature_groups.NumGroups();
     int n_mps = 0;
-
-#if defined(XGBOOST_USE_CUDA)
     dh::safe_cuda(cudaDeviceGetAttribute(&n_mps, cudaDevAttrMultiProcessorCount, device));
     int n_blocks_per_mp = 0;
     dh::safe_cuda(cudaOccupancyMaxActiveBlocksPerMultiprocessor(&n_blocks_per_mp, kernel,
                                                                 kBlockThreads, smem_size));
-#elif defined(XGBOOST_USE_HIP)
-    dh::safe_cuda(hipDeviceGetAttribute(&n_mps, hipDeviceAttributeMultiprocessorCount, device));
-    int n_blocks_per_mp = 0;
-    dh::safe_cuda(hipOccupancyMaxActiveBlocksPerMultiprocessor(&n_blocks_per_mp, kernel,
-                                                                kBlockThreads, smem_size));
-#endif
-
     // This gives the number of blocks to keep the device occupied
     // Use this as the maximum number of blocks
     unsigned grid_size = n_blocks_per_mp * n_mps;
@@ -327,13 +297,8 @@ void BuildGradientHistogram(CUDAContext const* ctx, EllpackDeviceAccessor const&
 
     // Allocate number of blocks such that each block has about kMinItemsPerBlock work
     // Up to a maximum where the device is saturated
-#if defined(XGBOOST_USE_CUDA)
     grid_size = std::min(grid_size, static_cast<std::uint32_t>(
                                         common::DivRoundUp(items_per_group, kMinItemsPerBlock)));
-#elif defined(XGBOOST_USE_HIP)
-    grid_size = std::min(common::DivRoundUp(grid_size, num_groups), static_cast<std::uint32_t>(
-                                        common::DivRoundUp(items_per_group, kMinItemsPerBlock)));
-#endif
 
     dh::LaunchKernel {dim3(grid_size, num_groups), static_cast<uint32_t>(kBlockThreads), smem_size,
                      ctx->Stream()} (kernel, matrix, feature_groups, d_ridx, histogram.data(),
@@ -346,11 +311,7 @@ void BuildGradientHistogram(CUDAContext const* ctx, EllpackDeviceAccessor const&
     runit(SharedMemHistKernel<false, kBlockThreads, kItemsPerThread>);
   }
 
-#if defined(XGBOOST_USE_CUDA)
   dh::safe_cuda(cudaGetLastError());
-#elif defined(XGBOOST_USE_HIP)
-  dh::safe_cuda(hipGetLastError());
-#endif
 }
 
 }  // namespace tree

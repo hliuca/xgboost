@@ -1,7 +1,6 @@
 /*!
  * Copyright 2021 by Contributors
  */
-
 #include "../common/device_helpers.cuh"
 #include "xgboost/context.h"
 #include "xgboost/linalg.h"

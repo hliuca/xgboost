@@ -59,16 +59,9 @@ std::size_t SegmentedTrapezoidThreads(xgboost::common::Span<U> group_ptr,
   });
   dh::InclusiveSum(out_group_threads_ptr.data(), out_group_threads_ptr.data(),
                    out_group_threads_ptr.size());
-  size_t total = 0;
-
-#if defined(XGBOOST_USE_HIP)
-  dh::safe_cuda(hipMemcpy(&total, out_group_threads_ptr.data() + out_group_threads_ptr.size() - 1,
-      sizeof(total), hipMemcpyDeviceToHost));
-#elif defined(XGBOOST_USE_CUDA)
+  std::size_t total = 0;
   dh::safe_cuda(cudaMemcpy(&total, out_group_threads_ptr.data() + out_group_threads_ptr.size() - 1,
-      sizeof(total), cudaMemcpyDeviceToHost));
-#endif
-
+                           sizeof(total), cudaMemcpyDeviceToHost));
   return total;
 }
 

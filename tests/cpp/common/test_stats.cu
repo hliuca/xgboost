@@ -7,8 +7,13 @@
 #include <utility>                            // std::pair
 #include <vector>                             // std::vector
 
+#if defined(XGBOOST_USE_CUDA)
 #include "../../../src/common/linalg_op.cuh"  // ElementWiseTransformDevice
 #include "../../../src/common/stats.cuh"
+#elif defined(XGBOOST_USE_HIP)
+#include "../../../src/common/linalg_op.hip.h"  // ElementWiseTransformDevice
+#include "../../../src/common/stats.hip.h"
+#endif
 #include "xgboost/base.h"                     // XGBOOST_DEVICE
 #include "xgboost/context.h"                  // Context
 #include "xgboost/host_device_vector.h"       // HostDeviceVector
