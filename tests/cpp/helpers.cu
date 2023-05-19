@@ -1,7 +1,11 @@
 #include <xgboost/c_api.h>
 
 #include "helpers.h"
+#if defined(XGBOOST_USE_CUDA)
 #include "../../src/data/device_adapter.cuh"
+#elif defined(XGBOOST_USE_HIP)
+#include "../../src/data/device_adapter.hip.h"
+#endif
 #include "../../src/data/iterative_dmatrix.h"
 
 namespace xgboost {

@@ -12,10 +12,17 @@
 
 #include "../../../src/common/common.h"
 #include "../../../src/data/sparse_page_source.h"
+#if defined(XGBOOST_USE_CUDA)
 #include "../../../src/tree/constraints.cuh"
 #include "../../../src/tree/param.h"  // for TrainParam
 #include "../../../src/tree/updater_gpu_common.cuh"
 #include "../../../src/tree/updater_gpu_hist.cu"
+#elif defined(XGBOOST_USE_HIP)
+#include "../../../src/tree/constraints.hip.h"
+#include "../../../src/tree/param.h"  // for TrainParam
+#include "../../../src/tree/updater_gpu_common.hip.h"
+#include "../../../src/tree/updater_gpu_hist.hip"
+#endif
 #include "../filesystem.h"  // dmlc::TemporaryDirectory
 #include "../helpers.h"
 #include "../histogram_helpers.h"
