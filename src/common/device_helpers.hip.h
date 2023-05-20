@@ -1273,14 +1273,12 @@ class CUDAStream {
   hipStream_t stream_;
 
  public:
-  CUDAStream() {
-    dh::safe_cuda(hipStreamCreateWithFlags(&stream_, hipStreamNonBlocking));
-  }
-  ~CUDAStream() {
-    dh::safe_cuda(hipStreamDestroy(stream_));
-  }
+  CUDAStream() { dh::safe_cuda(hipStreamCreateWithFlags(&stream_, hipStreamNonBlocking)); }
+  ~CUDAStream() { dh::safe_cuda(hipStreamDestroy(stream_)); }
 
-  CUDAStreamView View() const { return CUDAStreamView{stream_}; }
+  [[nodiscard]] CUDAStreamView View() const { return CUDAStreamView{stream_}; }
+  [[nodiscard]] hipStream_t Handle() const { return stream_; }
+
   void Sync() { this->View().Sync(); }
 };
 

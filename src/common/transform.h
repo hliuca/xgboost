@@ -145,7 +145,7 @@ class Transform {
 
 #if defined(XGBOOST_USE_HIP)
       dh::safe_cuda(hipSetDevice(device_));
-#else
+#elif defined(XGBOOST_USE_CUDA)
       dh::safe_cuda(cudaSetDevice(device_));
 #endif
 

@@ -10,14 +10,23 @@
 
 #include <cstddef>             // size_t
 #include <cstdint>             // int32_t
+#if defined(XGBOOST_USE_CUDA)
 #include <cub/cub.cuh>         // DispatchSegmentedRadixSort,NullType,DoubleBuffer
+#elif defined(XGBOOST_USE_HIP)
+#include <hipcub/hipcub.hpp>
+#endif
 #include <iterator>            // distance
 #include <limits>              // numeric_limits
 #include <type_traits>         // conditional_t,remove_const_t
 
 #include "common.h"            // safe_cuda
+#if defined(XGBOOST_USE_CUDA)
 #include "cuda_context.cuh"    // CUDAContext
 #include "device_helpers.cuh"  // TemporaryArray,SegmentId,LaunchN,Iota,device_vector
+#elif defined(XGBOOST_USE_HIP)
+#include "cuda_context.hip.h"
+#include "device_helpers.hip.h"
+#endif
 #include "xgboost/base.h"      // XGBOOST_DEVICE
 #include "xgboost/context.h"   // Context
 #include "xgboost/logging.h"   // CHECK

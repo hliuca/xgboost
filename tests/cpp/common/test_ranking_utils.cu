@@ -21,8 +21,8 @@
 #include "../../../src/common/cuda_context.hip.h"    // for CUDAContext
 #include "../../../src/common/device_helpers.hip.h"  // for device_vector, ToSpan
 #include "../../../src/common/ranking_utils.hip.h"   // for CalcQueriesInvIDCG
-#include "../../../src/common/ranking_utils.h"     // for LambdaRankParam, RankingCache
 #endif
+#include "../../../src/common/ranking_utils.h"     // for LambdaRankParam, RankingCache
 #include "../helpers.h"                            // for EmptyDMatrix
 #include "test_ranking_utils.h"                    // for TestNDCGCache
 #include "xgboost/data.h"                          // for MetaInfo

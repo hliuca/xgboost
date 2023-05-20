@@ -39,6 +39,18 @@
 #define GPUIDX -1
 #endif
 
+#if defined(__CUDACC__) || defined(__HIP_PLATFORM_AMD__)
+#define DeclareUnifiedDistributedTest(name) MGPU ## name
+#else
+#define DeclareUnifiedDistributedTest(name) name
+#endif
+
+#if defined(__CUDACC__) || defined(__HIP_PLATFORM_AMD__)
+#define WORLD_SIZE_FOR_TEST (xgboost::common::AllVisibleGPUs())
+#else
+#define WORLD_SIZE_FOR_TEST (3)
+#endif
+
 namespace xgboost {
 class ObjFunction;
 class Metric;
@@ -92,13 +104,15 @@ xgboost::bst_float GetMetricEval(
   xgboost::HostDeviceVector<xgboost::bst_float> const& preds,
   std::vector<xgboost::bst_float> labels,
   std::vector<xgboost::bst_float> weights = std::vector<xgboost::bst_float>(),
-  std::vector<xgboost::bst_uint> groups = std::vector<xgboost::bst_uint>());
+  std::vector<xgboost::bst_uint> groups = std::vector<xgboost::bst_uint>(),
+  xgboost::DataSplitMode data_split_Mode = xgboost::DataSplitMode::kRow);
 
 double GetMultiMetricEval(xgboost::Metric* metric,
                           xgboost::HostDeviceVector<xgboost::bst_float> const& preds,
                           xgboost::linalg::Tensor<float, 2> const& labels,
                           std::vector<xgboost::bst_float> weights = {},
-                          std::vector<xgboost::bst_uint> groups = {});
+                          std::vector<xgboost::bst_uint> groups = {},
+                          xgboost::DataSplitMode data_split_Mode = xgboost::DataSplitMode::kRow);
 
 namespace xgboost {
 
@@ -374,6 +388,11 @@ inline Context CreateEmptyGenericParam(int gpu_id) {
   return tparam;
 }
 
+/**
+ * \brief Make a context that uses CUDA.
+ */
+inline Context MakeCUDACtx(std::int32_t device) { return Context{}.MakeCUDA(device); }
+
 inline HostDeviceVector<GradientPair> GenerateRandomGradients(const size_t n_rows,
                                                               float lower= 0.0f, float upper = 1.0f) {
   xgboost::SimpleLCG gen;
@@ -478,22 +497,44 @@ inline std::int32_t AllThreadsForTest() { return Context{}.Threads(); }
 
 template <typename Function, typename... Args>
 void RunWithInMemoryCommunicator(int32_t world_size, Function&& function, Args&&... args) {
+  auto run = [&](auto rank) {
+    Json config{JsonObject()};
+    config["xgboost_communicator"] = String("in-memory");
+    config["in_memory_world_size"] = world_size;
+    config["in_memory_rank"] = rank;
+    xgboost::collective::Init(config);
+
+    std::forward<Function>(function)(std::forward<Args>(args)...);
+
+    xgboost::collective::Finalize();
+  };
+#if defined(_OPENMP)
+#pragma omp parallel num_threads(world_size)
+  {
+    auto rank = omp_get_thread_num();
+    run(rank);
+  }
+#else
   std::vector<std::thread> threads;
   for (auto rank = 0; rank < world_size; rank++) {
-    threads.emplace_back([&, rank]() {
-      Json config{JsonObject()};
-      config["xgboost_communicator"] = String("in-memory");
-      config["in_memory_world_size"] = world_size;
-      config["in_memory_rank"] = rank;
-      xgboost::collective::Init(config);
-
-      std::forward<Function>(function)(std::forward<Args>(args)...);
-
-      xgboost::collective::Finalize();
-    });
+    threads.emplace_back(run, rank);
   }
   for (auto& thread : threads) {
     thread.join();
   }
+#endif
 }
+
+class DeclareUnifiedDistributedTest(MetricTest) : public ::testing::Test {
+ protected:
+  int world_size_;
+
+  void SetUp() override {
+    world_size_ = WORLD_SIZE_FOR_TEST;
+    if (world_size_ <= 1) {
+      GTEST_SKIP() << "Skipping MGPU test with # GPUs = " << world_size_;
+    }
+  }
+};
+
 }  // namespace xgboost

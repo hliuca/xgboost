@@ -60,7 +60,7 @@ void ElementWiseKernel(Context const* ctx, linalg::TensorView<T, D> t, Fn&& fn) 
   }
   ElementWiseKernelHost(t, ctx->Threads(), fn);
 }
-#endif  // !defined(XGBOOST_USE_CUDA) && !defined(XGBOOST_USE_
+#endif  // !defined(XGBOOST_USE_CUDA) && !defined(XGBOOST_USE_HIP)
 
 template <typename T, std::int32_t kDim>
 auto cbegin(TensorView<T, kDim> const& v) {  // NOLINT
