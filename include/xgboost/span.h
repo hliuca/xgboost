@@ -42,11 +42,6 @@
 #include <cuda_runtime.h>
 #elif defined(__HIP_PLATFORM_AMD__)
 #include <hip/hip_runtime.h>
-
-extern "C" void __assert_fail (const char *__assertion, const char *__file,
-      unsigned int __line, const char *__function)
-     noexcept (true) __attribute__ ((__noreturn__));
-
 #endif
 
 /*!
@@ -127,7 +122,7 @@ namespace common {
 
 #define __ASSERT_STR_HELPER(x) #x
 
-#if 1
+#if 0  /* need to fix __assert_fail, without __host__ */
 #define HIP_KERNEL_CHECK(cond)  \
   (XGBOOST_EXPECT((cond), true) \
        ? static_cast<void>(0)   \
