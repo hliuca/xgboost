@@ -1,5 +1,5 @@
-/*!
- * Copyright 2018 XGBoost contributors
+/**
+ * Copyright 2018-2023, XGBoost contributors
  * \brief span class based on ISO++20 span
  *
  * About NOLINTs in this file:
@@ -32,21 +32,17 @@
 #include <xgboost/base.h>
 #include <xgboost/logging.h>
 
-#include <cinttypes>          // size_t
-#include <limits>             // numeric_limits
-#include <iterator>
-#include <type_traits>
+#include <cinttypes>  // size_t
 #include <cstdio>
+#include <iterator>
+#include <limits>  // numeric_limits
+#include <type_traits>
+#include <utility>  // for move
 
 #if defined(__CUDACC__)
 #include <cuda_runtime.h>
 #elif defined(__HIP_PLATFORM_AMD__)
 #include <hip/hip_runtime.h>
-
-extern "C" void __assert_fail (const char *__assertion, const char *__file,
-      unsigned int __line, const char *__function)
-     noexcept (true) __attribute__ ((__noreturn__));
-
 #endif
 
 /*!
@@ -127,7 +123,7 @@ namespace common {
 
 #define __ASSERT_STR_HELPER(x) #x
 
-#if 1
+#if 0
 #define HIP_KERNEL_CHECK(cond)  \
   (XGBOOST_EXPECT((cond), true) \
        ? static_cast<void>(0)   \
@@ -710,6 +706,44 @@ XGBOOST_DEVICE auto as_writable_bytes(Span<T, E> s) __span_noexcept ->  // NOLIN
     Span<byte, detail::ExtentAsBytesValue<T, E>::value> {
   return {reinterpret_cast<byte*>(s.data()), s.size_bytes()};
 }
+
+/**
+ * \brief A simple custom Span type that uses general iterator instead of pointer.
+ */
+template <typename It>
+class IterSpan {
+ public:
+  using value_type = typename std::iterator_traits<It>::value_type;  // NOLINT
+  using index_type = std::size_t;                                    // NOLINT
+  using iterator = It;                                               // NOLINT
+
+ private:
+  It it_;
+  index_type size_{0};
+
+ public:
+  IterSpan() = default;
+  XGBOOST_DEVICE IterSpan(It it, index_type size) : it_{std::move(it)}, size_{size} {}
+  XGBOOST_DEVICE explicit IterSpan(common::Span<It, dynamic_extent> span)
+      : it_{span.data()}, size_{span.size()} {}
+
+  [[nodiscard]] XGBOOST_DEVICE index_type size() const noexcept { return size_; }  // NOLINT
+  [[nodiscard]] XGBOOST_DEVICE decltype(auto) operator[](index_type i) const { return it_[i]; }
+  [[nodiscard]] XGBOOST_DEVICE decltype(auto) operator[](index_type i) { return it_[i]; }
+  [[nodiscard]] XGBOOST_DEVICE bool empty() const noexcept { return size() == 0; }  // NOLINT
+  [[nodiscard]] XGBOOST_DEVICE It data() const noexcept { return it_; }             // NOLINT
+  [[nodiscard]] XGBOOST_DEVICE IterSpan<It> subspan(                                // NOLINT
+      index_type _offset, index_type _count = dynamic_extent) const {
+    SPAN_CHECK((_count == dynamic_extent) ? (_offset <= size()) : (_offset + _count <= size()));
+    return {data() + _offset, _count == dynamic_extent ? size() - _offset : _count};
+  }
+  [[nodiscard]] XGBOOST_DEVICE constexpr iterator begin() const noexcept {  // NOLINT
+    return {this, 0};
+  }
+  [[nodiscard]] XGBOOST_DEVICE constexpr iterator end() const noexcept {  // NOLINT
+    return {this, size()};
+  }
+};
 }  // namespace common
 }  // namespace xgboost
 
