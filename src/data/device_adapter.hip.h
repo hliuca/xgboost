@@ -29,7 +29,11 @@ class CudfAdapterBatch : public detail::NoMetaInfo {
       : columns_(columns),
         num_rows_(num_rows) {}
   size_t Size() const { return num_rows_ * columns_.size(); }
+<<<<<<< HEAD
   __device__ COOTuple GetElement(size_t idx) const {
+=======
+  __device__ __forceinline__ COOTuple GetElement(size_t idx) const {
+>>>>>>> sync-sep-2023Jun01
     size_t column_idx = idx % columns_.size();
     size_t row_idx = idx / columns_.size();
     auto const& column = columns_[column_idx];
@@ -39,6 +43,17 @@ class CudfAdapterBatch : public detail::NoMetaInfo {
     return {row_idx, column_idx, value};
   }
 
+<<<<<<< HEAD
+=======
+  __device__ float GetElement(bst_row_t ridx, bst_feature_t fidx) const {
+    auto const& column = columns_[fidx];
+    float value = column.valid.Data() == nullptr || column.valid.Check(ridx)
+                      ? column(ridx)
+                      : std::numeric_limits<float>::quiet_NaN();
+    return value;
+  }
+
+>>>>>>> sync-sep-2023Jun01
   XGBOOST_DEVICE bst_row_t NumRows() const { return num_rows_; }
   XGBOOST_DEVICE bst_row_t NumCols() const { return columns_.size(); }
 
@@ -166,6 +181,13 @@ class CupyAdapterBatch : public detail::NoMetaInfo {
     float value = array_interface_(row_idx, column_idx);
     return {row_idx, column_idx, value};
   }
+<<<<<<< HEAD
+=======
+  __device__ float GetElement(bst_row_t ridx, bst_feature_t fidx) const {
+    float value = array_interface_(ridx, fidx);
+    return value;
+  }
+>>>>>>> sync-sep-2023Jun01
 
   XGBOOST_DEVICE bst_row_t NumRows() const { return array_interface_.Shape(0); }
   XGBOOST_DEVICE bst_row_t NumCols() const { return array_interface_.Shape(1); }
@@ -202,6 +224,7 @@ class CupyAdapter : public detail::SingleBatchDataIter<CupyAdapterBatch> {
 
 // Returns maximum row length
 template <typename AdapterBatchT>
+<<<<<<< HEAD
 size_t GetRowCounts(const AdapterBatchT batch, common::Span<size_t> offset,
                     int device_idx, float missing) {
 
@@ -236,6 +259,66 @@ size_t GetRowCounts(const AdapterBatchT batch, common::Span<size_t> offset,
                  static_cast<std::size_t>(0), thrust::maximum<size_t>());
 #endif
 
+=======
+std::size_t GetRowCounts(const AdapterBatchT batch, common::Span<bst_row_t> offset, int device_idx,
+                         float missing) {
+#if defined(XGBOOST_USE_CUDA)
+  dh::safe_cuda(cudaSetDevice(device_idx));
+#elif defined(XGBOOST_USE_HIP)
+  dh::safe_cuda(hipSetDevice(device_idx));
+#endif
+
+  IsValidFunctor is_valid(missing);
+#if defined(XGBOOST_USE_CUDA)
+  dh::safe_cuda(cudaMemsetAsync(offset.data(), '\0', offset.size_bytes()));
+#elif defined(XGBOOST_USE_HIP)
+  dh::safe_cuda(hipMemsetAsync(offset.data(), '\0', offset.size_bytes()));
+#endif
+
+  auto n_samples = batch.NumRows();
+  bst_feature_t n_features = batch.NumCols();
+
+  // Use more than 1 threads for each row in case of dataset being too wide.
+  bst_feature_t stride{0};
+  if (n_features < 32) {
+    stride = std::min(n_features, 4u);
+  } else if (n_features < 64) {
+    stride = 8;
+  } else if (n_features < 128) {
+    stride = 16;
+  } else {
+    stride = 32;
+  }
+
+  // Count elements per row
+  dh::LaunchN(n_samples * stride, [=] __device__(std::size_t idx) {
+    bst_row_t cnt{0};
+    auto [ridx, fbeg] = linalg::UnravelIndex(idx, n_samples, stride);
+    SPAN_CHECK(ridx < n_samples);
+    for (bst_feature_t fidx = fbeg; fidx < n_features; fidx += stride) {
+      if (is_valid(batch.GetElement(ridx, fidx))) {
+        cnt++;
+      }
+    }
+
+    atomicAdd(reinterpret_cast<unsigned long long*>(  // NOLINT
+                  &offset[ridx]),
+              static_cast<unsigned long long>(cnt));  // NOLINT
+  });
+
+  dh::XGBCachingDeviceAllocator<char> alloc;
+#if defined(XGBOOST_USE_CUDA)
+  bst_row_t row_stride =
+      dh::Reduce(thrust::cuda::par(alloc), thrust::device_pointer_cast(offset.data()),
+                 thrust::device_pointer_cast(offset.data()) + offset.size(),
+                 static_cast<bst_row_t>(0), thrust::maximum<bst_row_t>());
+#elif defined(XGBOOST_USE_HIP)
+  bst_row_t row_stride =
+      dh::Reduce(thrust::hip::par(alloc), thrust::device_pointer_cast(offset.data()),
+                 thrust::device_pointer_cast(offset.data()) + offset.size(),
+                 static_cast<bst_row_t>(0), thrust::maximum<bst_row_t>());
+#endif
+>>>>>>> sync-sep-2023Jun01
   return row_stride;
 }
 
@@ -243,6 +326,7 @@ size_t GetRowCounts(const AdapterBatchT batch, common::Span<size_t> offset,
  * \brief Check there's no inf in data.
  */
 template <typename AdapterBatchT>
+<<<<<<< HEAD
 bool HasInfInData(AdapterBatchT const& batch, IsValidFunctor is_valid) {
   auto counting = thrust::make_counting_iterator(0llu);
   auto value_iter = dh::MakeTransformIterator<float>(
@@ -250,6 +334,31 @@ bool HasInfInData(AdapterBatchT const& batch, IsValidFunctor is_valid) {
   auto valid =
       thrust::none_of(value_iter, value_iter + batch.Size(),
                       [is_valid] XGBOOST_DEVICE(float v) { return is_valid(v) && std::isinf(v); });
+=======
+bool NoInfInData(AdapterBatchT const& batch, IsValidFunctor is_valid) {
+  auto counting = thrust::make_counting_iterator(0llu);
+  auto value_iter = dh::MakeTransformIterator<bool>(counting, [=] XGBOOST_DEVICE(std::size_t idx) {
+    auto v = batch.GetElement(idx).value;
+    if (!is_valid(v)) {
+      // discard the invalid elements.
+      return true;
+    }
+    // check that there's no inf in data.
+    return !std::isinf(v);
+  });
+  dh::XGBCachingDeviceAllocator<char> alloc;
+  // The default implementation in thrust optimizes any_of/none_of/all_of by using small
+  // intervals to early stop. But we expect all data to be valid here, using small
+  // intervals only decreases performance due to excessive kernel launch and stream
+  // synchronization.
+#if defined(XGBOOST_USE_CUDA)
+  auto valid = dh::Reduce(thrust::cuda::par(alloc), value_iter, value_iter + batch.Size(), true,
+                          thrust::logical_and<>{});
+#elif defined(XGBOOST_USE_HIP)
+  auto valid = dh::Reduce(thrust::hip::par(alloc), value_iter, value_iter + batch.Size(), true,
+                          thrust::logical_and<>{});
+#endif
+>>>>>>> sync-sep-2023Jun01
   return valid;
 }
 };  // namespace data

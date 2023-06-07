@@ -3,9 +3,13 @@
  */
 #include <gtest/gtest.h>
 
+#if defined(XGBOOST_USE_CUDA)
 #include "../../../../src/data/ellpack_page.cuh"
 #include "../../../../src/tree/gpu_hist/gradient_based_sampler.cuh"
-#include "../../../../src/tree/param.h"
+#elif defined(XGBOOST_USE_HIP)
+#include "../../../../src/data/ellpack_page.hip.h"
+#include "../../../../src/tree/gpu_hist/gradient_based_sampler.hip.h"
+#endif
 #include "../../../../src/tree/param.h"  // TrainParam
 #include "../../filesystem.h"            // dmlc::TemporaryDirectory
 #include "../../helpers.h"

@@ -92,7 +92,11 @@ void IterativeDMatrix::InitFromCUDA(Context const* ctx, BatchParam const& p,
     }
     auto batch_rows = num_rows();
     accumulated_rows += batch_rows;
+<<<<<<< HEAD
     dh::caching_device_vector<size_t> row_counts(batch_rows + 1, 0);
+=======
+    dh::device_vector<size_t> row_counts(batch_rows + 1, 0);
+>>>>>>> sync-sep-2023Jun01
     common::Span<size_t> row_counts_span(row_counts.data().get(), row_counts.size());
     row_stride = std::max(row_stride, Dispatch(proxy, [=](auto const& value) {
                             return GetRowCounts(value, row_counts_span, get_device(), missing);
@@ -163,7 +167,11 @@ void IterativeDMatrix::InitFromCUDA(Context const* ctx, BatchParam const& p,
 #endif
 
     auto rows = num_rows();
+<<<<<<< HEAD
     dh::caching_device_vector<size_t> row_counts(rows + 1, 0);
+=======
+    dh::device_vector<size_t> row_counts(rows + 1, 0);
+>>>>>>> sync-sep-2023Jun01
     common::Span<size_t> row_counts_span(row_counts.data().get(), row_counts.size());
     Dispatch(proxy, [=](auto const& value) {
       return GetRowCounts(value, row_counts_span, get_device(), missing);

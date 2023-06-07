@@ -1,5 +1,5 @@
 # XGBoost4J: Distributed XGBoost for Scala/Java
-[![Build Status](https://travis-ci.org/dmlc/xgboost.svg?branch=master)](https://travis-ci.org/dmlc/xgboost)
+[![Build Status](https://badge.buildkite.com/aca47f40a32735c00a8550540c5eeff6a4c1d246a580cae9b0.svg?branch=master)](https://buildkite.com/xgboost/xgboost-ci)
 [![Documentation Status](https://readthedocs.org/projects/xgboost/badge/?version=latest)](https://xgboost.readthedocs.org/en/latest/jvm/index.html)
 [![GitHub license](http://dmlc.github.io/img/apache2.svg)](../LICENSE)
 
@@ -36,6 +36,19 @@ XGBoost4J, XGBoost4J-Spark, etc. in maven repository is compiled with g++-4.8.5.
     <version>latest_version_num</version>
 </dependency>
 ```
+or 
+```
+<dependency>
+    <groupId>ml.dmlc</groupId>
+    <artifactId>xgboost4j_2.13</artifactId>
+    <version>latest_version_num</version>
+</dependency>
+<dependency>
+    <groupId>ml.dmlc</groupId>
+    <artifactId>xgboost4j-spark_2.13</artifactId>
+    <version>latest_version_num</version>
+</dependency>
+```
 
 <b>sbt</b>
 ```sbt
@@ -47,7 +60,6 @@ libraryDependencies ++= Seq(
 
 For the latest release version number, please check [here](https://github.com/dmlc/xgboost/releases).
 
-To enable the GPU algorithm (`tree_method='gpu_hist'`), use artifacts `xgboost4j-gpu_2.12` and `xgboost4j-spark-gpu_2.12` instead.
 
 ### Access SNAPSHOT version
 
@@ -85,6 +97,19 @@ Then add XGBoost4J as a dependency:
     <version>latest_version_num-SNAPSHOT</version>
 </dependency>
 ```
+or with scala 2.13 
+```
+<dependency>
+    <groupId>ml.dmlc</groupId>
+    <artifactId>xgboost4j_2.13</artifactId>
+    <version>latest_version_num-SNAPSHOT</version>
+</dependency>
+<dependency>
+    <groupId>ml.dmlc</groupId>
+    <artifactId>xgboost4j-spark_2.13</artifactId>
+    <version>latest_version_num-SNAPSHOT</version>
+</dependency>
+```
 
 <b>sbt</b>
 ```sbt
@@ -96,7 +121,9 @@ libraryDependencies ++= Seq(
 
 For the latest release version number, please check [the repository listing](https://s3-us-west-2.amazonaws.com/xgboost-maven-repo/list.html).
 
+### GPU algorithm
 To enable the GPU algorithm (`tree_method='gpu_hist'`), use artifacts `xgboost4j-gpu_2.12` and `xgboost4j-spark-gpu_2.12` instead.
+Note that scala 2.13 is not supported by the [NVIDIA/spark-rapids#1525](https://github.com/NVIDIA/spark-rapids/issues/1525) yet, so the GPU algorithm can only be used with scala 2.12.
 
 ## Examples
 

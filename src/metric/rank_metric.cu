@@ -28,6 +28,7 @@ namespace xgboost::metric {
 // tag the this file, used by force static link later.
 DMLC_REGISTRY_FILE_TAG(rank_metric_gpu);
 
+<<<<<<< HEAD
 /*! \brief Evaluate rank list on GPU */
 template <typename EvalMetricT>
 struct EvalRankGpu : public GPUMetric, public EvalRankConfig {
@@ -128,8 +129,59 @@ struct EvalPrecisionGpu {
 XGBOOST_REGISTER_GPU_METRIC(PrecisionGpu, "pre")
 .describe("precision@k for rank computed on GPU.")
 .set_body([](const char* param) { return new EvalRankGpu<EvalPrecisionGpu>("pre", param); });
-
+=======
 namespace cuda_impl {
+PackedReduceResult PreScore(Context const *ctx, MetaInfo const &info,
+                            HostDeviceVector<float> const &predt,
+                            std::shared_ptr<ltr::PreCache> p_cache) {
+  auto d_gptr = p_cache->DataGroupPtr(ctx);
+  auto d_label = info.labels.View(ctx->gpu_id).Slice(linalg::All(), 0);
+
+  predt.SetDevice(ctx->gpu_id);
+  auto d_rank_idx = p_cache->SortedIdx(ctx, predt.ConstDeviceSpan());
+  auto topk = p_cache->Param().TopK();
+  auto d_weight = common::MakeOptionalWeights(ctx, info.weights_);
+
+  auto it = dh::MakeTransformIterator<double>(
+      thrust::make_counting_iterator(0ul), [=] XGBOOST_DEVICE(std::size_t i) {
+        auto g = dh::SegmentId(d_gptr, i);
+        auto g_begin = d_gptr[g];
+        auto g_end = d_gptr[g + 1];
+        i -= g_begin;
+        auto g_label = d_label.Slice(linalg::Range(g_begin, g_end));
+        auto g_rank = d_rank_idx.subspan(g_begin, g_end - g_begin);
+        double y = g_label(g_rank[i]);
+        auto n = std::min(static_cast<std::size_t>(topk), g_label.Size());
+        double w{d_weight[g]};
+        if (i >= n) {
+          return 0.0;
+        }
+        return y / static_cast<double>(n) * w;
+      });
+
+  auto cuctx = ctx->CUDACtx();
+  auto pre = p_cache->Pre(ctx);
+  thrust::fill_n(cuctx->CTP(), pre.data(), pre.size(), 0.0);
+
+  std::size_t bytes;
+  cub::DeviceSegmentedReduce::Sum(nullptr, bytes, it, pre.data(), p_cache->Groups(), d_gptr.data(),
+                                  d_gptr.data() + 1, cuctx->Stream());
+  dh::TemporaryArray<char> temp(bytes);
+  cub::DeviceSegmentedReduce::Sum(temp.data().get(), bytes, it, pre.data(), p_cache->Groups(),
+                                  d_gptr.data(), d_gptr.data() + 1, cuctx->Stream());
+
+  auto w_it =
+      dh::MakeTransformIterator<double>(thrust::make_counting_iterator(0ul),
+                                        [=] XGBOOST_DEVICE(std::size_t g) { return d_weight[g]; });
+  auto n_weights = p_cache->Groups();
+  auto sw = dh::Reduce(cuctx->CTP(), w_it, w_it + n_weights, 0.0, thrust::plus<double>{});
+  auto sum =
+      dh::Reduce(cuctx->CTP(), dh::tcbegin(pre), dh::tcend(pre), 0.0, thrust::plus<double>{});
+  auto result = PackedReduceResult{sum, sw};
+  return result;
+}
+>>>>>>> sync-sep-2023Jun01
+
 PackedReduceResult NDCGScore(Context const *ctx, MetaInfo const &info,
                              HostDeviceVector<float> const &predt, bool minus,
                              std::shared_ptr<ltr::NDCGCache> p_cache) {
