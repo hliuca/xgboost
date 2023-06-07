@@ -14,9 +14,15 @@
 #include "../common/bitfield.h"
 #include "../common/categorical.h"
 #include "../common/common.h"
+#if defined(XGBOOST_USE_CUDA)
 #include "../common/device_helpers.cuh"
 #include "../data/device_adapter.cuh"
 #include "../data/ellpack_page.cuh"
+#elif defined(XGBOOST_USE_HIP)
+#include "../common/device_helpers.hip.h"
+#include "../data/device_adapter.hip.h"
+#include "../data/ellpack_page.hip.h"
+#endif
 #include "../data/proxy_dmatrix.h"
 #include "../gbm/gbtree_model.h"
 #include "predict_fn.h"
@@ -989,7 +995,7 @@ class GPUPredictor : public xgboost::Predictor {
 
   void PredictInstance(const SparsePage::Inst&,
                        std::vector<bst_float>*,
-                       const gbm::GBTreeModel&, unsigned) const override {
+                       const gbm::GBTreeModel&, unsigned, bool) const override {
     LOG(FATAL) << "[Internal error]: " << __func__
                << " is not implemented in GPU Predictor.";
   }
