@@ -3,11 +3,7 @@
  */
 #include "../common/api_entry.h"  // XGBAPIThreadLocalEntry
 #include "../common/threading_utils.h"
-#if defined(XGBOOST_USE_CUDA)
 #include "../data/device_adapter.hip.h"
-#elif defined(XGBOOST_USE_HIP)
-#include "../data/device_adapter.hip.h"
-#endif
 #include "../data/proxy_dmatrix.h"
 #include "c_api_error.h"
 #include "c_api_utils.h"

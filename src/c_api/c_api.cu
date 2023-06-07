@@ -3,11 +3,7 @@
  */
 #include "../common/api_entry.h"  // XGBAPIThreadLocalEntry
 #include "../common/threading_utils.h"
-#if defined(XGBOOST_USE_CUDA)
 #include "../data/device_adapter.cuh"
-#elif defined(XGBOOST_USE_HIP)
-#include "../data/device_adapter.hip.h"
-#endif
 #include "../data/proxy_dmatrix.h"
 #include "c_api_error.h"
 #include "c_api_utils.h"
@@ -21,11 +17,7 @@ namespace xgboost {
 void XGBBuildInfoDevice(Json *p_info) {
   auto &info = *p_info;
 
-#if defined(XGBOOST_USE_CUDA)
   info["USE_CUDA"] = true;
-#elif defined(XGBOOST_USE_HIP)
-  info["USE_HIP"] = true;
-#endif
 
   std::vector<Json> v{Json{Integer{THRUST_MAJOR_VERSION}}, Json{Integer{THRUST_MINOR_VERSION}},
                       Json{Integer{THRUST_SUBMINOR_VERSION}}};
@@ -38,13 +30,8 @@ void XGBBuildInfoDevice(Json *p_info) {
   info["USE_NCCL"] = Boolean{true};
   v = {Json{Integer{NCCL_MAJOR}}, Json{Integer{NCCL_MINOR}}, Json{Integer{NCCL_PATCH}}};
   info["NCCL_VERSION"] = v;
-#elif defined(XGBOOST_USE_RCCL)
-  info["USE_RCCL"] = Boolean{true};
-  v = {Json{Integer{NCCL_MAJOR}}, Json{Integer{NCCL_MINOR}}, Json{Integer{NCCL_PATCH}}};
-  info["RCCL_VERSION"] = v;
 #else
   info["USE_NCCL"] = Boolean{false};
-  info["USE_RCCL"] = Boolean{false};
 #endif
 
 #if defined(XGBOOST_USE_RMM)
@@ -60,21 +47,13 @@ void XGBBuildInfoDevice(Json *p_info) {
 void XGBoostAPIGuard::SetGPUAttribute() {
   // Not calling `safe_cuda` to avoid unnecessary exception handling overhead.
   // If errors, do nothing, assuming running on CPU only machine.
-#if defined(XGBOOST_USE_CUDA)
   cudaGetDevice(&device_id_);
-#elif defined(XGBOOST_USE_HIP)
-  hipGetDevice(&device_id_);
-#endif
 }
 
 void XGBoostAPIGuard::RestoreGPUAttribute() {
   // Not calling `safe_cuda` to avoid unnecessary exception handling overhead.
   // If errors, do nothing, assuming running on CPU only machine.
-#if defined(XGBOOST_USE_CUDA)
   cudaSetDevice(device_id_);
-#elif defined(XGBOOST_USE_HIP)
-  hipSetDevice(device_id_);
-#endif
 }
 }                        // namespace xgboost
 

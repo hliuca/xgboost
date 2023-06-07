@@ -20,7 +20,7 @@
 #include "xgboost/objective.h"              // ObjFunction
 #include "xgboost/parameter.h"              // XGBoostParameter
 
-#if defined(XGBOOST_USE_CUDA) || defined(XGBOOST_USE_HIP)
+#if defined(XGBOOST_USE_CUDA)
 
 #include "../common/linalg_op.cuh"  // ElementWiseKernel
 #include "../common/stats.cuh"      // SegmentedQuantile
@@ -127,7 +127,7 @@ class QuantileRegression : public ObjFunction {
         }
       }
     } else {
-#if defined(XGBOOST_USE_CUDA) || defined(XGBOOST_USE_HIP)
+#if defined(XGBOOST_USE_CUDA)
       alpha_.SetDevice(ctx_->gpu_id);
       auto d_alpha = alpha_.ConstDeviceSpan();
       auto d_labels = info.labels.View(ctx_->gpu_id);
@@ -162,7 +162,7 @@ class QuantileRegression : public ObjFunction {
       }
 #else
       common::AssertGPUSupport();
-#endif  // defined(XGBOOST_USE_CUDA) || defined(XGBOOST_USE_HIP)
+#endif  // defined(XGBOOST_USE_CUDA)
     }
 
     // For multiple quantiles, we should extend the base score to a vector instead of
@@ -220,8 +220,8 @@ XGBOOST_REGISTER_OBJECTIVE(QuantileRegression, QuantileRegression::Name())
     .describe("Regression with quantile loss.")
     .set_body([]() { return new QuantileRegression(); });
 
-#if defined(XGBOOST_USE_CUDA) || defined(XGBOOST_USE_HIP)
+#if defined(XGBOOST_USE_CUDA)
 DMLC_REGISTRY_FILE_TAG(quantile_obj_gpu);
-#endif  // defined(XGBOOST_USE_CUDA) || defined(XGBOOST_USE_HIP)
+#endif  // defined(XGBOOST_USE_CUDA)
 }  // namespace obj
 }  // namespace xgboost

@@ -113,35 +113,18 @@ void SortByWeight(dh::device_vector<float>* weights,
                   dh::device_vector<Entry>* sorted_entries) {
   // Sort both entries and wegihts.
   dh::XGBDeviceAllocator<char> alloc;
-
-#if defined(XGBOOST_USE_CUDA)
   thrust::sort_by_key(thrust::cuda::par(alloc), sorted_entries->begin(),
                       sorted_entries->end(), weights->begin(),
                       detail::EntryCompareOp());
-#elif defined(XGBOOST_USE_HIP)
-  thrust::sort_by_key(thrust::hip::par(alloc), sorted_entries->begin(),
-                      sorted_entries->end(), weights->begin(),
-                      detail::EntryCompareOp());
-#endif
 
   // Scan weights
   dh::XGBCachingDeviceAllocator<char> caching;
-
-#if defined(XGBOOST_USE_CUDA)
   thrust::inclusive_scan_by_key(thrust::cuda::par(caching),
                                 sorted_entries->begin(), sorted_entries->end(),
                                 weights->begin(), weights->begin(),
                                 [=] __device__(const Entry& a, const Entry& b) {
                                   return a.index == b.index;
                                 });
-#elif defined(XGBOOST_USE_HIP)
-  thrust::inclusive_scan_by_key(thrust::hip::par(caching),
-                                sorted_entries->begin(), sorted_entries->end(),
-                                weights->begin(), weights->begin(),
-                                [=] __device__(const Entry& a, const Entry& b) {
-                                  return a.index == b.index;
-                                });
-#endif
 }
 
 void RemoveDuplicatedCategories(
@@ -209,14 +192,8 @@ void ProcessBatch(int device, MetaInfo const &info, const SparsePage &page,
     sorted_entries = dh::device_vector<Entry>(host_data.begin() + begin,
                                               host_data.begin() + end);
   }
-
-#if defined(XGBOOST_USE_CUDA)
   thrust::sort(thrust::cuda::par(alloc), sorted_entries.begin(),
                sorted_entries.end(), detail::EntryCompareOp());
-#elif defined(XGBOOST_USE_HIP)
-  thrust::sort(thrust::hip::par(alloc), sorted_entries.begin(),
-               sorted_entries.end(), detail::EntryCompareOp());
-#endif
 
   HostDeviceVector<SketchContainer::OffsetT> cuts_ptr;
   dh::caching_device_vector<size_t> column_sizes_scan;

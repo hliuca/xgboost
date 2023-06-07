@@ -5,7 +5,7 @@
 #include "device_communicator.cuh"
 #include "device_communicator_adapter.cuh"
 #include "noop_communicator.h"
-#if defined(XGBOOST_USE_NCCL) || defined(XGBOOST_USE_RCCL)
+#ifdef XGBOOST_USE_NCCL
 #include "nccl_device_communicator.cuh"
 #endif
 
@@ -28,7 +28,7 @@ DeviceCommunicator* Communicator::GetDevice(int device_ordinal) {
       communicator_->GetWorldSize() != old_world_size) {
     old_device_ordinal = device_ordinal;
     old_world_size = communicator_->GetWorldSize();
-#if defined(XGBOOST_USE_NCCL) || defined(XGBOOST_USE_RCCL)
+#ifdef XGBOOST_USE_NCCL
     if (type_ != CommunicatorType::kFederated) {
       device_communicator_.reset(new NcclDeviceCommunicator(device_ordinal, Get()));
     } else {
