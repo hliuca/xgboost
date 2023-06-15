@@ -28,11 +28,7 @@ void ArrayInterfaceHandler::SyncCudaStream(std::int64_t stream) {
       // default per-thread stream
     default: {
       dh::CUDAEvent e;
-#if defined(XGBOOST_USE_CUDA)
       e.Record(dh::CUDAStreamView{reinterpret_cast<cudaStream_t>(stream)});
-#elif defined(XGBOOST_USE_HIP)
-      e.Record(dh::CUDAStreamView{reinterpret_cast<hipStream_t>(stream)});
-#endif
       dh::DefaultStream().Wait(e);
     }
   }
@@ -42,8 +38,6 @@ bool ArrayInterfaceHandler::IsCudaPtr(void const* ptr) {
   if (!ptr) {
     return false;
   }
-
-#if defined(XGBOOST_USE_CUDA)
   cudaPointerAttributes attr;
   auto err = cudaPointerGetAttributes(&attr, ptr);
   // reset error
@@ -65,25 +59,5 @@ bool ArrayInterfaceHandler::IsCudaPtr(void const* ptr) {
     // other errors, `cudaErrorNoDevice`, `cudaErrorInsufficientDriver` etc.
     return false;
   }
-#elif defined(XGBOOST_USE_HIP)
-  hipPointerAttribute_t attr;
-  auto err = hipPointerGetAttributes(&attr, ptr);
-  // reset error
-  CHECK_EQ(err, hipGetLastError());
-  if (err == hipErrorInvalidValue) {
-    return false;
-  } else if (err == hipSuccess) {
-    switch (attr.memoryType) {
-      case hipMemoryTypeUnified:
-      case hipMemoryTypeHost:
-        return false;
-      default:
-        return true;
-    }
-    return true;
-  } else {
-    return false;
-  }
-#endif
 }
 }  // namespace xgboost

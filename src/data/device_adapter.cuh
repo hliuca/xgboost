@@ -122,13 +122,7 @@ class CudfAdapter : public detail::SingleBatchDataIter<CudfAdapterBatch> {
 
     device_idx_ = dh::CudaGetPointerDevice(first_column.data);
     CHECK_NE(device_idx_, Context::kCpuId);
-
-#if defined(XGBOOST_USE_HIP)
-    dh::safe_cuda(hipSetDevice(device_idx_));
-#elif defined(XGBOOST_USE_CUDA)
     dh::safe_cuda(cudaSetDevice(device_idx_));
-#endif
-
     for (auto& json_col : json_columns) {
       auto column = ArrayInterface<1>(get<Object const>(json_col));
       columns.push_back(column);
@@ -216,18 +210,9 @@ class CupyAdapter : public detail::SingleBatchDataIter<CupyAdapterBatch> {
 template <typename AdapterBatchT>
 std::size_t GetRowCounts(const AdapterBatchT batch, common::Span<bst_row_t> offset, int device_idx,
                          float missing) {
-#if defined(XGBOOST_USE_CUDA)
   dh::safe_cuda(cudaSetDevice(device_idx));
-#elif defined(XGBOOST_USE_HIP)
-  dh::safe_cuda(hipSetDevice(device_idx));
-#endif
-
   IsValidFunctor is_valid(missing);
-#if defined(XGBOOST_USE_CUDA)
   dh::safe_cuda(cudaMemsetAsync(offset.data(), '\0', offset.size_bytes()));
-#elif defined(XGBOOST_USE_HIP)
-  dh::safe_cuda(hipMemsetAsync(offset.data(), '\0', offset.size_bytes()));
-#endif
 
   auto n_samples = batch.NumRows();
   bst_feature_t n_features = batch.NumCols();
@@ -259,19 +244,11 @@ std::size_t GetRowCounts(const AdapterBatchT batch, common::Span<bst_row_t> offs
                   &offset[ridx]),
               static_cast<unsigned long long>(cnt));  // NOLINT
   });
-
   dh::XGBCachingDeviceAllocator<char> alloc;
-#if defined(XGBOOST_USE_CUDA)
   bst_row_t row_stride =
       dh::Reduce(thrust::cuda::par(alloc), thrust::device_pointer_cast(offset.data()),
                  thrust::device_pointer_cast(offset.data()) + offset.size(),
                  static_cast<bst_row_t>(0), thrust::maximum<bst_row_t>());
-#elif defined(XGBOOST_USE_HIP)
-  bst_row_t row_stride =
-      dh::Reduce(thrust::hip::par(alloc), thrust::device_pointer_cast(offset.data()),
-                 thrust::device_pointer_cast(offset.data()) + offset.size(),
-                 static_cast<bst_row_t>(0), thrust::maximum<bst_row_t>());
-#endif
   return row_stride;
 }
 
@@ -295,13 +272,8 @@ bool NoInfInData(AdapterBatchT const& batch, IsValidFunctor is_valid) {
   // intervals to early stop. But we expect all data to be valid here, using small
   // intervals only decreases performance due to excessive kernel launch and stream
   // synchronization.
-#if defined(XGBOOST_USE_CUDA)
   auto valid = dh::Reduce(thrust::cuda::par(alloc), value_iter, value_iter + batch.Size(), true,
                           thrust::logical_and<>{});
-#elif defined(XGBOOST_USE_HIP)
-  auto valid = dh::Reduce(thrust::hip::par(alloc), value_iter, value_iter + batch.Size(), true,
-                          thrust::logical_and<>{});
-#endif
   return valid;
 }
 };  // namespace data

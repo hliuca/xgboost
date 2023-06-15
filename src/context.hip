@@ -1,4 +1,14 @@
+/**
+ * Copyright 2022 by XGBoost Contributors
+ */
+#include "common/cuda_context.hip.h"  // CUDAContext
+#include "xgboost/context.h"
 
-#if defined(XGBOOST_USE_HIP)
-#include "context.cu"
-#endif
+namespace xgboost {
+CUDAContext const* Context::CUDACtx() const {
+  if (!cuctx_) {
+    cuctx_.reset(new CUDAContext{});
+  }
+  return cuctx_.get();
+}
+}  // namespace xgboost
