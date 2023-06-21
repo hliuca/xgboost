@@ -28,108 +28,6 @@ namespace xgboost::metric {
 // tag the this file, used by force static link later.
 DMLC_REGISTRY_FILE_TAG(rank_metric_gpu);
 
-<<<<<<< HEAD
-/*! \brief Evaluate rank list on GPU */
-template <typename EvalMetricT>
-struct EvalRankGpu : public GPUMetric, public EvalRankConfig {
- public:
-  double Eval(const HostDeviceVector<bst_float> &preds, const MetaInfo &info) override {
-    // Sanity check is done by the caller
-    std::vector<unsigned> tgptr(2, 0);
-    tgptr[1] = static_cast<unsigned>(preds.Size());
-    const std::vector<unsigned> &gptr = info.group_ptr_.size() == 0 ? tgptr : info.group_ptr_;
-
-    const auto ngroups = static_cast<bst_omp_uint>(gptr.size() - 1);
-
-    auto device = ctx_->gpu_id;
-    dh::safe_cuda(cudaSetDevice(device));
-
-    info.labels.SetDevice(device);
-    preds.SetDevice(device);
-
-    auto dpreds = preds.ConstDevicePointer();
-    auto dlabels = info.labels.View(device);
-
-    // Sort all the predictions
-    dh::SegmentSorter<float> segment_pred_sorter;
-    segment_pred_sorter.SortItems(dpreds, preds.Size(), gptr);
-
-    // Compute individual group metric and sum them up
-    return EvalMetricT::EvalMetric(segment_pred_sorter, dlabels.Values().data(), *this);
-  }
-
-  const char* Name() const override {
-    return name.c_str();
-  }
-
-  explicit EvalRankGpu(const char* name, const char* param) {
-    using namespace std;  // NOLINT(*)
-    if (param != nullptr) {
-      std::ostringstream os;
-      if (sscanf(param, "%u[-]?", &this->topn) == 1) {
-        os << name << '@' << param;
-        this->name = os.str();
-      } else {
-        os << name << param;
-        this->name = os.str();
-      }
-      if (param[strlen(param) - 1] == '-') {
-        this->minus = true;
-      }
-    } else {
-      this->name = name;
-    }
-  }
-};
-
-/*! \brief Precision at N, for both classification and rank */
-struct EvalPrecisionGpu {
- public:
-  static double EvalMetric(const dh::SegmentSorter<float> &pred_sorter,
-                           const float *dlabels,
-                           const EvalRankConfig &ecfg) {
-    // Group info on device
-    const auto &dgroups = pred_sorter.GetGroupsSpan();
-    const auto ngroups = pred_sorter.GetNumGroups();
-    const auto &dgroup_idx = pred_sorter.GetGroupSegmentsSpan();
-
-    // Original positions of the predictions after they have been sorted
-    const auto &dpreds_orig_pos = pred_sorter.GetOriginalPositionsSpan();
-
-    // First, determine non zero labels in the dataset individually
-    auto DetermineNonTrivialLabelLambda = [=] __device__(uint32_t idx) {
-      return (static_cast<unsigned>(dlabels[dpreds_orig_pos[idx]]) != 0) ? 1 : 0;
-    };  // NOLINT
-
-    // Find each group's metric sum
-    dh::caching_device_vector<uint32_t> hits(ngroups, 0);
-    const auto nitems = pred_sorter.GetNumItems();
-    auto *dhits = hits.data().get();
-
-    int device_id = -1;
-    dh::safe_cuda(cudaGetDevice(&device_id));
-    // For each group item compute the aggregated precision
-    dh::LaunchN(nitems, nullptr, [=] __device__(uint32_t idx) {
-      const auto group_idx = dgroup_idx[idx];
-      const auto group_begin = dgroups[group_idx];
-      const auto ridx = idx - group_begin;
-      if (ridx < ecfg.topn && DetermineNonTrivialLabelLambda(idx)) {
-        atomicAdd(&dhits[group_idx], 1);
-      }
-    });
-
-    // Allocator to be used for managing space overhead while performing reductions
-    dh::XGBCachingDeviceAllocator<char> alloc;
-    return static_cast<double>(thrust::reduce(thrust::cuda::par(alloc),
-                                              hits.begin(), hits.end())) / ecfg.topn;
-  }
-};
-
-
-XGBOOST_REGISTER_GPU_METRIC(PrecisionGpu, "pre")
-.describe("precision@k for rank computed on GPU.")
-.set_body([](const char* param) { return new EvalRankGpu<EvalPrecisionGpu>("pre", param); });
-=======
 namespace cuda_impl {
 PackedReduceResult PreScore(Context const *ctx, MetaInfo const &info,
                             HostDeviceVector<float> const &predt,
@@ -180,7 +78,6 @@ PackedReduceResult PreScore(Context const *ctx, MetaInfo const &info,
   auto result = PackedReduceResult{sum, sw};
   return result;
 }
->>>>>>> sync-sep-2023Jun01
 
 PackedReduceResult NDCGScore(Context const *ctx, MetaInfo const &info,
                              HostDeviceVector<float> const &predt, bool minus,
