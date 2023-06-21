@@ -9,8 +9,10 @@
 
 #if defined(XGBOOST_USE_NCCL)
 #include "../../../src/collective/nccl_device_communicator.cuh"
+#include "../../../src/collective/communicator-inl.cuh"
 #elif defined(XGBOOST_USE_RCCL)
 #include "../../../src/collective/nccl_device_communicator.hip.h"
+#include "../../../src/collective/communicator-inl.hip.h"
 #endif
 
 namespace xgboost {

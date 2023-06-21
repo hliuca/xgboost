@@ -17,10 +17,6 @@
 #include "quantile.cuh"
 #include "timer.h"
 
-#if defined(XGBOOST_USE_HIP)
-namespace cub = hipcub;
-#endif
-
 namespace xgboost {
 namespace common {
 namespace cuda {
@@ -89,19 +85,10 @@ __global__ void GetColumnSizeSharedMemKernel(IterSpan<BatchIt> batch_iter,
 template <std::uint32_t kBlockThreads, typename Kernel>
 std::uint32_t EstimateGridSize(std::int32_t device, Kernel kernel, std::size_t shared_mem) {
   int n_mps = 0;
-#if defined(XGBOOST_USE_CUDA)
   dh::safe_cuda(cudaDeviceGetAttribute(&n_mps, cudaDevAttrMultiProcessorCount, device));
-#elif defined(XGBOOST_USE_HIP)
-  dh::safe_cuda(hipDeviceGetAttribute(&n_mps, hipDeviceAttributeMultiprocessorCount, device));
-#endif
   int n_blocks_per_mp = 0;
-#if defined(XGBOOST_USE_CUDA)
   dh::safe_cuda(cudaOccupancyMaxActiveBlocksPerMultiprocessor(&n_blocks_per_mp, kernel,
                                                               kBlockThreads, shared_mem));
-#elif defined(XGBOOST_USE_HIP)
-  dh::safe_cuda(hipOccupancyMaxActiveBlocksPerMultiprocessor(&n_blocks_per_mp, kernel,
-                                                              kBlockThreads, shared_mem));
-#endif
   std::uint32_t grid_size = n_blocks_per_mp * n_mps;
   return grid_size;
 }

@@ -23,20 +23,28 @@ class DeviceCommunicatorAdapter : public DeviceCommunicator {
 
   ~DeviceCommunicatorAdapter() override = default;
 
-  void AllReduceSum(float *send_receive_buffer, size_t count) override {
-    DoAllReduceSum<collective::DataType::kFloat>(send_receive_buffer, count);
-  }
+  void AllReduce(void *send_receive_buffer, std::size_t count, DataType data_type,
+                 Operation op) override {
+    if (communicator_->GetWorldSize() == 1) {
+      return;
+    }
 
-  void AllReduceSum(double *send_receive_buffer, size_t count) override {
-    DoAllReduceSum<collective::DataType::kDouble>(send_receive_buffer, count);
-  }
-
-  void AllReduceSum(int64_t *send_receive_buffer, size_t count) override {
-    DoAllReduceSum<collective::DataType::kInt64>(send_receive_buffer, count);
-  }
-
-  void AllReduceSum(uint64_t *send_receive_buffer, size_t count) override {
-    DoAllReduceSum<collective::DataType::kUInt64>(send_receive_buffer, count);
+#if defined(XGBOOST_USE_CUDA)
+    dh::safe_cuda(cudaSetDevice(device_ordinal_));
+#elif defined(XGBOOST_USE_HIP)
+    dh::safe_cuda(hipSetDevice(device_ordinal_));
+#endif
+    auto size = count * GetTypeSize(data_type);
+    host_buffer_.reserve(size);
+#if defined(XGBOOST_USE_CUDA)
+    dh::safe_cuda(cudaMemcpy(host_buffer_.data(), send_receive_buffer, size, cudaMemcpyDefault));
+    communicator_->AllReduce(host_buffer_.data(), count, data_type, op);
+    dh::safe_cuda(cudaMemcpy(send_receive_buffer, host_buffer_.data(), size, cudaMemcpyDefault));
+#elif defined(XGBOOST_USE_HIP)
+    dh::safe_cuda(hipMemcpy(host_buffer_.data(), send_receive_buffer, size, hipMemcpyDefault));
+    communicator_->AllReduce(host_buffer_.data(), count, data_type, op);
+    dh::safe_cuda(hipMemcpy(send_receive_buffer, host_buffer_.data(), size, hipMemcpyDefault));
+#endif
   }
 
   void AllGatherV(void const *send_buffer, size_t length_bytes, std::vector<std::size_t> *segments,
@@ -93,32 +101,6 @@ class DeviceCommunicatorAdapter : public DeviceCommunicator {
   }
 
  private:
-  template <collective::DataType data_type, typename T>
-  void DoAllReduceSum(T *send_receive_buffer, size_t count) {
-    if (communicator_->GetWorldSize() == 1) {
-      return;
-    }
-
-#if defined(XGBOOST_USE_HIP)
-    dh::safe_cuda(hipSetDevice(device_ordinal_));
-#else
-    dh::safe_cuda(cudaSetDevice(device_ordinal_));
-#endif
-
-    auto size = count * sizeof(T);
-    host_buffer_.reserve(size);
-
-#if defined(XGBOOST_USE_HIP)
-    dh::safe_cuda(hipMemcpy(host_buffer_.data(), send_receive_buffer, size, hipMemcpyDefault));
-    communicator_->AllReduce(host_buffer_.data(), count, data_type, collective::Operation::kSum);
-    dh::safe_cuda(hipMemcpy(send_receive_buffer, host_buffer_.data(), size, hipMemcpyDefault));
-#else
-    dh::safe_cuda(cudaMemcpy(host_buffer_.data(), send_receive_buffer, size, cudaMemcpyDefault));
-    communicator_->AllReduce(host_buffer_.data(), count, data_type, collective::Operation::kSum);
-    dh::safe_cuda(cudaMemcpy(send_receive_buffer, host_buffer_.data(), size, cudaMemcpyDefault));
-#endif
-  }
-
   int const device_ordinal_;
   Communicator *communicator_;
   /// Host buffer used to call communicator functions.

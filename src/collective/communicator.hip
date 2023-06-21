@@ -12,27 +12,15 @@
 namespace xgboost {
 namespace collective {
 
-<<<<<<< HEAD
-thread_local int Communicator::device_ordinal_{-1};
-=======
->>>>>>> sync-sep-2023Jun01
 thread_local std::unique_ptr<DeviceCommunicator> Communicator::device_communicator_{};
 
 void Communicator::Finalize() {
   communicator_->Shutdown();
   communicator_.reset(new NoOpCommunicator());
-<<<<<<< HEAD
-  device_ordinal_ = -1;
-=======
->>>>>>> sync-sep-2023Jun01
   device_communicator_.reset(nullptr);
 }
 
 DeviceCommunicator* Communicator::GetDevice(int device_ordinal) {
-<<<<<<< HEAD
-  if (!device_communicator_ || device_ordinal_ != device_ordinal) {
-    device_ordinal_ = device_ordinal;
-=======
   thread_local auto old_device_ordinal = -1;
   // If the number of GPUs changes, we need to re-initialize NCCL.
   thread_local auto old_world_size = -1;
@@ -40,7 +28,6 @@ DeviceCommunicator* Communicator::GetDevice(int device_ordinal) {
       communicator_->GetWorldSize() != old_world_size) {
     old_device_ordinal = device_ordinal;
     old_world_size = communicator_->GetWorldSize();
->>>>>>> sync-sep-2023Jun01
 #if defined(XGBOOST_USE_NCCL) || defined(XGBOOST_USE_RCCL)
     if (type_ != CommunicatorType::kFederated) {
       device_communicator_.reset(new NcclDeviceCommunicator(device_ordinal, Get()));

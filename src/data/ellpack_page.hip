@@ -213,11 +213,7 @@ void CopyDataToEllpack(const AdapterBatchT& batch, common::Span<FeatureType cons
   // correct output position
   auto counting = thrust::make_counting_iterator(0llu);
   data::IsValidFunctor is_valid(missing);
-<<<<<<< HEAD
-  bool valid = data::HasInfInData(batch, is_valid);
-=======
   bool valid = data::NoInfInData(batch, is_valid);
->>>>>>> sync-sep-2023Jun01
   CHECK(valid) << error::InfInData();
 
   auto key_iter = dh::MakeTransformIterator<size_t>(

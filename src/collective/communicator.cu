@@ -21,10 +21,6 @@ void Communicator::Finalize() {
 }
 
 DeviceCommunicator* Communicator::GetDevice(int device_ordinal) {
-<<<<<<< HEAD
-  if (!device_communicator_ || device_ordinal_ != device_ordinal) {
-    device_ordinal_ = device_ordinal;
-=======
   thread_local auto old_device_ordinal = -1;
   // If the number of GPUs changes, we need to re-initialize NCCL.
   thread_local auto old_world_size = -1;
@@ -32,7 +28,6 @@ DeviceCommunicator* Communicator::GetDevice(int device_ordinal) {
       communicator_->GetWorldSize() != old_world_size) {
     old_device_ordinal = device_ordinal;
     old_world_size = communicator_->GetWorldSize();
->>>>>>> sync-sep-2023Jun01
 #ifdef XGBOOST_USE_NCCL
     if (type_ != CommunicatorType::kFederated) {
       device_communicator_.reset(new NcclDeviceCommunicator(device_ordinal, Get()));

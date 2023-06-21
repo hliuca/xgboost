@@ -29,11 +29,7 @@ class CudfAdapterBatch : public detail::NoMetaInfo {
       : columns_(columns),
         num_rows_(num_rows) {}
   size_t Size() const { return num_rows_ * columns_.size(); }
-<<<<<<< HEAD
-  __device__ COOTuple GetElement(size_t idx) const {
-=======
   __device__ __forceinline__ COOTuple GetElement(size_t idx) const {
->>>>>>> sync-sep-2023Jun01
     size_t column_idx = idx % columns_.size();
     size_t row_idx = idx / columns_.size();
     auto const& column = columns_[column_idx];
@@ -43,8 +39,6 @@ class CudfAdapterBatch : public detail::NoMetaInfo {
     return {row_idx, column_idx, value};
   }
 
-<<<<<<< HEAD
-=======
   __device__ float GetElement(bst_row_t ridx, bst_feature_t fidx) const {
     auto const& column = columns_[fidx];
     float value = column.valid.Data() == nullptr || column.valid.Check(ridx)
@@ -53,7 +47,6 @@ class CudfAdapterBatch : public detail::NoMetaInfo {
     return value;
   }
 
->>>>>>> sync-sep-2023Jun01
   XGBOOST_DEVICE bst_row_t NumRows() const { return num_rows_; }
   XGBOOST_DEVICE bst_row_t NumCols() const { return columns_.size(); }
 
@@ -181,13 +174,10 @@ class CupyAdapterBatch : public detail::NoMetaInfo {
     float value = array_interface_(row_idx, column_idx);
     return {row_idx, column_idx, value};
   }
-<<<<<<< HEAD
-=======
   __device__ float GetElement(bst_row_t ridx, bst_feature_t fidx) const {
     float value = array_interface_(ridx, fidx);
     return value;
   }
->>>>>>> sync-sep-2023Jun01
 
   XGBOOST_DEVICE bst_row_t NumRows() const { return array_interface_.Shape(0); }
   XGBOOST_DEVICE bst_row_t NumCols() const { return array_interface_.Shape(1); }
@@ -224,42 +214,6 @@ class CupyAdapter : public detail::SingleBatchDataIter<CupyAdapterBatch> {
 
 // Returns maximum row length
 template <typename AdapterBatchT>
-<<<<<<< HEAD
-size_t GetRowCounts(const AdapterBatchT batch, common::Span<size_t> offset,
-                    int device_idx, float missing) {
-
-#if defined(XGBOOST_USE_HIP)
-  dh::safe_cuda(hipSetDevice(device_idx));
-#elif defined(XGBOOST_USE_CUDA)
-  dh::safe_cuda(cudaSetDevice(device_idx));
-#endif
-
-  IsValidFunctor is_valid(missing);
-  // Count elements per row
-  dh::LaunchN(batch.Size(), [=] __device__(size_t idx) {
-    auto element = batch.GetElement(idx);
-    if (is_valid(element)) {
-      atomicAdd(reinterpret_cast<unsigned long long*>(  // NOLINT
-                    &offset[element.row_idx]),
-                static_cast<unsigned long long>(1));  // NOLINT
-    }
-  });
-
-  dh::XGBCachingDeviceAllocator<char> alloc;
-
-#if defined(XGBOOST_USE_HIP)
-  size_t row_stride =
-      dh::Reduce(thrust::hip::par(alloc), thrust::device_pointer_cast(offset.data()),
-                 thrust::device_pointer_cast(offset.data()) + offset.size(),
-                 static_cast<std::size_t>(0), thrust::maximum<size_t>());
-#elif defined(XGBOOST_USE_CUDA)
-  size_t row_stride =
-      dh::Reduce(thrust::cuda::par(alloc), thrust::device_pointer_cast(offset.data()),
-                 thrust::device_pointer_cast(offset.data()) + offset.size(),
-                 static_cast<std::size_t>(0), thrust::maximum<size_t>());
-#endif
-
-=======
 std::size_t GetRowCounts(const AdapterBatchT batch, common::Span<bst_row_t> offset, int device_idx,
                          float missing) {
 #if defined(XGBOOST_USE_CUDA)
@@ -318,7 +272,6 @@ std::size_t GetRowCounts(const AdapterBatchT batch, common::Span<bst_row_t> offs
                  thrust::device_pointer_cast(offset.data()) + offset.size(),
                  static_cast<bst_row_t>(0), thrust::maximum<bst_row_t>());
 #endif
->>>>>>> sync-sep-2023Jun01
   return row_stride;
 }
 
@@ -326,15 +279,6 @@ std::size_t GetRowCounts(const AdapterBatchT batch, common::Span<bst_row_t> offs
  * \brief Check there's no inf in data.
  */
 template <typename AdapterBatchT>
-<<<<<<< HEAD
-bool HasInfInData(AdapterBatchT const& batch, IsValidFunctor is_valid) {
-  auto counting = thrust::make_counting_iterator(0llu);
-  auto value_iter = dh::MakeTransformIterator<float>(
-      counting, [=] XGBOOST_DEVICE(std::size_t idx) { return batch.GetElement(idx).value; });
-  auto valid =
-      thrust::none_of(value_iter, value_iter + batch.Size(),
-                      [is_valid] XGBOOST_DEVICE(float v) { return is_valid(v) && std::isinf(v); });
-=======
 bool NoInfInData(AdapterBatchT const& batch, IsValidFunctor is_valid) {
   auto counting = thrust::make_counting_iterator(0llu);
   auto value_iter = dh::MakeTransformIterator<bool>(counting, [=] XGBOOST_DEVICE(std::size_t idx) {
@@ -358,7 +302,6 @@ bool NoInfInData(AdapterBatchT const& batch, IsValidFunctor is_valid) {
   auto valid = dh::Reduce(thrust::hip::par(alloc), value_iter, value_iter + batch.Size(), true,
                           thrust::logical_and<>{});
 #endif
->>>>>>> sync-sep-2023Jun01
   return valid;
 }
 };  // namespace data
