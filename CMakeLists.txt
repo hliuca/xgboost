@@ -47,6 +47,7 @@ option(USE_NVTX "Build with cuda profiling annotations. Developers only." OFF)
 set(NVTX_HEADER_DIR "" CACHE PATH "Path to the stand-alone nvtx header")
 option(RABIT_MOCK "Build rabit with mock" OFF)
 option(HIDE_CXX_SYMBOLS "Build shared library and hide all C++ symbols" OFF)
+option(KEEP_BUILD_ARTIFACTS_IN_BINARY_DIR "Output build artifacts in CMake binary dir" OFF)
 ## CUDA
 option(USE_CUDA  "Build with GPU acceleration" OFF)
 option(USE_NCCL  "Build with NCCL to enable distributed GPU support." OFF)
@@ -170,6 +171,8 @@ if (USE_CUDA)
   set(GEN_CODE "")
   format_gencode_flags("${GPU_COMPUTE_VER}" GEN_CODE)
   add_subdirectory(${PROJECT_SOURCE_DIR}/gputreeshap)
+
+  find_package(CUDAToolkit REQUIRED)
 endif (USE_CUDA)
 
 if (USE_HIP)
@@ -187,7 +190,6 @@ if (USE_HIP)
   set(CMAKE_HIP_FLAGS "${CMAKE_HIP_FLAGS} -Wunused-result -w")
   set(CMAKE_HIP_FLAGS "${CMAKE_HIP_FLAGS} -D__HIP_PLATFORM_AMD__")
   add_subdirectory(${PROJECT_SOURCE_DIR}/rocgputreeshap)
-  add_subdirectory(${PROJECT_SOURCE_DIR}/warp-primitives)
 endif (USE_HIP)
 
 if (FORCE_COLORED_OUTPUT AND (CMAKE_GENERATOR STREQUAL "Ninja") AND
@@ -312,8 +314,13 @@ if (JVM_BINDINGS)
   xgboost_target_defs(xgboost4j)
 endif (JVM_BINDINGS)
 
-set_output_directory(runxgboost ${xgboost_SOURCE_DIR})
-set_output_directory(xgboost ${xgboost_SOURCE_DIR}/lib)
+if (KEEP_BUILD_ARTIFACTS_IN_BINARY_DIR)
+  set_output_directory(runxgboost ${xgboost_BINARY_DIR})
+  set_output_directory(xgboost ${xgboost_BINARY_DIR}/lib)
+else ()
+  set_output_directory(runxgboost ${xgboost_SOURCE_DIR})
+  set_output_directory(xgboost ${xgboost_SOURCE_DIR}/lib)
+endif ()
 # Ensure these two targets do not build simultaneously, as they produce outputs with conflicting names
 add_dependencies(xgboost runxgboost)
 
