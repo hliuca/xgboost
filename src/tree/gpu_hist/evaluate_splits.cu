@@ -14,6 +14,11 @@
 #if defined(XGBOOST_USE_HIP)
 #include <hip/hip_cooperative_groups.h>
 
+#ifdef __AMDGCN_WAVEFRONT_SIZE
+#undef WAVEFRONT_SIZE
+#define WAVEFRONT_SIZE __AMDGCN_WAVEFRONT_SIZE
+#endif
+
 #define WARP_SIZE WAVEFRONT_SIZE
 #elif defined(XGBOOST_USE_CUDA)
 #define WARP_SIZE 32
