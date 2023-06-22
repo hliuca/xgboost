@@ -171,6 +171,8 @@ if (USE_CUDA)
   set(GEN_CODE "")
   format_gencode_flags("${GPU_COMPUTE_VER}" GEN_CODE)
   add_subdirectory(${PROJECT_SOURCE_DIR}/gputreeshap)
+
+  find_package(CUDAToolkit REQUIRED)
 endif (USE_CUDA)
 
 if (USE_HIP)
@@ -188,7 +190,6 @@ if (USE_HIP)
   set(CMAKE_HIP_FLAGS "${CMAKE_HIP_FLAGS} -Wunused-result -w")
   set(CMAKE_HIP_FLAGS "${CMAKE_HIP_FLAGS} -D__HIP_PLATFORM_AMD__")
   add_subdirectory(${PROJECT_SOURCE_DIR}/rocgputreeshap)
-  add_subdirectory(${PROJECT_SOURCE_DIR}/warp-primitives)
 endif (USE_HIP)
 
 if (FORCE_COLORED_OUTPUT AND (CMAKE_GENERATOR STREQUAL "Ninja") AND
