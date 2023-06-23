@@ -7,4 +7,4 @@
 	url = https://github.com/rapidsai/gputreeshap.git
 [submodule "rocgputreeshap"]
 	path = rocgputreeshap
-	url = https://www.github.com/AMD-AI/rocgputreeshap
+	url = https://github.com/ROCmSoftwarePlatform/rocgputreeshap
