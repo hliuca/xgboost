@@ -116,13 +116,7 @@ template <typename RowIndexT, typename OpT, typename OpDataT>
 void SortPositionBatch(common::Span<const PerNodeData<OpDataT>> d_batch_info,
                        common::Span<RowIndexT> ridx, common::Span<RowIndexT> ridx_tmp,
                        common::Span<bst_uint> d_counts, std::size_t total_rows, OpT op,
-                       dh::device_vector<int8_t>* tmp,
-#if defined(XGBOOST_USE_HIP)
-                       hipStream_t stream
-#elif defined(XGBOOST_USE_CUDA)
-                       cudaStream_t stream
-#endif
-                       ) {
+                       dh::device_vector<int8_t>* tmp) {
   dh::LDGIterator<PerNodeData<OpDataT>> batch_info_itr(d_batch_info.data());
   WriteResultsFunctor<OpDataT> write_results{batch_info_itr, ridx.data(), ridx_tmp.data(),
                                              d_counts.data()};
@@ -135,29 +129,28 @@ void SortPositionBatch(common::Span<const PerNodeData<OpDataT>> d_batch_info,
         int batch_idx;
         std::size_t item_idx;
         AssignBatch(batch_info_itr, idx, &batch_idx, &item_idx);
-        auto op_res = op(ridx[item_idx], batch_info_itr[batch_idx].data);
+        auto op_res = op(ridx[item_idx], batch_idx, batch_info_itr[batch_idx].data);
         return IndexFlagTuple{static_cast<bst_uint>(item_idx), op_res, batch_idx, op_res};
       });
   size_t temp_bytes = 0;
   if (tmp->empty()) {
 #if defined(XGBOOST_USE_CUDA)
     cub::DeviceScan::InclusiveScan(nullptr, temp_bytes, input_iterator, discard_write_iterator,
-                                   IndexFlagOp(), total_rows, stream);
+                                   IndexFlagOp(), total_rows);
 #elif defined(XGBOOST_USE_HIP)
     rocprim::inclusive_scan(nullptr, temp_bytes, input_iterator, discard_write_iterator,
-                                   total_rows, IndexFlagOp(), stream);
+                                   total_rows,IndexFlagOp());
 #endif
-
     tmp->resize(temp_bytes);
   }
   temp_bytes = tmp->size();
 
 #if defined(XGBOOST_USE_CUDA)
   cub::DeviceScan::InclusiveScan(tmp->data().get(), temp_bytes, input_iterator,
-                                 discard_write_iterator, IndexFlagOp(), total_rows, stream);
+                                 discard_write_iterator, IndexFlagOp(), total_rows);
 #elif defined(XGBOOST_USE_HIP)
-  rocprim::inclusive_scan(tmp->data().get(), temp_bytes, input_iterator, discard_write_iterator,
-                                   total_rows, IndexFlagOp(), stream);
+  rocprim::inclusive_scan(tmp->data().get(), temp_bytes, input_iterator,
+                                 discard_write_iterator, total_rows, IndexFlagOp());
 #endif
 
   constexpr int kBlockSize = 256;
@@ -167,7 +160,7 @@ void SortPositionBatch(common::Span<const PerNodeData<OpDataT>> d_batch_info,
   const int grid_size = xgboost::common::DivRoundUp(total_rows, kBlockSize * kItemsThread);
 
   SortPositionCopyKernel<kBlockSize, RowIndexT, OpDataT>
-      <<<grid_size, kBlockSize, 0, stream>>>(batch_info_itr, ridx, ridx_tmp, total_rows);
+      <<<grid_size, kBlockSize, 0>>>(batch_info_itr, ridx, ridx_tmp, total_rows);
 }
 
 struct NodePositionInfo {
@@ -240,12 +233,6 @@ class RowPartitioner {
   dh::PinnedMemory pinned_;
   dh::PinnedMemory pinned2_;
 
-#if defined(XGBOOST_USE_HIP)
-  hipStream_t stream_;
-#else
-  cudaStream_t stream_;
-#endif
-
  public:
   RowPartitioner(int device_idx, size_t num_rows);
   ~RowPartitioner();
@@ -303,11 +290,11 @@ class RowPartitioner {
 #if defined(XGBOOST_USE_HIP)
     dh::safe_cuda(hipMemcpyAsync(d_batch_info.data().get(), h_batch_info.data(),
                                   h_batch_info.size() * sizeof(PerNodeData<OpDataT>),
-                                  hipMemcpyDefault, stream_));
+                                  hipMemcpyDefault));
 #else
     dh::safe_cuda(cudaMemcpyAsync(d_batch_info.data().get(), h_batch_info.data(),
                                   h_batch_info.size() * sizeof(PerNodeData<OpDataT>),
-                                  cudaMemcpyDefault, stream_));
+                                  cudaMemcpyDefault));
 #endif
 
     // Temporary arrays
@@ -317,23 +304,17 @@ class RowPartitioner {
     // Partition the rows according to the operator
     SortPositionBatch<RowIndexT, UpdatePositionOpT, OpDataT>(
         dh::ToSpan(d_batch_info), dh::ToSpan(ridx_), dh::ToSpan(ridx_tmp_), dh::ToSpan(d_counts),
-        total_rows, op, &tmp_, stream_);
-
-#if defined(XGBOOST_USE_HIP)
-    dh::safe_cuda(hipMemcpyAsync(h_counts.data(), d_counts.data().get(), h_counts.size_bytes(),
-                                  hipMemcpyDefault, stream_));
-#else
+        total_rows, op, &tmp_);
+#if defined(XGBOOST_USE_CUDA)
     dh::safe_cuda(cudaMemcpyAsync(h_counts.data(), d_counts.data().get(), h_counts.size_bytes(),
-                                  cudaMemcpyDefault, stream_));
+                                  cudaMemcpyDefault));
+#elif defined(XGBOOST_USE_HIP)
+    dh::safe_cuda(hipMemcpyAsync(h_counts.data(), d_counts.data().get(), h_counts.size_bytes(),
+                                  hipMemcpyDefault));
 #endif
-
     // TODO(Rory): this synchronisation hurts performance a lot
     // Future optimisation should find a way to skip this
-#if defined(XGBOOST_USE_HIP)
-    dh::safe_cuda(hipStreamSynchronize(stream_));
-#else
-    dh::safe_cuda(cudaStreamSynchronize(stream_));
-#endif
+    dh::DefaultStream().Sync();
 
     // Update segments
     for (size_t i = 0; i < nidx.size(); i++) {
@@ -370,18 +351,18 @@ class RowPartitioner {
 #if defined(XGBOOST_USE_HIP)
     dh::safe_cuda(hipMemcpyAsync(d_node_info_storage.data().get(), ridx_segments_.data(),
                                   sizeof(NodePositionInfo) * ridx_segments_.size(),
-                                  hipMemcpyDefault, stream_));
+                                  hipMemcpyDefault));
 #else
     dh::safe_cuda(cudaMemcpyAsync(d_node_info_storage.data().get(), ridx_segments_.data(),
                                   sizeof(NodePositionInfo) * ridx_segments_.size(),
-                                  cudaMemcpyDefault, stream_));
+                                  cudaMemcpyDefault));
 #endif
 
     constexpr int kBlockSize = 512;
     const int kItemsThread = 8;
     const int grid_size = xgboost::common::DivRoundUp(ridx_.size(), kBlockSize * kItemsThread);
     common::Span<const RowIndexT> d_ridx(ridx_.data().get(), ridx_.size());
-    FinalisePositionKernel<kBlockSize><<<grid_size, kBlockSize, 0, stream_>>>(
+    FinalisePositionKernel<kBlockSize><<<grid_size, kBlockSize, 0>>>(
         dh::ToSpan(d_node_info_storage), d_ridx, d_out_position, op);
   }
 };

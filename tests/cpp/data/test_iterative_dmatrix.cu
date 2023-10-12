@@ -10,6 +10,7 @@
 #include "../../../src/data/device_adapter.hip.h"
 #include "../../../src/data/ellpack_page.hip.h"
 #endif
+#include "../../../src/data/ellpack_page.h"
 #include "../../../src/data/iterative_dmatrix.h"
 #include "../../../src/tree/param.h"  // TrainParam
 #include "../helpers.h"

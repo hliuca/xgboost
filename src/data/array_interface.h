@@ -386,7 +386,7 @@ inline bool ArrayInterfaceHandler::IsCudaPtr(void const *) { return false; }
  *   numpy has the proper support even though it's in the __cuda_array_interface__
  *   protocol defined by numba.
  */
-template <int32_t D, bool allow_mask = (D == 1)>
+template <std::int32_t D, bool allow_mask = (D == 1)>
 class ArrayInterface {
   static_assert(D > 0, "Invalid dimension for array interface.");
 
@@ -457,7 +457,7 @@ class ArrayInterface {
 
   explicit ArrayInterface(std::string const &str) : ArrayInterface{StringView{str}} {}
 
-  explicit ArrayInterface(StringView str) : ArrayInterface<D>{Json::Load(str)} {}
+  explicit ArrayInterface(StringView str) : ArrayInterface{Json::Load(str)} {}
 
   void AssignType(StringView typestr) {
     using T = ArrayInterfaceHandler::Type;
@@ -590,9 +590,9 @@ class ArrayInterface {
 };
 
 template <std::int32_t D, typename Fn>
-void DispatchDType(ArrayInterface<D> const array, std::int32_t device, Fn fn) {
+void DispatchDType(ArrayInterface<D> const array, DeviceOrd device, Fn fn) {
   // Only used for cuDF at the moment.
-  CHECK_EQ(array.valid.Size(), 0);
+  CHECK_EQ(array.valid.Capacity(), 0);
   auto dispatch = [&](auto t) {
     using T = std::remove_const_t<decltype(t)> const;
     // Set the data size to max as we don't know the original size of a sliced array:

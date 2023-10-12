@@ -110,7 +110,7 @@ class XGBoostJNI {
 
   public final static native int XGBoosterUpdateOneIter(long handle, int iter, long dtrain);
 
-  public final static native int XGBoosterBoostOneIter(long handle, long dtrain, float[] grad,
+  public final static native int XGBoosterTrainOneIter(long handle, long dtrain, int iter, float[] grad,
                                                        float[] hess);
 
   public final static native int XGBoosterEvalOneIter(long handle, int iter, long[] dmats,
@@ -163,5 +163,9 @@ class XGBoostJNI {
 
   public final static native int XGDMatrixCreateFromArrayInterfaceColumns(
     String featureJson, float missing, int nthread, long[] out);
+
+  public final static native int XGBoosterSetStrFeatureInfo(long handle, String field, String[] features);
+
+  public final static native int XGBoosterGetStrFeatureInfo(long handle, String field, String[] out);
 
 }

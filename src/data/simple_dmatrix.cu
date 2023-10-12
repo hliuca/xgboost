@@ -32,7 +32,7 @@ SimpleDMatrix::SimpleDMatrix(AdapterT* adapter, float missing, std::int32_t nthr
 #endif
 
   Context ctx;
-  ctx.Init(Args{{"nthread", std::to_string(nthread)}, {"gpu_id", std::to_string(device)}});
+  ctx.Init(Args{{"nthread", std::to_string(nthread)}, {"device", DeviceOrd::CUDA(device).Name()}});
 
   CHECK(adapter->NumRows() != kAdapterUnknownSize);
   CHECK(adapter->NumColumns() != kAdapterUnknownSize);

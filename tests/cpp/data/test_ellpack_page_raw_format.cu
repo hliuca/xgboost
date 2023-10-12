@@ -5,8 +5,10 @@
 #include <xgboost/data.h>
 
 #if defined(XGBOOST_USE_CUDA)
+#include "../../../src/common/io.h"  // for PrivateMmapConstStream, AlignedResourceReadStream...
 #include "../../../src/data/ellpack_page.cuh"
 #elif defined(XGBOOST_USE_HIP)
+#include "../../../src/common/io.h"  // for PrivateMmapConstStream, AlignedResourceReadStream...
 #include "../../../src/data/ellpack_page.hip.h"
 #endif
 #include "../../../src/data/sparse_page_source.h"
@@ -14,8 +16,7 @@
 #include "../filesystem.h"            // dmlc::TemporaryDirectory
 #include "../helpers.h"
 
-namespace xgboost {
-namespace data {
+namespace xgboost::data {
 TEST(EllpackPageRawFormat, IO) {
   Context ctx{MakeCUDACtx(0)};
   auto param = BatchParam{256, tree::TrainParam::DftSparseThreshold()};
@@ -26,15 +27,17 @@ TEST(EllpackPageRawFormat, IO) {
   dmlc::TemporaryDirectory tmpdir;
   std::string path = tmpdir.path + "/ellpack.page";
 
+  std::size_t n_bytes{0};
   {
-    std::unique_ptr<dmlc::Stream> fo{dmlc::Stream::Create(path.c_str(), "w")};
+    auto fo = std::make_unique<common::AlignedFileWriteStream>(StringView{path}, "wb");
     for (auto const &ellpack : m->GetBatches<EllpackPage>(&ctx, param)) {
-      format->Write(ellpack, fo.get());
+      n_bytes += format->Write(ellpack, fo.get());
     }
   }
 
   EllpackPage page;
-  std::unique_ptr<dmlc::SeekStream> fi{dmlc::SeekStream::CreateForRead(path.c_str())};
+  std::unique_ptr<common::AlignedResourceReadStream> fi{
+      std::make_unique<common::PrivateMmapConstStream>(path.c_str(), 0, n_bytes)};
   format->Read(&page, fi.get());
 
   for (auto const &ellpack : m->GetBatches<EllpackPage>(&ctx, param)) {
@@ -48,5 +51,4 @@ TEST(EllpackPageRawFormat, IO) {
     ASSERT_EQ(loaded->gidx_buffer.HostVector(), orig->gidx_buffer.HostVector());
   }
 }
-}  // namespace data
-}  // namespace xgboost
+}  // namespace xgboost::data

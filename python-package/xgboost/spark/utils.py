@@ -7,7 +7,7 @@ import os
 import sys
 import uuid
 from threading import Thread
-from typing import Any, Callable, Dict, Set, Type
+from typing import Any, Callable, Dict, Optional, Set, Type
 
 import pyspark
 from pyspark import BarrierTaskContext, SparkContext, SparkFiles
@@ -104,6 +104,10 @@ def get_logger(name: str, level: str = "INFO") -> logging.Logger:
     # If the logger is configured, skip the configure
     if not logger.handlers and not logging.getLogger().handlers:
         handler = logging.StreamHandler(sys.stderr)
+        formatter = logging.Formatter(
+            "%(asctime)s %(levelname)s %(name)s: %(funcName)s %(message)s"
+        )
+        handler.setFormatter(formatter)
         logger.addHandler(handler)
     return logger
 
@@ -186,3 +190,8 @@ def deserialize_booster(model: str) -> Booster:
         f.write(model)
     booster.load_model(tmp_file_name)
     return booster
+
+
+def use_cuda(device: Optional[str]) -> bool:
+    """Whether xgboost is using CUDA workers."""
+    return device in ("cuda", "gpu")

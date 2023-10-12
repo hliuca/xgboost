@@ -16,6 +16,7 @@
 #include "../common/bitfield.h"               // for RBitField8
 #include "../common/categorical.h"            // for IsCat, Decision
 #include "../common/common.h"                 // for DivRoundUp
+#include "../common/error_msg.h"              // for InplacePredictProxy
 #include "../common/math.h"                   // for CheckNAN
 #include "../common/threading_utils.h"        // for ParallelFor
 #include "../data/adapter.h"                  // for ArrayAdapter, CSRAdapter, CSRArrayAdapter
@@ -467,7 +468,6 @@ class ColumnSplitHelper {
   void MaskOneTree(RegTree::FVec const &feat, std::size_t tree_id, std::size_t row_id) {
     auto const &tree = *model_.trees[tree_id];
     auto const &cats = tree.GetCategoriesMatrix();
-    auto const has_categorical = tree.HasCategoricalSplit();
     bst_node_t n_nodes = tree.GetNodes().size();
 
     for (bst_node_t nid = 0; nid < n_nodes; nid++) {
@@ -484,16 +484,10 @@ class ColumnSplitHelper {
       }
 
       auto const fvalue = feat.GetFvalue(split_index);
-      if (has_categorical && common::IsCat(cats.split_type, nid)) {
-        auto const node_categories =
-            cats.categories.subspan(cats.node_ptr[nid].beg, cats.node_ptr[nid].size);
-        if (!common::Decision(node_categories, fvalue)) {
-          decision_bits_.Set(bit_index);
-        }
-        continue;
-      }
-
-      if (fvalue >= node.SplitCond()) {
+      auto const decision = tree.HasCategoricalSplit()
+                                ? GetDecision<true>(node, nid, fvalue, cats)
+                                : GetDecision<false>(node, nid, fvalue, cats);
+      if (decision) {
         decision_bits_.Set(bit_index);
       }
     }
@@ -511,7 +505,7 @@ class ColumnSplitHelper {
     if (missing_bits_.Check(bit_index)) {
       return node.DefaultChild();
     } else {
-      return node.LeftChild() + decision_bits_.Check(bit_index);
+      return node.LeftChild() + !decision_bits_.Check(bit_index);
     }
   }
 
@@ -669,7 +663,7 @@ class CPUPredictor : public Predictor {
     std::size_t n_samples = p_fmat->Info().num_row_;
     std::size_t n_groups = model.learner_model_param->OutputLength();
     CHECK_EQ(out_preds->size(), n_samples * n_groups);
-    linalg::TensorView<float, 2> out_predt{*out_preds, {n_samples, n_groups}, ctx_->gpu_id};
+    auto out_predt = linalg::MakeTensorView(ctx_, *out_preds, n_samples, n_groups);
 
     if (!p_fmat->PageExists<SparsePage>()) {
       std::vector<Entry> workspace(p_fmat->Info().num_col_ * kUnroll * n_threads);
@@ -738,7 +732,7 @@ class CPUPredictor : public Predictor {
     std::vector<RegTree::FVec> thread_temp;
     InitThreadTemp(n_threads * kBlockSize, &thread_temp);
     std::size_t n_groups = model.learner_model_param->OutputLength();
-    linalg::TensorView<float, 2> out_predt{predictions, {m->NumRows(), n_groups}, Context::kCpuId};
+    auto out_predt = linalg::MakeTensorView(ctx_, predictions, m->NumRows(), n_groups);
     PredictBatchByBlockOfRowsKernel<AdapterView<Adapter>, kBlockSize>(
         AdapterView<Adapter>(m.get(), missing, common::Span<Entry>{workspace}, n_threads), model,
         tree_begin, tree_end, &thread_temp, n_threads, out_predt);
@@ -748,7 +742,7 @@ class CPUPredictor : public Predictor {
                       PredictionCacheEntry *out_preds, uint32_t tree_begin,
                       unsigned tree_end) const override {
     auto proxy = dynamic_cast<data::DMatrixProxy *>(p_m.get());
-    CHECK(proxy)<< "Inplace predict accepts only DMatrixProxy as input.";
+    CHECK(proxy)<< error::InplacePredictProxy();
     CHECK(!p_m->Info().IsColumnSplit())
         << "Inplace predict support for column-wise data split is not yet implemented.";
     auto x = proxy->Adapter();
@@ -884,15 +878,14 @@ class CPUPredictor : public Predictor {
     common::ParallelFor(ntree_limit, n_threads, [&](bst_omp_uint i) {
       FillNodeMeanValues(model.trees[i].get(), &(mean_values[i]));
     });
-    auto base_margin = info.base_margin_.View(Context::kCpuId);
-    auto base_score = model.learner_model_param->BaseScore(Context::kCpuId)(0);
+    auto base_margin = info.base_margin_.View(ctx_->Device());
+    auto base_score = model.learner_model_param->BaseScore(ctx_->Device())(0);
     // start collecting the contributions
     for (const auto &batch : p_fmat->GetBatches<SparsePage>()) {
       auto page = batch.GetView();
       // parallel over local batch
-      const auto nsize = static_cast<bst_omp_uint>(batch.Size());
-      common::ParallelFor(nsize, n_threads, [&](bst_omp_uint i) {
-        auto row_idx = static_cast<size_t>(batch.base_rowid + i);
+      common::ParallelFor(batch.Size(), n_threads, [&](auto i) {
+        auto row_idx = batch.base_rowid + i;
         RegTree::FVec &feats = feat_vecs[omp_get_thread_num()];
         if (feats.Size() == 0) {
           feats.Init(num_feature);

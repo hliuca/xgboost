@@ -6,17 +6,17 @@
 #define XGBOOST_DATA_ELLPACK_PAGE_SOURCE_H_
 
 #include <xgboost/data.h>
+
 #include <memory>
 #include <string>
 #include <utility>
 
 #include "../common/common.h"
 #include "../common/hist_util.h"
+#include "ellpack_page.h"  // for EllpackPage
 #include "sparse_page_source.h"
 
-namespace xgboost {
-namespace data {
-
+namespace xgboost::data {
 class EllpackPageSource : public PageSourceIncMixIn<EllpackPage> {
   bool is_dense_;
   size_t row_stride_;
@@ -52,8 +52,7 @@ inline void EllpackPageSource::Fetch() {
   (void)(is_dense_);
   common::AssertGPUSupport();
 }
-#endif  // !defined(XGBOOST_USE_CUDA) && !defined(XGBOOST_USE_HIP)
-}  // namespace data
-}  // namespace xgboost
+#endif  // !defined(XGBOOST_USE_CUDA)
+}  // namespace xgboost::data
 
 #endif  // XGBOOST_DATA_ELLPACK_PAGE_SOURCE_H_

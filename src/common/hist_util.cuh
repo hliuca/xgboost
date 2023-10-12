@@ -11,18 +11,17 @@
 
 #include <cstddef>  // for size_t
 
-#include "../data/device_adapter.cuh"
+#include "../data/adapter.h"  // for IsValidFunctor
 #include "device_helpers.cuh"
 #include "hist_util.h"
 #include "quantile.cuh"
-#include "timer.h"
+#include "xgboost/span.h"  // for IterSpan
 
 #if defined(XGBOOST_USE_HIP)
 namespace cub = hipcub;
 #endif
 
-namespace xgboost {
-namespace common {
+namespace xgboost::common {
 namespace cuda {
 /**
  * copy and paste of the host version, we can't make it a __host__ __device__ function as
@@ -148,12 +147,12 @@ void LaunchGetColumnSizeKernel(std::int32_t device, IterSpan<BatchIt> batch_iter
       CHECK(!force_use_u64);
       auto kernel = GetColumnSizeSharedMemKernel<kBlockThreads, std::uint32_t, BatchIt>;
       auto grid_size = EstimateGridSize<kBlockThreads>(device, kernel, required_shared_memory);
-      dh::LaunchKernel{grid_size, kBlockThreads, required_shared_memory, dh::DefaultStream()}(
+      dh::LaunchKernel{grid_size, kBlockThreads, required_shared_memory}(
           kernel, batch_iter, is_valid, out_column_size);
     } else {
       auto kernel = GetColumnSizeSharedMemKernel<kBlockThreads, std::size_t, BatchIt>;
       auto grid_size = EstimateGridSize<kBlockThreads>(device, kernel, required_shared_memory);
-      dh::LaunchKernel{grid_size, kBlockThreads, required_shared_memory, dh::DefaultStream()}(
+      dh::LaunchKernel{grid_size, kBlockThreads, required_shared_memory}(
           kernel, batch_iter, is_valid, out_column_size);
     }
   } else {
@@ -262,16 +261,41 @@ void MakeEntriesFromAdapter(AdapterBatch const& batch, BatchIter batch_iter, Ran
 void SortByWeight(dh::device_vector<float>* weights,
                   dh::device_vector<Entry>* sorted_entries);
 
-void RemoveDuplicatedCategories(
-    int32_t device, MetaInfo const &info, Span<bst_row_t> d_cuts_ptr,
-    dh::device_vector<Entry> *p_sorted_entries,
-    dh::caching_device_vector<size_t> *p_column_sizes_scan);
+void RemoveDuplicatedCategories(int32_t device, MetaInfo const& info, Span<bst_row_t> d_cuts_ptr,
+                                dh::device_vector<Entry>* p_sorted_entries,
+                                dh::device_vector<float>* p_sorted_weights,
+                                dh::caching_device_vector<size_t>* p_column_sizes_scan);
 }  // namespace detail
 
-// Compute sketch on DMatrix.
-// sketch_batch_num_elements 0 means autodetect. Only modify this for testing.
-HistogramCuts DeviceSketch(int device, DMatrix* dmat, int max_bins,
-                           size_t sketch_batch_num_elements = 0);
+/**
+ * @brief Compute sketch on DMatrix with GPU and Hessian as weight.
+ *
+ * @param ctx     Runtime context
+ * @param p_fmat  Training feature matrix
+ * @param max_bin Maximum number of bins for each feature
+ * @param hessian Hessian vector.
+ * @param sketch_batch_num_elements 0 means autodetect. Only modify this for testing.
+ *
+ * @return Quantile cuts
+ */
+HistogramCuts DeviceSketchWithHessian(Context const* ctx, DMatrix* p_fmat, bst_bin_t max_bin,
+                                      Span<float const> hessian,
+                                      std::size_t sketch_batch_num_elements = 0);
+
+/**
+ * @brief Compute sketch on DMatrix with GPU.
+ *
+ * @param ctx     Runtime context
+ * @param p_fmat  Training feature matrix
+ * @param max_bin Maximum number of bins for each feature
+ * @param sketch_batch_num_elements 0 means autodetect. Only modify this for testing.
+ *
+ * @return Quantile cuts
+ */
+inline HistogramCuts DeviceSketch(Context const* ctx, DMatrix* p_fmat, bst_bin_t max_bin,
+                                  std::size_t sketch_batch_num_elements = 0) {
+  return DeviceSketchWithHessian(ctx, p_fmat, max_bin, {}, sketch_batch_num_elements);
+}
 
 template <typename AdapterBatch>
 void ProcessSlidingWindow(AdapterBatch const &batch, MetaInfo const &info,
@@ -303,8 +327,8 @@ void ProcessSlidingWindow(AdapterBatch const &batch, MetaInfo const &info,
 
   if (sketch_container->HasCategorical()) {
     auto d_cuts_ptr = cuts_ptr.DeviceSpan();
-    detail::RemoveDuplicatedCategories(device, info, d_cuts_ptr,
-                                       &sorted_entries, &column_sizes_scan);
+    detail::RemoveDuplicatedCategories(device, info, d_cuts_ptr, &sorted_entries, nullptr,
+                                       &column_sizes_scan);
   }
 
   auto d_cuts_ptr = cuts_ptr.DeviceSpan();
@@ -408,8 +432,8 @@ void ProcessWeightedSlidingWindow(Batch batch, MetaInfo const& info,
 
   if (sketch_container->HasCategorical()) {
     auto d_cuts_ptr = cuts_ptr.DeviceSpan();
-    detail::RemoveDuplicatedCategories(device, info, d_cuts_ptr,
-                                       &sorted_entries, &column_sizes_scan);
+    detail::RemoveDuplicatedCategories(device, info, d_cuts_ptr, &sorted_entries, &temp_weights,
+                                       &column_sizes_scan);
   }
 
   auto const& h_cuts_ptr = cuts_ptr.ConstHostVector();
@@ -471,7 +495,5 @@ void AdapterDeviceSketch(Batch batch, int num_bins,
     }
   }
 }
-}      // namespace common
-}      // namespace xgboost
-
+}  // namespace xgboost::common
 #endif  // COMMON_HIST_UTIL_CUH_

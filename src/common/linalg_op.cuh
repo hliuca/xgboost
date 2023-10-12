@@ -12,18 +12,17 @@
 namespace xgboost {
 namespace linalg {
 template <typename T, int32_t D, typename Fn>
-#if defined(XGBOOST_USE_HIP)
-void ElementWiseKernelDevice(linalg::TensorView<T, D> t, Fn&& fn, hipStream_t s = nullptr)
-#elif defined(XGBOOST_USE_CUDA)
+#if defined(XGBOOST_USE_CUDA)
 void ElementWiseKernelDevice(linalg::TensorView<T, D> t, Fn&& fn, cudaStream_t s = nullptr)
+#elif defined(XGBOOST_USE_HIP)
+void ElementWiseKernelDevice(linalg::TensorView<T, D> t, Fn&& fn, hipStream_t s = nullptr)
 #endif
 {
-#if defined(XGBOOST_USE_HIP)
-  dh::safe_cuda(hipSetDevice(t.DeviceIdx()));
-#elif defined(XGBOOST_USE_CUDA)
-  dh::safe_cuda(cudaSetDevice(t.DeviceIdx()));
+#if defined(XGBOOST_USE_CUDA)
+  dh::safe_cuda(cudaSetDevice(t.Device().ordinal));
+#elif defined(XGBOOST_USE_HIP)
+  dh::safe_cuda(hipSetDevice(t.Device().ordinal));
 #endif
-
   static_assert(std::is_void<std::result_of_t<Fn(size_t, T&)>>::value,
                 "For function with return, use transform instead.");
   if (t.Contiguous()) {

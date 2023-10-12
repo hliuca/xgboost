@@ -12,6 +12,7 @@
 #elif defined(XGBOOST_USE_HIP)
 #include "../../../src/data/ellpack_page.hip.h"
 #endif
+#include "../../../src/data/ellpack_page.h"
 #include "../../../src/tree/param.h"  // TrainParam
 #include "../helpers.h"
 #include "../histogram_helpers.h"

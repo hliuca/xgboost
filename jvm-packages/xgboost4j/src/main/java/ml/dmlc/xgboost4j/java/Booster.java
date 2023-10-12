@@ -163,6 +163,51 @@ public class Booster implements Serializable, KryoSerializable {
   }
 
   /**
+   * Get feature names from the Booster.
+   * @return
+   * @throws XGBoostError
+   */
+  public final String[] getFeatureNames() throws XGBoostError {
+    int numFeature = (int) getNumFeature();
+    String[] out = new String[numFeature];
+    XGBoostJNI.checkCall(XGBoostJNI.XGBoosterGetStrFeatureInfo(handle, "feature_name", out));
+    return out;
+  }
+
+  /**
+   * Set feature names to the Booster.
+   *
+   * @param featureNames
+   * @throws XGBoostError
+   */
+  public void setFeatureNames(String[] featureNames) throws XGBoostError {
+    XGBoostJNI.checkCall(XGBoostJNI.XGBoosterSetStrFeatureInfo(
+        handle, "feature_name", featureNames));
+  }
+
+  /**
+   * Get feature types from the Booster.
+   * @return
+   * @throws XGBoostError
+   */
+  public final String[] getFeatureTypes() throws XGBoostError {
+    int numFeature = (int) getNumFeature();
+    String[] out = new String[numFeature];
+    XGBoostJNI.checkCall(XGBoostJNI.XGBoosterGetStrFeatureInfo(handle, "feature_type", out));
+    return out;
+  }
+
+  /**
+   * Set feature types to the Booster.
+   * @param featureTypes
+   * @throws XGBoostError
+   */
+  public void setFeatureTypes(String[] featureTypes) throws XGBoostError {
+    XGBoostJNI.checkCall(XGBoostJNI.XGBoosterSetStrFeatureInfo(
+        handle, "feature_type", featureTypes));
+  }
+
+  /**
    * Update the booster for one iteration.
    *
    * @param dtrain training data
@@ -173,34 +218,48 @@ public class Booster implements Serializable, KryoSerializable {
     XGBoostJNI.checkCall(XGBoostJNI.XGBoosterUpdateOneIter(handle, iter, dtrain.getHandle()));
   }
 
+  @Deprecated
+  public void update(DMatrix dtrain, IObjective obj) throws XGBoostError {
+    float[][] predicts = this.predict(dtrain, true, 0, false, false);
+    List<float[]> gradients = obj.getGradient(predicts, dtrain);
+    this.boost(dtrain, gradients.get(0), gradients.get(1));
+  }
+
   /**
    * Update with customize obj func
    *
    * @param dtrain training data
+   * @param iter   The current training iteration.
    * @param obj    customized objective class
    * @throws XGBoostError native error
    */
-  public void update(DMatrix dtrain, IObjective obj) throws XGBoostError {
+  public void update(DMatrix dtrain, int iter, IObjective obj) throws XGBoostError {
     float[][] predicts = this.predict(dtrain, true, 0, false, false);
     List<float[]> gradients = obj.getGradient(predicts, dtrain);
-    boost(dtrain, gradients.get(0), gradients.get(1));
+    this.boost(dtrain, iter, gradients.get(0), gradients.get(1));
+  }
+
+  @Deprecated
+  public void boost(DMatrix dtrain, float[] grad, float[] hess) throws XGBoostError {
+    this.boost(dtrain, 0, grad, hess);
   }
 
   /**
-   * update with give grad and hess
+   * Update with give grad and hess
    *
    * @param dtrain training data
+   * @param iter   The current training iteration.
    * @param grad   first order of gradient
    * @param hess   seconde order of gradient
    * @throws XGBoostError native error
    */
-  public void boost(DMatrix dtrain, float[] grad, float[] hess) throws XGBoostError {
+  public void boost(DMatrix dtrain, int iter, float[] grad, float[] hess) throws XGBoostError {
     if (grad.length != hess.length) {
       throw new AssertionError(String.format("grad/hess length mismatch %s / %s", grad.length,
               hess.length));
     }
-    XGBoostJNI.checkCall(XGBoostJNI.XGBoosterBoostOneIter(handle,
-            dtrain.getHandle(), grad, hess));
+    XGBoostJNI.checkCall(XGBoostJNI.XGBoosterTrainOneIter(handle,
+                                                          dtrain.getHandle(), iter, grad, hess));
   }
 
   /**
@@ -744,7 +803,7 @@ public class Booster implements Serializable, KryoSerializable {
   private void writeObject(java.io.ObjectOutputStream out) throws IOException {
     try {
       out.writeInt(version);
-      out.writeObject(this.toByteArray());
+      out.writeObject(this.toByteArray("ubj"));
     } catch (XGBoostError ex) {
       ex.printStackTrace();
       logger.error(ex.getMessage());
@@ -780,7 +839,7 @@ public class Booster implements Serializable, KryoSerializable {
   @Override
   public void write(Kryo kryo, Output output) {
     try {
-      byte[] serObj = this.toByteArray();
+      byte[] serObj = this.toByteArray("ubj");
       int serObjSize = serObj.length;
       output.writeInt(serObjSize);
       output.writeInt(version);

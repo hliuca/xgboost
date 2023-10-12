@@ -31,10 +31,10 @@ void IterativeDMatrix::InitFromCUDA(Context const* ctx, BatchParam const& p,
   dh::XGBCachingDeviceAllocator<char> alloc;
 
   auto num_rows = [&]() {
-    return Dispatch(proxy, [](auto const& value) { return value.NumRows(); });
+    return cuda_impl::Dispatch(proxy, [](auto const& value) { return value.NumRows(); });
   };
   auto num_cols = [&]() {
-    return Dispatch(proxy, [](auto const& value) { return value.NumCols(); });
+    return cuda_impl::Dispatch(proxy, [](auto const& value) { return value.NumCols(); });
   };
 
   size_t row_stride = 0;
@@ -86,7 +86,7 @@ void IterativeDMatrix::InitFromCUDA(Context const* ctx, BatchParam const& p,
                                      get_device());
       auto* p_sketch = &sketch_containers.back();
       proxy->Info().weights_.SetDevice(get_device());
-      Dispatch(proxy, [&](auto const& value) {
+      cuda_impl::Dispatch(proxy, [&](auto const& value) {
         common::AdapterDeviceSketch(value, p.max_bin, proxy->Info(), missing, p_sketch);
       });
     }
@@ -94,7 +94,7 @@ void IterativeDMatrix::InitFromCUDA(Context const* ctx, BatchParam const& p,
     accumulated_rows += batch_rows;
     dh::device_vector<size_t> row_counts(batch_rows + 1, 0);
     common::Span<size_t> row_counts_span(row_counts.data().get(), row_counts.size());
-    row_stride = std::max(row_stride, Dispatch(proxy, [=](auto const& value) {
+    row_stride = std::max(row_stride, cuda_impl::Dispatch(proxy, [=](auto const& value) {
                             return GetRowCounts(value, row_counts_span, get_device(), missing);
                           }));
 
@@ -129,7 +129,7 @@ void IterativeDMatrix::InitFromCUDA(Context const* ctx, BatchParam const& p,
     sketch_containers.clear();
     sketch_containers.shrink_to_fit();
 
-    final_sketch.MakeCuts(&cuts);
+    final_sketch.MakeCuts(&cuts, this->info_.IsColumnSplit());
   } else {
     GetCutsFromRef(ctx, ref, Info().num_col_, p, &cuts);
   }
@@ -137,7 +137,7 @@ void IterativeDMatrix::InitFromCUDA(Context const* ctx, BatchParam const& p,
   this->info_.num_row_ = accumulated_rows;
   this->info_.num_nonzero_ = nnz;
 
-  auto init_page = [this, &proxy, &cuts, row_stride, accumulated_rows, get_device]() {
+  auto init_page = [this, &cuts, row_stride, accumulated_rows, get_device]() {
     if (!ellpack_) {
       // Should be put inside the while loop to protect against empty batch.  In
       // that case device id is invalid.
@@ -165,14 +165,14 @@ void IterativeDMatrix::InitFromCUDA(Context const* ctx, BatchParam const& p,
     auto rows = num_rows();
     dh::device_vector<size_t> row_counts(rows + 1, 0);
     common::Span<size_t> row_counts_span(row_counts.data().get(), row_counts.size());
-    Dispatch(proxy, [=](auto const& value) {
+    cuda_impl::Dispatch(proxy, [=](auto const& value) {
       return GetRowCounts(value, row_counts_span, get_device(), missing);
     });
     auto is_dense = this->IsDense();
 
     proxy->Info().feature_types.SetDevice(get_device());
     auto d_feature_types = proxy->Info().feature_types.ConstDeviceSpan();
-    auto new_impl = Dispatch(proxy, [&](auto const& value) {
+    auto new_impl = cuda_impl::Dispatch(proxy, [&](auto const& value) {
       return EllpackPageImpl(value, missing, get_device(), is_dense, row_counts_span,
                              d_feature_types, row_stride, rows, cuts);
     });
