@@ -159,11 +159,7 @@ class ElementWiseSurvivalMetricsReduction {
       labels_upper_bound.SetDevice(ctx.gpu_id);
       weights.SetDevice(ctx.gpu_id);
 
-#if defined(XGBOOST_USE_CUDA)
       dh::safe_cuda(cudaSetDevice(ctx.gpu_id));
-#elif defined(XGBOOST_USE_HIP)
-      dh::safe_cuda(hipSetDevice(ctx.gpu_id));
-#endif
 
       result = DeviceReduceMetrics(weights, labels_lower_bound, labels_upper_bound, preds);
     }

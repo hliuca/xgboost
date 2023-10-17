@@ -147,13 +147,8 @@ void RankingCache::InitOnCUDA(Context const* ctx, MetaInfo const& info) {
     auto const& h_group_ptr = info.group_ptr_;
     group_ptr_.Resize(h_group_ptr.size());
     auto d_group_ptr = group_ptr_.DeviceSpan();
-#if defined(XGBOOST_USE_CUDA)
     dh::safe_cuda(cudaMemcpyAsync(d_group_ptr.data(), h_group_ptr.data(), d_group_ptr.size_bytes(),
                                   cudaMemcpyHostToDevice, cuctx->Stream()));
-#elif defined(XGBOOST_USE_HIP)
-    dh::safe_cuda(hipMemcpyAsync(d_group_ptr.data(), h_group_ptr.data(), d_group_ptr.size_bytes(),
-                                  hipMemcpyHostToDevice, cuctx->Stream()));
-#endif
   }
 
   auto d_group_ptr = DataGroupPtr(ctx);

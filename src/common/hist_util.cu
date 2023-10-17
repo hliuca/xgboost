@@ -330,13 +330,8 @@ void ProcessWeightedBatch(Context const* ctx, const SparsePage& page, MetaInfo c
   } else {
     // copy hessian as weight
     CHECK_EQ(d_weight_out.size(), hessian.size());
-#if defined(XGBOOST_USE_CUDA)
     dh::safe_cuda(cudaMemcpyAsync(d_weight_out.data(), hessian.data(), hessian.size_bytes(),
                                   cudaMemcpyDefault));
-#elif defined(XGBOOST_USE_HIP)
-    dh::safe_cuda(hipMemcpyAsync(d_weight_out.data(), hessian.data(), hessian.size_bytes(),
-                                  hipMemcpyDefault));
-#endif
   }
   return d_weight_out;
 }

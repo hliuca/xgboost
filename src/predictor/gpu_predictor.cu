@@ -341,11 +341,7 @@ class DeviceModel {
   int num_group;
 
   void Init(const gbm::GBTreeModel& model, size_t tree_begin, size_t tree_end, int32_t gpu_id) {
-#if defined(XGBOOST_USE_CUDA)
     dh::safe_cuda(cudaSetDevice(gpu_id));
-#elif defined(XGBOOST_USE_HIP)
-    dh::safe_cuda(hipSetDevice(gpu_id));
-#endif
 
     // Copy decision trees to device
     tree_segments = HostDeviceVector<size_t>({}, gpu_id);
@@ -366,21 +362,12 @@ class DeviceModel {
       auto& src_nodes = model.trees.at(tree_idx)->GetNodes();
       auto& src_stats = model.trees.at(tree_idx)->GetStats();
 
-#if defined(XGBOOST_USE_CUDA)
       dh::safe_cuda(cudaMemcpyAsync(
           d_nodes + h_tree_segments[tree_idx - tree_begin], src_nodes.data(),
           sizeof(RegTree::Node) * src_nodes.size(), cudaMemcpyDefault));
       dh::safe_cuda(cudaMemcpyAsync(
           d_stats + h_tree_segments[tree_idx - tree_begin], src_stats.data(),
           sizeof(RTreeNodeStat) * src_stats.size(), cudaMemcpyDefault));
-#elif defined(XGBOOST_USE_HIP)
-      dh::safe_cuda(hipMemcpyAsync(
-          d_nodes + h_tree_segments[tree_idx - tree_begin], src_nodes.data(),
-          sizeof(RegTree::Node) * src_nodes.size(), hipMemcpyDefault));
-      dh::safe_cuda(hipMemcpyAsync(
-          d_stats + h_tree_segments[tree_idx - tree_begin], src_stats.data(),
-          sizeof(RTreeNodeStat) * src_stats.size(), hipMemcpyDefault));
-#endif
     }
 
     tree_group = HostDeviceVector<int>(model.tree_info.size(), 0, gpu_id);
@@ -504,11 +491,7 @@ void ExtractPaths(
     dh::device_vector<gpu_treeshap::PathElement<ShapSplitCondition>> *paths,
     DeviceModel *model, dh::device_vector<uint32_t> *path_categories,
     int gpu_id) {
-#if defined(XGBOOST_USE_CUDA)
   dh::safe_cuda(cudaSetDevice(gpu_id));
-#elif defined(XGBOOST_USE_HIP)
-  dh::safe_cuda(hipSetDevice(gpu_id));
-#endif
   auto& device_model = *model;
 
   dh::caching_device_vector<PathInfo> info(device_model.nodes.Size());
@@ -584,15 +567,9 @@ void ExtractPaths(
         thrust::max_element(thrust::device, max_elem_it,
                             max_elem_it + d_cat_node_segments.size()) -
         max_elem_it;
-#if defined(XGBOOST_USE_CUDA)
     dh::safe_cuda(cudaMemcpy(h_max_cat.data(),
                              d_cat_node_segments.data() + max_cat_it,
                              h_max_cat.size_bytes(), cudaMemcpyDeviceToHost));
-#elif defined(XGBOOST_USE_HIP)
-    dh::safe_cuda(hipMemcpy(h_max_cat.data(),
-                             d_cat_node_segments.data() + max_cat_it,
-                             h_max_cat.size_bytes(), hipMemcpyDeviceToHost));
-#endif
     max_cat = h_max_cat[0].size;
     CHECK_GE(max_cat, 1);
     path_categories->resize(max_cat * paths->size());
@@ -786,11 +763,7 @@ class ColumnSplitHelper {
 
   void PredictDMatrix(DMatrix* dmat, HostDeviceVector<float>* out_preds, DeviceModel const& model,
                       bst_feature_t num_features, std::uint32_t num_group) const {
-#if defined(XGBOOST_USE_CUDA)
     dh::safe_cuda(cudaSetDevice(ctx_->gpu_id));
-#elif defined(XGBOOST_USE_HIP)
-    dh::safe_cuda(hipSetDevice(ctx_->gpu_id));
-#endif
     dh::caching_device_vector<BitType> decision_storage{};
     dh::caching_device_vector<BitType> missing_storage{};
 
@@ -970,11 +943,7 @@ class GPUPredictor : public xgboost::Predictor {
 
   ~GPUPredictor() override {
     if (ctx_->gpu_id >= 0 && ctx_->gpu_id < common::AllVisibleGPUs()) {
-#if defined(XGBOOST_USE_CUDA)
       dh::safe_cuda(cudaSetDevice(ctx_->gpu_id));
-#elif defined(XGBOOST_USE_HIP)
-      dh::safe_cuda(hipSetDevice(ctx_->gpu_id));
-#endif
     }
   }
 
@@ -1071,11 +1040,7 @@ class GPUPredictor : public xgboost::Predictor {
       LOG(FATAL) << "Dart booster feature " << not_implemented;
     }
 
-#if defined(XGBOOST_USE_CUDA)
     dh::safe_cuda(cudaSetDevice(ctx_->gpu_id));
-#elif defined(XGBOOST_USE_HIP)
-    dh::safe_cuda(hipSetDevice(ctx_->gpu_id));
-#endif
 
     out_contribs->SetDevice(ctx_->gpu_id);
     if (tree_end == 0 || tree_end > model.trees.size()) {
@@ -1135,11 +1100,7 @@ class GPUPredictor : public xgboost::Predictor {
       LOG(FATAL) << "Dart booster feature " << not_implemented;
     }
 
-#if defined(XGBOOST_USE_CUDA)
     dh::safe_cuda(cudaSetDevice(ctx_->gpu_id));
-#elif defined(XGBOOST_USE_HIP)
-    dh::safe_cuda(hipSetDevice(ctx_->gpu_id));
-#endif
 
     out_contribs->SetDevice(ctx_->gpu_id);
     if (tree_end == 0 || tree_end > model.trees.size()) {
@@ -1199,11 +1160,7 @@ class GPUPredictor : public xgboost::Predictor {
   void PredictLeaf(DMatrix *p_fmat, HostDeviceVector<bst_float> *predictions,
                    const gbm::GBTreeModel &model,
                    unsigned tree_end) const override {
-#if defined(XGBOOST_USE_CUDA)
     dh::safe_cuda(cudaSetDevice(ctx_->gpu_id));
-#elif defined(XGBOOST_USE_HIP)
-    dh::safe_cuda(hipSetDevice(ctx_->gpu_id));
-#endif
     auto max_shared_memory_bytes = ConfigureDevice(ctx_->gpu_id);
 
     const MetaInfo& info = p_fmat->Info();

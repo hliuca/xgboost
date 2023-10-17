@@ -22,19 +22,11 @@ namespace cub = hipcub;
 namespace xgboost {
 namespace {
 auto SetDeviceToPtr(void const* ptr) {
-#if defined(XGBOOST_USE_CUDA)
   cudaPointerAttributes attr;
   dh::safe_cuda(cudaPointerGetAttributes(&attr, ptr));
   int32_t ptr_device = attr.device;
   dh::safe_cuda(cudaSetDevice(ptr_device));
   return ptr_device;
-#elif defined(XGBOOST_USE_HIP) /* this is wrong, need to figure out */
-  hipPointerAttribute_t attr;
-  dh::safe_cuda(hipPointerGetAttributes(&attr, ptr));
-  int32_t ptr_device = attr.device;
-  dh::safe_cuda(hipSetDevice(ptr_device));
-  return ptr_device;
-#endif
 }
 
 template <typename T, int32_t D>
@@ -57,13 +49,8 @@ void CopyTensorInfoImpl(CUDAContext const* ctx, Json arr_interface, linalg::Tens
       // set data
       data->Resize(array.n);
 
-#if defined(XGBOOST_USE_CUDA)
       dh::safe_cuda(cudaMemcpyAsync(data->DevicePointer(), array.data, array.n * sizeof(T),
                                     cudaMemcpyDefault, ctx->Stream()));
-#elif defined(XGBOOST_USE_HIP)
-      dh::safe_cuda(hipMemcpyAsync(data->DevicePointer(), array.data, array.n * sizeof(T),
-                                    hipMemcpyDefault, ctx->Stream()));
-#endif
     });
     return;
   }
@@ -114,13 +101,8 @@ void CopyQidImpl(ArrayInterface<1> array_interface, std::vector<bst_group_t>* p_
   });
   bool non_dec = true;
 
-#if defined(XGBOOST_USE_CUDA)
   dh::safe_cuda(cudaMemcpy(&non_dec, flag.data().get(), sizeof(bool),
                            cudaMemcpyDeviceToHost));
-#elif defined(XGBOOST_USE_HIP)
-  dh::safe_cuda(hipMemcpy(&non_dec, flag.data().get(), sizeof(bool),
-                           hipMemcpyDeviceToHost));
-#endif
 
   CHECK(non_dec) << "`qid` must be sorted in increasing order along with data.";
   size_t bytes = 0;

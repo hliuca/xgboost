@@ -59,13 +59,8 @@ void GPUHistEvaluator::Reset(common::HistogramCuts const &cuts, common::Span<Fea
     split_cats_.resize(node_categorical_storage_size_);
     h_split_cats_.resize(node_categorical_storage_size_);
 
-#if defined(XGBOOST_USE_CUDA)
     dh::safe_cuda(
         cudaMemsetAsync(split_cats_.data().get(), '\0', split_cats_.size() * sizeof(CatST)));
-#elif defined(XGBOOST_USE_HIP)
-    dh::safe_cuda(
-        hipMemsetAsync(split_cats_.data().get(), '\0', split_cats_.size() * sizeof(CatST)));
-#endif
 
     cat_sorted_idx_.resize(cuts.cut_values_.Size() * 2);  // evaluate 2 nodes at a time.
     sort_input_.resize(cat_sorted_idx_.size());

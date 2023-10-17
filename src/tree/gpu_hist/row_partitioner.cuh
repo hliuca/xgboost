@@ -287,15 +287,9 @@ class RowPartitioner {
       total_rows += ridx_segments_.at(nidx.at(i)).segment.Size();
     }
 
-#if defined(XGBOOST_USE_HIP)
-    dh::safe_cuda(hipMemcpyAsync(d_batch_info.data().get(), h_batch_info.data(),
-                                  h_batch_info.size() * sizeof(PerNodeData<OpDataT>),
-                                  hipMemcpyDefault));
-#else
     dh::safe_cuda(cudaMemcpyAsync(d_batch_info.data().get(), h_batch_info.data(),
                                   h_batch_info.size() * sizeof(PerNodeData<OpDataT>),
                                   cudaMemcpyDefault));
-#endif
 
     // Temporary arrays
     auto h_counts = pinned_.GetSpan<bst_uint>(nidx.size(), 0);
@@ -305,13 +299,8 @@ class RowPartitioner {
     SortPositionBatch<RowIndexT, UpdatePositionOpT, OpDataT>(
         dh::ToSpan(d_batch_info), dh::ToSpan(ridx_), dh::ToSpan(ridx_tmp_), dh::ToSpan(d_counts),
         total_rows, op, &tmp_);
-#if defined(XGBOOST_USE_CUDA)
     dh::safe_cuda(cudaMemcpyAsync(h_counts.data(), d_counts.data().get(), h_counts.size_bytes(),
                                   cudaMemcpyDefault));
-#elif defined(XGBOOST_USE_HIP)
-    dh::safe_cuda(hipMemcpyAsync(h_counts.data(), d_counts.data().get(), h_counts.size_bytes(),
-                                  hipMemcpyDefault));
-#endif
     // TODO(Rory): this synchronisation hurts performance a lot
     // Future optimisation should find a way to skip this
     dh::DefaultStream().Sync();
@@ -348,15 +337,9 @@ class RowPartitioner {
   void FinalisePosition(common::Span<bst_node_t> d_out_position, FinalisePositionOpT op) {
     dh::TemporaryArray<NodePositionInfo> d_node_info_storage(ridx_segments_.size());
 
-#if defined(XGBOOST_USE_HIP)
-    dh::safe_cuda(hipMemcpyAsync(d_node_info_storage.data().get(), ridx_segments_.data(),
-                                  sizeof(NodePositionInfo) * ridx_segments_.size(),
-                                  hipMemcpyDefault));
-#else
     dh::safe_cuda(cudaMemcpyAsync(d_node_info_storage.data().get(), ridx_segments_.data(),
                                   sizeof(NodePositionInfo) * ridx_segments_.size(),
                                   cudaMemcpyDefault));
-#endif
 
     constexpr int kBlockSize = 512;
     const int kItemsThread = 8;

@@ -47,11 +47,7 @@ void IterativeDMatrix::InitFromCUDA(Context const* ctx, BatchParam const& p,
 
   int32_t current_device;
 
-#if defined(XGBOOST_USE_CUDA)
   dh::safe_cuda(cudaGetDevice(&current_device));
-#elif defined(XGBOOST_USE_HIP)
-  dh::safe_cuda(hipGetDevice(&current_device));
-#endif
 
   auto get_device = [&]() -> int32_t {
     std::int32_t d = (ctx->gpu_id == Context::kCpuId) ? current_device : ctx->gpu_id;
@@ -68,11 +64,7 @@ void IterativeDMatrix::InitFromCUDA(Context const* ctx, BatchParam const& p,
     // ctx_.gpu_id = proxy->DeviceIdx();
     CHECK_LT(ctx->gpu_id, common::AllVisibleGPUs());
 
-#if defined(XGBOOST_USE_CUDA)
     dh::safe_cuda(cudaSetDevice(get_device()));
-#elif defined(XGBOOST_USE_HIP)
-    dh::safe_cuda(hipSetDevice(get_device()));
-#endif
 
     if (cols == 0) {
       cols = num_cols();
@@ -111,11 +103,7 @@ void IterativeDMatrix::InitFromCUDA(Context const* ctx, BatchParam const& p,
   auto n_features = cols;
   CHECK_GE(n_features, 1) << "Data must has at least 1 column.";
 
-#if defined(XGBOOST_USE_CUDA)
   dh::safe_cuda(cudaSetDevice(get_device()));
-#elif defined(XGBOOST_USE_HIP)
-  dh::safe_cuda(hipSetDevice(get_device()));
-#endif
 
   if (!ref) {
     HostDeviceVector<FeatureType> ft;
@@ -156,11 +144,7 @@ void IterativeDMatrix::InitFromCUDA(Context const* ctx, BatchParam const& p,
   while (iter.Next()) {
     init_page();
 
-#if defined(XGBOOST_USE_CUDA)
     dh::safe_cuda(cudaSetDevice(get_device()));
-#elif defined(XGBOOST_USE_HIP)
-    dh::safe_cuda(hipSetDevice(get_device()));
-#endif
 
     auto rows = num_rows();
     dh::device_vector<size_t> row_counts(rows + 1, 0);

@@ -95,11 +95,7 @@ GPUBinaryAUC(common::Span<float const> predts, MetaInfo const &info,
              Fn area_fn, std::shared_ptr<DeviceAUCCache> cache) {
   auto labels = info.labels.View(device);
   auto weights = info.weights_.ConstDeviceSpan();
-#if defined(XGBOOST_USE_CUDA)
   dh::safe_cuda(cudaSetDevice(device.ordinal));
-#elif defined(XGBOOST_USE_HIP)
-  dh::safe_cuda(hipSetDevice(device.ordinal));
-#endif
 
   CHECK_NE(labels.Size(), 0);
   CHECK_EQ(labels.Size(), predts.size());
@@ -352,11 +348,7 @@ template <bool scale, typename Fn>
 double GPUMultiClassAUCOVR(MetaInfo const &info, DeviceOrd device,
                            common::Span<uint32_t> d_class_ptr, size_t n_classes,
                            std::shared_ptr<DeviceAUCCache> cache, Fn area_fn) {
-#if defined(XGBOOST_USE_CUDA)
   dh::safe_cuda(cudaSetDevice(device.ordinal));
-#elif defined(XGBOOST_USE_HIP)
-  dh::safe_cuda(hipSetDevice(device.ordinal));
-#endif
   /**
    * Sorted idx
    */
@@ -934,11 +926,7 @@ std::pair<double, std::uint32_t> GPURankingPRAUC(Context const *ctx,
                                                  common::Span<float const> predts,
                                                  MetaInfo const &info,
                                                  std::shared_ptr<DeviceAUCCache> *p_cache) {
-#if defined(XGBOOST_USE_HIP)
-  dh::safe_cuda(hipSetDevice(ctx->gpu_id));
-#elif defined(XGBOOST_USE_CUDA)
   dh::safe_cuda(cudaSetDevice(ctx->gpu_id));
-#endif
 
   if (predts.empty()) {
     return std::make_pair(0.0, static_cast<uint32_t>(0));

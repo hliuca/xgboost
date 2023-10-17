@@ -16,22 +16,14 @@ namespace tree {
 RowPartitioner::RowPartitioner(int device_idx, size_t num_rows)
     : device_idx_(device_idx), ridx_(num_rows), ridx_tmp_(num_rows) {
 
-#if defined(XGBOOST_USE_CUDA)
   dh::safe_cuda(cudaSetDevice(device_idx_));
-#elif defined(XGBOOST_USE_HIP)
-  dh::safe_cuda(hipSetDevice(device_idx_));
-#endif
 
   ridx_segments_.emplace_back(NodePositionInfo{Segment(0, num_rows)});
   thrust::sequence(thrust::device, ridx_.data(), ridx_.data() + ridx_.size());
 }
 
 RowPartitioner::~RowPartitioner() {
-#if defined(XGBOOST_USE_CUDA)
   dh::safe_cuda(cudaSetDevice(device_idx_));
-#elif defined(XGBOOST_USE_HIP)
-  dh::safe_cuda(hipSetDevice(device_idx_));
-#endif
 }
 
 common::Span<const RowPartitioner::RowIndexT> RowPartitioner::GetRows(bst_node_t nidx) {

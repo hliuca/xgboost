@@ -110,15 +110,9 @@ void CopyTo(Span<T> out, Span<U> src) {
   CHECK_EQ(out.size(), src.size());
   static_assert(std::is_same<std::remove_cv_t<T>, std::remove_cv_t<T>>::value);
 
-#if defined(XGBOOST_USE_CUDA)
   dh::safe_cuda(cudaMemcpyAsync(out.data(), src.data(),
                                 out.size_bytes(),
                                 cudaMemcpyDefault));
-#elif defined(XGBOOST_USE_HIP)
-  dh::safe_cuda(hipMemcpyAsync(out.data(), src.data(),
-                                out.size_bytes(),
-                                hipMemcpyDefault));
-#endif
 }
 
 // Compute the merge path.
@@ -251,11 +245,7 @@ common::Span<thrust::tuple<uint64_t, uint64_t>> MergePath(
 void MergeImpl(int32_t device, Span<SketchEntry const> const &d_x,
                Span<bst_row_t const> const &x_ptr, Span<SketchEntry const> const &d_y,
                Span<bst_row_t const> const &y_ptr, Span<SketchEntry> out, Span<bst_row_t> out_ptr) {
-#if defined(XGBOOST_USE_CUDA)
   dh::safe_cuda(cudaSetDevice(device));
-#elif defined(XGBOOST_USE_HIP)
-  dh::safe_cuda(hipSetDevice(device));
-#endif
 
   CHECK_EQ(d_x.size() + d_y.size(), out.size());
   CHECK_EQ(x_ptr.size(), out_ptr.size());
@@ -354,11 +344,7 @@ void MergeImpl(int32_t device, Span<SketchEntry const> const &d_x,
 void SketchContainer::Push(Span<Entry const> entries, Span<size_t> columns_ptr,
                            common::Span<OffsetT> cuts_ptr,
                            size_t total_cuts, Span<float> weights) {
-#if defined(XGBOOST_USE_CUDA)
   dh::safe_cuda(cudaSetDevice(device_));
-#elif defined(XGBOOST_USE_HIP)
-  dh::safe_cuda(hipSetDevice(device_));
-#endif
 
   Span<SketchEntry> out;
   dh::device_vector<SketchEntry> cuts;
@@ -418,11 +404,7 @@ size_t SketchContainer::ScanInput(Span<SketchEntry> entries, Span<OffsetT> d_col
    * pruning or merging. We preserve the first type and remove the second type.
    */
   timer_.Start(__func__);
-#if defined(XGBOOST_USE_CUDA)
   dh::safe_cuda(cudaSetDevice(device_));
-#elif defined(XGBOOST_USE_HIP)
-  dh::safe_cuda(hipSetDevice(device_));
-#endif
   CHECK_EQ(d_columns_ptr_in.size(), num_columns_ + 1);
   dh::XGBCachingDeviceAllocator<char> alloc;
 
@@ -479,11 +461,7 @@ size_t SketchContainer::ScanInput(Span<SketchEntry> entries, Span<OffsetT> d_col
 
 void SketchContainer::Prune(size_t to) {
   timer_.Start(__func__);
-#if defined(XGBOOST_USE_CUDA)
   dh::safe_cuda(cudaSetDevice(device_));
-#elif defined(XGBOOST_USE_HIP)
-  dh::safe_cuda(hipSetDevice(device_));
-#endif
 
   OffsetT to_total = 0;
   auto& h_columns_ptr = columns_ptr_b_.HostVector();
@@ -518,11 +496,7 @@ void SketchContainer::Prune(size_t to) {
 
 void SketchContainer::Merge(Span<OffsetT const> d_that_columns_ptr,
                             Span<SketchEntry const> that) {
-#if defined(XGBOOST_USE_CUDA)
   dh::safe_cuda(cudaSetDevice(device_));
-#elif defined(XGBOOST_USE_HIP)
-  dh::safe_cuda(hipSetDevice(device_));
-#endif
 
   timer_.Start(__func__);
   if (this->Current().size() == 0) {
@@ -558,11 +532,7 @@ void SketchContainer::Merge(Span<OffsetT const> d_that_columns_ptr,
 }
 
 void SketchContainer::FixError() {
-#if defined(XGBOOST_USE_CUDA)
   dh::safe_cuda(cudaSetDevice(device_));
-#elif defined(XGBOOST_USE_HIP)
-  dh::safe_cuda(hipSetDevice(device_));
-#endif
 
   auto d_columns_ptr = this->columns_ptr_.ConstDeviceSpan();
   auto in = dh::ToSpan(this->Current());
@@ -588,11 +558,7 @@ void SketchContainer::FixError() {
 }
 
 void SketchContainer::AllReduce(bool is_column_split) {
-#if defined(XGBOOST_USE_CUDA)
   dh::safe_cuda(cudaSetDevice(device_));
-#elif defined(XGBOOST_USE_HIP)
-  dh::safe_cuda(hipSetDevice(device_));
-#endif
   auto world = collective::GetWorldSize();
   if (world == 1 || is_column_split) {
     return;
@@ -674,11 +640,7 @@ struct InvalidCatOp {
 
 void SketchContainer::MakeCuts(HistogramCuts* p_cuts, bool is_column_split) {
   timer_.Start(__func__);
-#if defined(XGBOOST_USE_CUDA)
   dh::safe_cuda(cudaSetDevice(device_));
-#elif defined(XGBOOST_USE_HIP)
-  dh::safe_cuda(hipSetDevice(device_));
-#endif
   p_cuts->min_vals_.Resize(num_columns_);
 
   // Sync between workers.

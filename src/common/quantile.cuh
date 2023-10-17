@@ -176,11 +176,7 @@ class SketchContainer {
   size_t Unique(KeyComp key_comp = thrust::equal_to<size_t>{}) {
     timer_.Start(__func__);
 
-#if defined(XGBOOST_USE_HIP)
-    dh::safe_cuda(hipSetDevice(device_));
-#else
     dh::safe_cuda(cudaSetDevice(device_));
-#endif
 
     this->columns_ptr_.SetDevice(device_);
     Span<OffsetT> d_column_scan = this->columns_ptr_.DeviceSpan();

@@ -297,11 +297,7 @@ void Launch(Context const* ctx, std::int32_t iter, HostDeviceVector<float> const
             linalg::Matrix<GradientPair>* out_gpair) {
   // boilerplate
   std::int32_t device_id = ctx->gpu_id;
-#if defined(XGBOOST_USE_CUDA)
   dh::safe_cuda(cudaSetDevice(device_id));
-#elif defined(XGBOOST_USE_HIP)
-  dh::safe_cuda(hipSetDevice(device_id));
-#endif
   auto n_groups = p_cache->Groups();
 
   info.labels.SetDevice(device_id);
@@ -385,11 +381,7 @@ void LambdaRankGetGradientNDCG(Context const* ctx, std::int32_t iter,
                                linalg::Matrix<GradientPair>* out_gpair) {
   // boilerplate
   auto device = ctx->Device();
-#if defined(XGBOOST_USE_CUDA)
   dh::safe_cuda(cudaSetDevice(device.ordinal));
-#elif defined(XGBOOST_USE_HIP)
-  dh::safe_cuda(hipSetDevice(device.ordinal));
-#endif
   auto const d_inv_IDCG = p_cache->InvIDCG(ctx);
   auto const discount = p_cache->Discount(ctx);
 
@@ -457,11 +449,7 @@ void LambdaRankGetGradientMAP(Context const* ctx, std::int32_t iter,
                               linalg::VectorView<double> li, linalg::VectorView<double> lj,
                               linalg::Matrix<GradientPair>* out_gpair) {
   auto device = ctx->Device();
-#if defined(XGBOOST_USE_CUDA)
   dh::safe_cuda(cudaSetDevice(device.ordinal));
-#elif defined(XGBOOST_USE_HIP)
-  dh::safe_cuda(hipSetDevice(device.ordinal));
-#endif
 
   info.labels.SetDevice(device);
   predt.SetDevice(device);
@@ -500,11 +488,7 @@ void LambdaRankGetGradientPairwise(Context const* ctx, std::int32_t iter,
                                    linalg::VectorView<double> li, linalg::VectorView<double> lj,
                                    linalg::Matrix<GradientPair>* out_gpair) {
   auto device = ctx->Device();
-#if defined(XGBOOST_USE_CUDA)
   dh::safe_cuda(cudaSetDevice(device.ordinal));
-#elif defined(XGBOOST_USE_HIP)
-  dh::safe_cuda(hipSetDevice(device.ordinal));
-#endif
 
   info.labels.SetDevice(device);
   predt.SetDevice(device);

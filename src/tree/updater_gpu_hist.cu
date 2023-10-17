@@ -232,26 +232,16 @@ struct GPUHistMakerDevice {
     this->column_sampler_->Init(ctx_, num_columns, info.feature_weights.HostVector(),
                                 param.colsample_bynode, param.colsample_bylevel,
                                 param.colsample_bytree);
-#if defined(XGBOOST_USE_CUDA)
     dh::safe_cuda(cudaSetDevice(ctx_->gpu_id));
-#elif defined(XGBOOST_USE_HIP)
-    dh::safe_cuda(hipSetDevice(ctx_->gpu_id));
-#endif
 
     this->interaction_constraints.Reset();
 
     if (d_gpair.size() != dh_gpair->Size()) {
       d_gpair.resize(dh_gpair->Size());
     }
-#if defined(XGBOOST_USE_CUDA)
     dh::safe_cuda(cudaMemcpyAsync(d_gpair.data().get(), dh_gpair->ConstDevicePointer(),
                                   dh_gpair->Size() * sizeof(GradientPair),
                                   cudaMemcpyDeviceToDevice));
-#elif defined(XGBOOST_USE_HIP)
-    dh::safe_cuda(hipMemcpyAsync(d_gpair.data().get(), dh_gpair->ConstDevicePointer(),
-                                  dh_gpair->Size() * sizeof(GradientPair),
-                                  hipMemcpyDeviceToDevice));
-#endif
     auto sample = sampler->Sample(ctx_, dh::ToSpan(d_gpair), dmat);
     page = sample.page;
     gpair = sample.gpair;
@@ -338,28 +328,15 @@ struct GPUHistMakerDevice {
       max_active_features =
           std::max(max_active_features, static_cast<bst_feature_t>(input.feature_set.size()));
     }
-#if defined(XGBOOST_USE_CUDA)
     dh::safe_cuda(cudaMemcpyAsync(
         d_node_inputs.data().get(), h_node_inputs.data(),
         h_node_inputs.size() * sizeof(EvaluateSplitInputs), cudaMemcpyDefault));
-#elif defined(XGBOOST_USE_HIP)
-    dh::safe_cuda(hipMemcpyAsync(
-        d_node_inputs.data().get(), h_node_inputs.data(),
-        h_node_inputs.size() * sizeof(EvaluateSplitInputs), hipMemcpyDefault));
-#endif
 
     this->evaluator_.EvaluateSplits(nidx, max_active_features, dh::ToSpan(d_node_inputs),
                                     shared_inputs, dh::ToSpan(entries));
-#if defined(XGBOOST_USE_CUDA)
     dh::safe_cuda(cudaMemcpyAsync(pinned_candidates_out.data(),
                                   entries.data().get(), sizeof(GPUExpandEntry) * entries.size(),
                                   cudaMemcpyDeviceToHost));
-#elif defined(XGBOOST_USE_HIP)
-    dh::safe_cuda(hipMemcpyAsync(pinned_candidates_out.data(),
-                                  entries.data().get(), sizeof(GPUExpandEntry) * entries.size(),
-                                  hipMemcpyDeviceToHost));
-#endif
-
     dh::DefaultStream().Sync();
   }
 
@@ -412,13 +389,8 @@ struct GPUHistMakerDevice {
     BitVector missing_bits{dh::ToSpan(missing_storage)};
 
     dh::TemporaryArray<NodeSplitData> split_data_storage(num_candidates);
-#if defined(XGBOOST_USE_CUDA)
     dh::safe_cuda(cudaMemcpyAsync(split_data_storage.data().get(), split_data.data(),
                                   num_candidates * sizeof(NodeSplitData), cudaMemcpyDefault));
-#elif defined(XGBOOST_USE_HIP)
-    dh::safe_cuda(hipMemcpyAsync(split_data_storage.data().get(), split_data.data(),
-                                  num_candidates * sizeof(NodeSplitData), hipMemcpyDefault));
-#endif
     auto d_split_data = dh::ToSpan(split_data_storage);
 
     dh::LaunchN(d_matrix.n_rows, [=] __device__(std::size_t ridx) mutable {
@@ -527,15 +499,9 @@ struct GPUHistMakerDevice {
 
     dh::TemporaryArray<RegTree::Node> d_nodes(p_tree->GetNodes().size());
 
-#if defined(XGBOOST_USE_CUDA)
     dh::safe_cuda(cudaMemcpyAsync(d_nodes.data().get(), p_tree->GetNodes().data(),
                                   d_nodes.size() * sizeof(RegTree::Node),
                                   cudaMemcpyHostToDevice));
-#elif defined(XGBOOST_USE_HIP)
-    dh::safe_cuda(hipMemcpyAsync(d_nodes.data().get(), p_tree->GetNodes().data(),
-                                  d_nodes.size() * sizeof(RegTree::Node),
-                                  hipMemcpyHostToDevice));
-#endif
 
     auto const& h_split_types = p_tree->GetSplitTypes();
     auto const& categories = p_tree->GetSplitCategories();
@@ -606,15 +572,9 @@ struct GPUHistMakerDevice {
     auto s_position = p_out_position->ConstDeviceSpan();
     positions.resize(s_position.size());
 
-#if defined(XGBOOST_USE_CUDA)
     dh::safe_cuda(cudaMemcpyAsync(positions.data().get(), s_position.data(),
                                   s_position.size_bytes(), cudaMemcpyDeviceToDevice,
                                   ctx_->CUDACtx()->Stream()));
-#elif defined(XGBOOST_USE_HIP)
-    dh::safe_cuda(hipMemcpyAsync(positions.data().get(), s_position.data(),
-                                  s_position.size_bytes(), hipMemcpyDeviceToDevice,
-                                  ctx_->CUDACtx()->Stream()));
-#endif
 
     dh::LaunchN(row_partitioner->GetRows().size(), [=] __device__(size_t idx) {
       bst_node_t position = d_out_position[idx];
@@ -632,26 +592,16 @@ struct GPUHistMakerDevice {
     CHECK(out_preds_d.Device().IsCUDA());
     CHECK_EQ(out_preds_d.Device().ordinal, ctx_->Ordinal());
 
-#if defined(XGBOOST_USE_CUDA)
     dh::safe_cuda(cudaSetDevice(ctx_->Ordinal()));
-#elif defined(XGBOOST_USE_HIP)
-    dh::safe_cuda(hipSetDevice(ctx_->Ordinal()));
-#endif
     auto d_position = dh::ToSpan(positions);
     CHECK_EQ(out_preds_d.Size(), d_position.size());
 
     auto const& h_nodes = p_tree->GetNodes();
     dh::caching_device_vector<RegTree::Node> nodes(h_nodes.size());
 
-#if defined(XGBOOST_USE_CUDA)
     dh::safe_cuda(cudaMemcpyAsync(nodes.data().get(), h_nodes.data(),
                                   h_nodes.size() * sizeof(RegTree::Node), cudaMemcpyHostToDevice,
                                   ctx_->CUDACtx()->Stream()));
-#elif defined(XGBOOST_USE_HIP)
-    dh::safe_cuda(hipMemcpyAsync(nodes.data().get(), h_nodes.data(),
-                                  h_nodes.size() * sizeof(RegTree::Node), hipMemcpyHostToDevice,
-                                  ctx_->CUDACtx()->Stream()));
-#endif
 
     auto d_nodes = dh::ToSpan(nodes);
     CHECK_EQ(out_preds_d.Shape(1), 1);
@@ -904,11 +854,7 @@ class GPUHistMaker : public TreeUpdater {
         ++t_idx;
       }
 
-#if defined(XGBOOST_USE_CUDA)
       dh::safe_cuda(cudaGetLastError());
-#elif defined(XGBOOST_USE_HIP)
-      dh::safe_cuda(hipGetLastError());
-#endif
     } catch (const std::exception& e) {
       LOG(FATAL) << "Exception in gpu_hist: " << e.what() << std::endl;
     }
@@ -925,11 +871,7 @@ class GPUHistMaker : public TreeUpdater {
     this->column_sampler_ = std::make_shared<common::ColumnSampler>(column_sampling_seed);
 
     auto batch_param = BatchParam{param->max_bin, TrainParam::DftSparseThreshold()};
-#if defined(XGBOOST_USE_CUDA)
     dh::safe_cuda(cudaSetDevice(ctx_->gpu_id));
-#elif defined(XGBOOST_USE_HIP)
-    dh::safe_cuda(hipSetDevice(ctx_->gpu_id));
-#endif
 
     info_->feature_types.SetDevice(ctx_->gpu_id);
     maker = std::make_unique<GPUHistMakerDevice>(

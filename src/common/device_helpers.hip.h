@@ -31,6 +31,8 @@
 #include <tuple>
 #include <vector>
 
+#include "cuda_to_hip.h"
+
 #include "../collective/communicator-inl.h"
 #include "common.h"
 #include "xgboost/global_config.h"

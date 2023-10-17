@@ -266,11 +266,7 @@ void BuildGradientHistogram(CUDAContext const* ctx, EllpackDeviceAccessor const&
   // decide whether to use shared memory
   int device = 0;
 
-#if defined(XGBOOST_USE_CUDA)
   dh::safe_cuda(cudaGetDevice(&device));
-#elif defined(XGBOOST_USE_HIP)
-  dh::safe_cuda(hipGetDevice(&device));
-#endif
 
   // opt into maximum shared memory for the kernel if necessary
 #if defined(XGBOOST_USE_CUDA)
@@ -303,17 +299,10 @@ void BuildGradientHistogram(CUDAContext const* ctx, EllpackDeviceAccessor const&
     int num_groups = feature_groups.NumGroups();
     int n_mps = 0;
 
-#if defined(XGBOOST_USE_CUDA)
     dh::safe_cuda(cudaDeviceGetAttribute(&n_mps, cudaDevAttrMultiProcessorCount, device));
     int n_blocks_per_mp = 0;
     dh::safe_cuda(cudaOccupancyMaxActiveBlocksPerMultiprocessor(&n_blocks_per_mp, kernel,
                                                                 kBlockThreads, smem_size));
-#elif defined(XGBOOST_USE_HIP)
-    dh::safe_cuda(hipDeviceGetAttribute(&n_mps, hipDeviceAttributeMultiprocessorCount, device));
-    int n_blocks_per_mp = 0;
-    dh::safe_cuda(hipOccupancyMaxActiveBlocksPerMultiprocessor(&n_blocks_per_mp, kernel,
-                                                                kBlockThreads, smem_size));
-#endif
 
     // This gives the number of blocks to keep the device occupied
     // Use this as the maximum number of blocks
@@ -347,11 +336,7 @@ void BuildGradientHistogram(CUDAContext const* ctx, EllpackDeviceAccessor const&
     runit(SharedMemHistKernel<false, kBlockThreads, kItemsPerThread>);
   }
 
-#if defined(XGBOOST_USE_CUDA)
   dh::safe_cuda(cudaGetLastError());
-#elif defined(XGBOOST_USE_HIP)
-  dh::safe_cuda(hipGetLastError());
-#endif
 }
 
 }  // namespace tree

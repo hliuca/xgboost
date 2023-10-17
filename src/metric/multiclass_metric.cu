@@ -166,12 +166,7 @@ class MultiClassMetricsReduction {
       labels.SetDevice(device_);
       weights.SetDevice(device_);
 
-#if defined(XGBOOST_USE_CUDA)
       dh::safe_cuda(cudaSetDevice(device_));
-#elif defined(XGBOOST_USE_HIP)
-      dh::safe_cuda(hipSetDevice(device_));
-#endif
-
       result = DeviceReduceMetrics(weights, labels, preds, n_class);
     }
 #endif  // defined(XGBOOST_USE_CUDA) || defined(XGBOOST_USE_HIP)

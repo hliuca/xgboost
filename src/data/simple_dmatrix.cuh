@@ -57,11 +57,7 @@ template <typename AdapterBatchT>
 void CountRowOffsets(const AdapterBatchT& batch, common::Span<bst_row_t> offset,
                      int device_idx, float missing) {
 
-#if defined(XGBOOST_USE_HIP)
-  dh::safe_cuda(hipSetDevice(device_idx));
-#elif defined(XGBOOST_USE_CUDA)
   dh::safe_cuda(cudaSetDevice(device_idx));
-#endif
 
   IsValidFunctor is_valid(missing);
   // Count elements per row

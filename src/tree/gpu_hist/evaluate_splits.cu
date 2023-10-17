@@ -427,15 +427,9 @@ void GPUHistEvaluator::CopyToHost(const std::vector<bst_node_t> &nidx) {
   for (auto idx : nidx) {
     copy_stream_.View().Wait(event);
 
-#if defined(XGBOOST_USE_CUDA)
     dh::safe_cuda(cudaMemcpyAsync(
         h_cats.GetNodeCatStorage(idx).data(), d_cats.GetNodeCatStorage(idx).data(),
         d_cats.GetNodeCatStorage(idx).size_bytes(), cudaMemcpyDeviceToHost, copy_stream_.View()));
-#elif defined(XGBOOST_USE_HIP)
-    dh::safe_cuda(hipMemcpyAsync(
-        h_cats.GetNodeCatStorage(idx).data(), d_cats.GetNodeCatStorage(idx).data(),
-        d_cats.GetNodeCatStorage(idx).size_bytes(), hipMemcpyDeviceToHost, copy_stream_.View()));
-#endif
   }
 }
 
@@ -516,13 +510,8 @@ GPUExpandEntry GPUHistEvaluator::EvaluateSingleSplit(
                        dh::ToSpan(out_entries));
   GPUExpandEntry root_entry;
 
-#if defined(XGBOOST_USE_CUDA)
   dh::safe_cuda(cudaMemcpyAsync(&root_entry, out_entries.data().get(), sizeof(GPUExpandEntry),
                                 cudaMemcpyDeviceToHost));
-#elif defined(XGBOOST_USE_HIP)
-  dh::safe_cuda(hipMemcpyAsync(&root_entry, out_entries.data().get(), sizeof(GPUExpandEntry),
-                                hipMemcpyDeviceToHost));
-#endif
   return root_entry;
 }
 }  // namespace xgboost::tree

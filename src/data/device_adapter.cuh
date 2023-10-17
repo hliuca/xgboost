@@ -123,11 +123,7 @@ class CudfAdapter : public detail::SingleBatchDataIter<CudfAdapterBatch> {
     device_idx_ = dh::CudaGetPointerDevice(first_column.data);
     CHECK_NE(device_idx_, Context::kCpuId);
 
-#if defined(XGBOOST_USE_HIP)
-    dh::safe_cuda(hipSetDevice(device_idx_));
-#elif defined(XGBOOST_USE_CUDA)
     dh::safe_cuda(cudaSetDevice(device_idx_));
-#endif
 
     for (auto& json_col : json_columns) {
       auto column = ArrayInterface<1>(get<Object const>(json_col));
@@ -216,18 +212,10 @@ class CupyAdapter : public detail::SingleBatchDataIter<CupyAdapterBatch> {
 template <typename AdapterBatchT>
 std::size_t GetRowCounts(const AdapterBatchT batch, common::Span<bst_row_t> offset, int device_idx,
                          float missing) {
-#if defined(XGBOOST_USE_CUDA)
   dh::safe_cuda(cudaSetDevice(device_idx));
-#elif defined(XGBOOST_USE_HIP)
-  dh::safe_cuda(hipSetDevice(device_idx));
-#endif
 
   IsValidFunctor is_valid(missing);
-#if defined(XGBOOST_USE_CUDA)
   dh::safe_cuda(cudaMemsetAsync(offset.data(), '\0', offset.size_bytes()));
-#elif defined(XGBOOST_USE_HIP)
-  dh::safe_cuda(hipMemsetAsync(offset.data(), '\0', offset.size_bytes()));
-#endif
 
   auto n_samples = batch.NumRows();
   bst_feature_t n_features = batch.NumCols();

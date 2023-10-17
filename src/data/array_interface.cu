@@ -28,11 +28,7 @@ void ArrayInterfaceHandler::SyncCudaStream(std::int64_t stream) {
       // default per-thread stream
     default: {
       dh::CUDAEvent e;
-#if defined(XGBOOST_USE_CUDA)
       e.Record(dh::CUDAStreamView{reinterpret_cast<cudaStream_t>(stream)});
-#elif defined(XGBOOST_USE_HIP)
-      e.Record(dh::CUDAStreamView{reinterpret_cast<hipStream_t>(stream)});
-#endif
       dh::DefaultStream().Wait(e);
     }
   }
