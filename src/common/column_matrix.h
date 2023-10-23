@@ -173,7 +173,7 @@ class ColumnMatrix {
       this->InitView();
     }
     /** @brief Set the i^th element to be a valid element (instead of missing). */
-    void SetValid(typename LBitField32::index_type i) { /*missing.Clear(i); */}
+    void SetValid(typename LBitField32::index_type i) {missing.Clear(i);}
     /** @brief assign the storage to the view. */
     void InitView() {
       missing = LBitField32{Span{storage.data(), storage.size()}};

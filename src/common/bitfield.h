@@ -162,6 +162,16 @@ struct BitFieldContainer {
     using Type = typename dh::detail::AtomicDispatcher<sizeof(value_type)>::Type;
     atomicAnd(reinterpret_cast<Type *>(&value), clear_bit);
   }
+
+  /* compiler hack */
+#if defined(__HIP_PLATFORM_AMD__)
+  void Clear(index_type pos) noexcept(true) {
+    Pos pos_v = Direction::Shift(ToBitPos(pos));
+    value_type& value = Data()[pos_v.int_pos];
+    value_type clear_bit = ~(kOne << pos_v.bit_pos);
+    value &= clear_bit;
+  }
+#endif
 #else
   void Set(index_type pos) noexcept(true) {
     Pos pos_v = Direction::Shift(ToBitPos(pos));

@@ -15,6 +15,7 @@
 #include "../../../src/collective/communicator-inl.hip.h"
 #include "../../../src/collective/nccl_device_communicator.hip.h"
 #endif
+#include "../helpers.h"
 
 namespace xgboost {
 namespace collective {

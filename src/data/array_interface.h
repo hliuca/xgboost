@@ -328,7 +328,7 @@ template <>
 struct ToDType<__half> {
   static constexpr ArrayInterfaceHandler::Type kType = ArrayInterfaceHandler::kF2;
 };
-#endif  // defined(XGBOOST_USE_CUDA) || defined(__HIP_PLATFORM_AMD__)
+#endif  // defined(XGBOOST_USE_CUDA)
 template <>
 struct ToDType<float> {
   static constexpr ArrayInterfaceHandler::Type kType = ArrayInterfaceHandler::kF4;
@@ -377,10 +377,10 @@ struct ToDType<int64_t> {
   static constexpr ArrayInterfaceHandler::Type kType = ArrayInterfaceHandler::kI8;
 };
 
-#if !defined(XGBOOST_USE_CUDA) && !defined(XGBOOST_USE_HIP)
+#if !defined(XGBOOST_USE_CUDA) && !defined(__HIP_PLATFORM_AMD__)
 inline void ArrayInterfaceHandler::SyncCudaStream(int64_t) { common::AssertGPUSupport(); }
 inline bool ArrayInterfaceHandler::IsCudaPtr(void const *) { return false; }
-#endif  // !defined(XGBOOST_USE_CUDA) && !defined(XGBOOST_USE_HIP)
+#endif  // !defined(XGBOOST_USE_CUDA)
 
 /**
  * \brief A type erased view over __array_interface__ protocol defined by numpy
@@ -482,7 +482,7 @@ class ArrayInterface {
       type = T::kF2;
 #else
       LOG(FATAL) << "Half type is not supported.";
-#endif  // defined(XGBOOST_USE_CUDA) || defined(__HIP_PLATFORM_AMD__)
+#endif  // defined(XGBOOST_USE_CUDA)
     } else if (typestr[1] == 'f' && typestr[2] == '4') {
       type = T::kF4;
     } else if (typestr[1] == 'f' && typestr[2] == '8') {
@@ -519,7 +519,7 @@ class ArrayInterface {
       case T::kF2: {
 #if defined(XGBOOST_USE_CUDA) || defined(__HIP_PLATFORM_AMD__)
         return func(reinterpret_cast<__half const *>(data));
-#endif  // defined(XGBOOST_USE_CUDA) || || defined(__HIP_PLATFORM_AMD__)
+#endif  // defined(XGBOOST_USE_CUDA)
       }
       case T::kF4:
         return func(reinterpret_cast<float const *>(data));
@@ -582,7 +582,7 @@ class ArrayInterface {
       return static_cast<T>(static_cast<Type>(p_values[offset]));
 #else
       return static_cast<T>(p_values[offset]);
-#endif  // defined(XGBOOST_USE_CUDA) || defined(__HIP_PLATFORM_AMD__)
+#endif  // defined(XGBOOST_USE_CUDA)
     });
   }
 

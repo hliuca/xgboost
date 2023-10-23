@@ -200,6 +200,18 @@ macro(xgboost_link_nccl target)
   endif()
 endmacro()
 
+macro(xgboost_link_rccl target)
+  if(BUILD_STATIC_LIB)
+    target_include_directories(${target} PUBLIC ${rccl_INCLUDE_DIR})
+    target_compile_definitions(${target} PUBLIC -DXGBOOST_USE_RCCL=1)
+    target_link_libraries(${target} PUBLIC ${rccl_LIBRARY})
+  else()
+    target_include_directories(${target} PRIVATE ${rccl_INCLUDE_DIR})
+    target_compile_definitions(${target} PRIVATE -DXGBOOST_USE_RCCL=1)
+    target_link_libraries(${target} PRIVATE ${rccl_LIBRARY})
+  endif()
+endmacro()
+
 # compile options
 macro(xgboost_target_properties target)
   set_target_properties(${target} PROPERTIES
@@ -300,6 +312,10 @@ macro(xgboost_target_link_libraries target)
 
   if(USE_NCCL)
     xgboost_link_nccl(${target})
+  endif()
+
+  if(USE_RCCL)
+    xgboost_link_rccl(${target})
   endif()
 
   if(USE_NVTX)

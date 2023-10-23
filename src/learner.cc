@@ -1478,11 +1478,11 @@ class LearnerImpl : public LearnerIO {
  private:
   void GetGradient(HostDeviceVector<bst_float> const& preds, MetaInfo const& info,
                    std::int32_t iter, linalg::Matrix<GradientPair>* out_gpair) {
-#if defined(XGBOOST_USE_CUDA)
+#ifndef XGBOOST_USE_HIP
     out_gpair->Reshape(info.num_row_, this->learner_model_param_.OutputLength());
     collective::ApplyWithLabels(info, out_gpair->Data(),
                                 [&] { obj_->GetGradient(preds, info, iter, out_gpair); });
-#elif defined(XGBOOST_USE_HIP)
+#else
     if (info.IsVerticalFederated()) {
         out_gpair->Reshape(info.num_row_, this->learner_model_param_.OutputLength());
         collective::ApplyWithLabels(info, out_gpair->Data(),
