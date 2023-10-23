@@ -268,7 +268,7 @@ TEST(SimpleDMatrix, Slice) {
   std::iota(upper.begin(), upper.end(), 1.0f);
 
   auto& margin = p_m->Info().base_margin_;
-  margin = decltype(p_m->Info().base_margin_){{kRows, kClasses}, Context::kCpuId};
+  margin = decltype(p_m->Info().base_margin_){{kRows, kClasses}, DeviceOrd::CPU()};
 
   std::array<int32_t, 3> ridxs {1, 3, 5};
   std::unique_ptr<DMatrix> out { p_m->Slice(ridxs) };
@@ -341,7 +341,7 @@ TEST(SimpleDMatrix, SliceCol) {
   std::iota(upper.begin(), upper.end(), 1.0f);
 
   auto& margin = p_m->Info().base_margin_;
-  margin = decltype(p_m->Info().base_margin_){{kRows, kClasses}, Context::kCpuId};
+  margin = decltype(p_m->Info().base_margin_){{kRows, kClasses}, DeviceOrd::CPU()};
 
   auto constexpr kSlices {2};
   auto constexpr kSliceSize {4};
@@ -427,4 +427,22 @@ TEST(SimpleDMatrix, Threads) {
   std::unique_ptr<DMatrix> p_fmat{
       DMatrix::Create(&adapter, std::numeric_limits<float>::quiet_NaN(), 0, "")};
   ASSERT_EQ(p_fmat->Ctx()->Threads(), AllThreadsForTest());
+}
+
+namespace {
+void VerifyColumnSplit() {
+  size_t constexpr kRows {16};
+  size_t constexpr kCols {8};
+  auto dmat =
+      RandomDataGenerator{kRows, kCols, 0}.GenerateDMatrix(false, false, 1, DataSplitMode::kCol);
+
+  ASSERT_EQ(dmat->Info().num_col_, kCols * collective::GetWorldSize());
+  ASSERT_EQ(dmat->Info().num_row_, kRows);
+  ASSERT_EQ(dmat->Info().data_split_mode, DataSplitMode::kCol);
+}
+}  // anonymous namespace
+
+TEST(SimpleDMatrix, ColumnSplit) {
+  auto constexpr kWorldSize{3};
+  RunWithInMemoryCommunicator(kWorldSize, VerifyColumnSplit);
 }

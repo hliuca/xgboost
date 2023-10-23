@@ -62,6 +62,7 @@ OBJECTS= \
     $(PKGROOT)/src/gbm/gbtree_model.o \
     $(PKGROOT)/src/gbm/gblinear.o \
     $(PKGROOT)/src/gbm/gblinear_model.o \
+    $(PKGROOT)/src/data/adapter.o \
     $(PKGROOT)/src/data/simple_dmatrix.o \
     $(PKGROOT)/src/data/data.o \
     $(PKGROOT)/src/data/sparse_page_raw_format.o \
@@ -97,9 +98,15 @@ OBJECTS= \
     $(PKGROOT)/src/context.o \
     $(PKGROOT)/src/logging.o \
     $(PKGROOT)/src/global_config.o \
+    $(PKGROOT)/src/collective/allgather.o \
+    $(PKGROOT)/src/collective/allreduce.o \
+    $(PKGROOT)/src/collective/broadcast.o \
+    $(PKGROOT)/src/collective/comm.o \
+    $(PKGROOT)/src/collective/tracker.o \
     $(PKGROOT)/src/collective/communicator.o \
     $(PKGROOT)/src/collective/in_memory_communicator.o \
     $(PKGROOT)/src/collective/in_memory_handler.o \
+    $(PKGROOT)/src/collective/loop.o \
     $(PKGROOT)/src/collective/socket.o \
     $(PKGROOT)/src/common/charconv.o \
     $(PKGROOT)/src/common/column_matrix.o \

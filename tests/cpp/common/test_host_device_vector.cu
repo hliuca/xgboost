@@ -1,7 +1,6 @@
-/*!
- * Copyright 2018 XGBoost contributors
+/**
+ * Copyright 2018-2023 XGBoost contributors
  */
-
 #include <gtest/gtest.h>
 #include <thrust/equal.h>
 #include <thrust/iterator/counting_iterator.h>
@@ -13,21 +12,14 @@
 #endif
 #include <xgboost/host_device_vector.h>
 
-namespace xgboost {
-namespace common {
+namespace xgboost::common {
 namespace {
-void SetDeviceForTest(int device) {
+void SetDeviceForTest(DeviceOrd device) {
   int n_devices;
 
-#if defined(XGBOOST_USE_CUDA)
   dh::safe_cuda(cudaGetDeviceCount(&n_devices));
-  device %= n_devices;
-  dh::safe_cuda(cudaSetDevice(device));
-#elif defined(XGBOOST_USE_HIP)
-  dh::safe_cuda(hipGetDeviceCount(&n_devices));
-  device %= n_devices;
-  dh::safe_cuda(hipSetDevice(device));
-#endif
+  device.ordinal %= n_devices;
+  dh::safe_cuda(cudaSetDevice(device.ordinal));
 }
 }  // namespace
 
@@ -42,13 +34,13 @@ struct HostDeviceVectorSetDeviceHandler {
   }
 };
 
-void InitHostDeviceVector(size_t n, int device, HostDeviceVector<int> *v) {
+void InitHostDeviceVector(size_t n, DeviceOrd device, HostDeviceVector<int> *v) {
   // create the vector
   v->SetDevice(device);
   v->Resize(n);
 
   ASSERT_EQ(v->Size(), n);
-  ASSERT_EQ(v->DeviceIdx(), device);
+  ASSERT_EQ(v->Device(), device);
   // ensure that the device have read-write access
   ASSERT_TRUE(v->DeviceCanRead());
   ASSERT_TRUE(v->DeviceCanWrite());
@@ -68,7 +60,7 @@ void InitHostDeviceVector(size_t n, int device, HostDeviceVector<int> *v) {
 }
 
 void PlusOne(HostDeviceVector<int> *v) {
-  int device = v->DeviceIdx();
+  auto device = v->Device();
   SetDeviceForTest(device);
   thrust::transform(dh::tcbegin(*v), dh::tcend(*v), dh::tbegin(*v),
                     [=]__device__(unsigned int a){ return a + 1; });
@@ -80,7 +72,7 @@ void CheckDevice(HostDeviceVector<int>* v,
                  unsigned int first,
                  GPUAccess access) {
   ASSERT_EQ(v->Size(), size);
-  SetDeviceForTest(v->DeviceIdx());
+  SetDeviceForTest(v->Device());
 
   ASSERT_TRUE(thrust::equal(dh::tcbegin(*v), dh::tcend(*v),
                             thrust::make_counting_iterator(first)));
@@ -111,7 +103,7 @@ void CheckHost(HostDeviceVector<int> *v, GPUAccess access) {
   ASSERT_FALSE(v->DeviceCanWrite());
 }
 
-void TestHostDeviceVector(size_t n, int device) {
+void TestHostDeviceVector(size_t n, DeviceOrd device) {
   HostDeviceVectorSetDeviceHandler hdvec_dev_hndlr(SetDevice);
   HostDeviceVector<int> v;
   InitHostDeviceVector(n, device, &v);
@@ -124,13 +116,13 @@ void TestHostDeviceVector(size_t n, int device) {
 
 TEST(HostDeviceVector, Basic) {
   size_t n = 1001;
-  int device = 0;
+  DeviceOrd device = DeviceOrd::CUDA(0);
   TestHostDeviceVector(n, device);
 }
 
 TEST(HostDeviceVector, Copy) {
   size_t n = 1001;
-  int device = 0;
+  auto device = DeviceOrd::CUDA(0);
   HostDeviceVectorSetDeviceHandler hdvec_dev_hndlr(SetDevice);
 
   HostDeviceVector<int> v;
@@ -154,15 +146,15 @@ TEST(HostDeviceVector, SetDevice) {
     h_vec[i] = i;
   }
   HostDeviceVector<int> vec (h_vec);
-  auto device = 0;
+  auto device = DeviceOrd::CUDA(0);
 
   vec.SetDevice(device);
   ASSERT_EQ(vec.Size(), h_vec.size());
   auto span = vec.DeviceSpan();  // sync to device
 
-  vec.SetDevice(-1);  // pull back to cpu.
+  vec.SetDevice(DeviceOrd::CPU());  // pull back to cpu.
   ASSERT_EQ(vec.Size(), h_vec.size());
-  ASSERT_EQ(vec.DeviceIdx(), -1);
+  ASSERT_EQ(vec.Device(), DeviceOrd::CPU());
 
   auto h_vec_1 = vec.HostVector();
   ASSERT_TRUE(std::equal(h_vec_1.cbegin(), h_vec_1.cend(), h_vec.cbegin()));
@@ -170,7 +162,7 @@ TEST(HostDeviceVector, SetDevice) {
 
 TEST(HostDeviceVector, Span) {
   HostDeviceVector<float> vec {1.0f, 2.0f, 3.0f, 4.0f};
-  vec.SetDevice(0);
+  vec.SetDevice(DeviceOrd::CUDA(0));
   auto span = vec.DeviceSpan();
   ASSERT_EQ(vec.Size(), span.size());
   ASSERT_EQ(vec.DevicePointer(), span.data());
@@ -194,5 +186,4 @@ TEST(HostDeviceVector, Empty) {
   ASSERT_FALSE(another.Empty());
   ASSERT_TRUE(vec.Empty());
 }
-}  // namespace common
-}  // namespace xgboost
+}  // namespace xgboost::common

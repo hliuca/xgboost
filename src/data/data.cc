@@ -635,22 +635,39 @@ void MetaInfo::GetInfo(char const* key, bst_ulong* out_len, DataType dtype,
 }
 
 void MetaInfo::SetFeatureInfo(const char* key, const char **info, const bst_ulong size) {
-  if (size != 0 && this->num_col_ != 0) {
+  if (size != 0 && this->num_col_ != 0 && !IsColumnSplit()) {
     CHECK_EQ(size, this->num_col_) << "Length of " << key << " must be equal to number of columns.";
     CHECK(info);
   }
   if (!std::strcmp(key, "feature_type")) {
     feature_type_names.clear();
-    auto& h_feature_types = feature_types.HostVector();
     for (size_t i = 0; i < size; ++i) {
       auto elem = info[i];
       feature_type_names.emplace_back(elem);
     }
+    if (IsColumnSplit()) {
+      feature_type_names = collective::AllgatherStrings(feature_type_names);
+      CHECK_EQ(feature_type_names.size(), num_col_)
+          << "Length of " << key << " must be equal to number of columns.";
+    }
+    auto& h_feature_types = feature_types.HostVector();
     LoadFeatureType(feature_type_names, &h_feature_types);
   } else if (!std::strcmp(key, "feature_name")) {
-    feature_names.clear();
-    for (size_t i = 0; i < size; ++i) {
-      feature_names.emplace_back(info[i]);
+    if (IsColumnSplit()) {
+      std::vector<std::string> local_feature_names{};
+      auto const rank = collective::GetRank();
+      for (std::size_t i = 0; i < size; ++i) {
+        auto elem = std::to_string(rank) + "." + info[i];
+        local_feature_names.emplace_back(elem);
+      }
+      feature_names = collective::AllgatherStrings(local_feature_names);
+      CHECK_EQ(feature_names.size(), num_col_)
+        << "Length of " << key << " must be equal to number of columns.";
+    } else {
+      feature_names.clear();
+      for (size_t i = 0; i < size; ++i) {
+        feature_names.emplace_back(info[i]);
+      }
     }
   } else {
     LOG(FATAL) << "Unknown feature info name: " << key;
@@ -687,13 +704,13 @@ void MetaInfo::Extend(MetaInfo const& that, bool accumulate_rows, bool check_col
 
   linalg::Stack(&this->labels, that.labels);
 
-  this->weights_.SetDevice(that.weights_.DeviceIdx());
+  this->weights_.SetDevice(that.weights_.Device());
   this->weights_.Extend(that.weights_);
 
-  this->labels_lower_bound_.SetDevice(that.labels_lower_bound_.DeviceIdx());
+  this->labels_lower_bound_.SetDevice(that.labels_lower_bound_.Device());
   this->labels_lower_bound_.Extend(that.labels_lower_bound_);
 
-  this->labels_upper_bound_.SetDevice(that.labels_upper_bound_.DeviceIdx());
+  this->labels_upper_bound_.SetDevice(that.labels_upper_bound_.Device());
   this->labels_upper_bound_.Extend(that.labels_upper_bound_);
 
   linalg::Stack(&this->base_margin_, that.base_margin_);
@@ -723,13 +740,13 @@ void MetaInfo::Extend(MetaInfo const& that, bool accumulate_rows, bool check_col
   }
   if (!that.feature_weights.Empty()) {
     this->feature_weights.Resize(that.feature_weights.Size());
-    this->feature_weights.SetDevice(that.feature_weights.DeviceIdx());
+    this->feature_weights.SetDevice(that.feature_weights.Device());
     this->feature_weights.Copy(that.feature_weights);
   }
 }
 
 void MetaInfo::SynchronizeNumberOfColumns() {
-  if (IsVerticalFederated()) {
+  if (IsColumnSplit()) {
     collective::Allreduce<collective::Operation::kSum>(&num_col_, 1);
   } else {
     collective::Allreduce<collective::Operation::kMax>(&num_col_, 1);
@@ -738,22 +755,22 @@ void MetaInfo::SynchronizeNumberOfColumns() {
 
 namespace {
 template <typename T>
-void CheckDevice(std::int32_t device, HostDeviceVector<T> const& v) {
-  bool valid = v.Device().IsCPU() || device == Context::kCpuId || v.DeviceIdx() == device;
+void CheckDevice(DeviceOrd device, HostDeviceVector<T> const& v) {
+  bool valid = v.Device().IsCPU() || device.IsCPU() || v.Device() == device;
   if (!valid) {
     LOG(FATAL) << "Invalid device ordinal. Data is associated with a different device ordinal than "
                   "the booster. The device ordinal of the data is: "
-               << v.DeviceIdx() << "; the device ordinal of the Booster is: " << device;
+               << v.Device() << "; the device ordinal of the Booster is: " << device;
   }
 }
 
 template <typename T, std::int32_t D>
-void CheckDevice(std::int32_t device, linalg::Tensor<T, D> const& v) {
+void CheckDevice(DeviceOrd device, linalg::Tensor<T, D> const& v) {
   CheckDevice(device, *v.Data());
 }
 }  // anonymous namespace
 
-void MetaInfo::Validate(std::int32_t device) const {
+void MetaInfo::Validate(DeviceOrd device) const {
   if (group_ptr_.size() != 0 && weights_.Size() != 0) {
     CHECK_EQ(group_ptr_.size(), weights_.Size() + 1) << error::GroupWeight();
     return;
@@ -850,14 +867,6 @@ DMatrix* TryLoadBinary(std::string fname, bool silent) {
 }  // namespace
 
 DMatrix* DMatrix::Load(const std::string& uri, bool silent, DataSplitMode data_split_mode) {
-  auto need_split = false;
-  if (collective::IsFederated()) {
-    LOG(CONSOLE) << "XGBoost federated mode detected, not splitting data among workers";
-  } else if (collective::IsDistributed()) {
-    LOG(CONSOLE) << "XGBoost distributed mode detected, will split data among workers";
-    need_split = true;
-  }
-
   std::string fname, cache_file;
   auto dlm_pos = uri.find('#');
   if (dlm_pos != std::string::npos) {
@@ -865,24 +874,6 @@ DMatrix* DMatrix::Load(const std::string& uri, bool silent, DataSplitMode data_s
     fname = uri.substr(0, dlm_pos);
     CHECK_EQ(cache_file.find('#'), std::string::npos)
         << "Only one `#` is allowed in file path for cache file specification.";
-    if (need_split && data_split_mode == DataSplitMode::kRow) {
-      std::ostringstream os;
-      std::vector<std::string> cache_shards = common::Split(cache_file, ':');
-      for (size_t i = 0; i < cache_shards.size(); ++i) {
-        size_t pos = cache_shards[i].rfind('.');
-        if (pos == std::string::npos) {
-          os << cache_shards[i] << ".r" << collective::GetRank() << "-"
-             << collective::GetWorldSize();
-        } else {
-          os << cache_shards[i].substr(0, pos) << ".r" << collective::GetRank() << "-"
-             << collective::GetWorldSize() << cache_shards[i].substr(pos, cache_shards[i].length());
-        }
-        if (i + 1 != cache_shards.size()) {
-          os << ':';
-        }
-      }
-      cache_file = os.str();
-    }
   } else {
     fname = uri;
   }
@@ -894,19 +885,7 @@ DMatrix* DMatrix::Load(const std::string& uri, bool silent, DataSplitMode data_s
   }
 
   int partid = 0, npart = 1;
-  if (need_split && data_split_mode == DataSplitMode::kRow) {
-    partid = collective::GetRank();
-    npart = collective::GetWorldSize();
-  } else {
-    // test option to load in part
-    npart = 1;
-  }
-
-  if (npart != 1) {
-    LOG(CONSOLE) << "Load part of data " << partid << " of " << npart << " parts";
-  }
-
-  DMatrix* dmat{nullptr};
+  DMatrix* dmat{};
 
   if (cache_file.empty()) {
     fname = data::ValidateFileFormat(fname);
@@ -916,6 +895,8 @@ DMatrix* DMatrix::Load(const std::string& uri, bool silent, DataSplitMode data_s
     dmat = DMatrix::Create(&adapter, std::numeric_limits<float>::quiet_NaN(), Context{}.Threads(),
                            cache_file, data_split_mode);
   } else {
+    CHECK(data_split_mode != DataSplitMode::kCol)
+        << "Column-wise data split is not supported for external memory.";
     data::FileIterator iter{fname, static_cast<uint32_t>(partid), static_cast<uint32_t>(npart)};
     dmat = new data::SparsePageDMatrix{&iter,
                                        iter.Proxy(),
@@ -926,17 +907,7 @@ DMatrix* DMatrix::Load(const std::string& uri, bool silent, DataSplitMode data_s
                                        cache_file};
   }
 
-  if (need_split && data_split_mode == DataSplitMode::kCol) {
-    if (!cache_file.empty()) {
-      LOG(FATAL) << "Column-wise data split is not support for external memory.";
-    }
-    LOG(CONSOLE) << "Splitting data by column";
-    auto* sliced = dmat->SliceCol(npart, partid);
-    delete dmat;
-    return sliced;
-  } else {
-    return dmat;
-  }
+  return dmat;
 }
 
 template <typename DataIterHandle, typename DMatrixHandle, typename DataIterResetCallback,
@@ -1011,9 +982,6 @@ template DMatrix* DMatrix::Create<data::CSCArrayAdapter>(data::CSCArrayAdapter* 
 template DMatrix* DMatrix::Create(
     data::IteratorAdapter<DataIterHandle, XGBCallbackDataIterNext, XGBoostBatchCSR>* adapter,
     float missing, int nthread, const std::string& cache_prefix, DataSplitMode data_split_mode);
-template DMatrix* DMatrix::Create<data::RecordBatchesIterAdapter>(
-    data::RecordBatchesIterAdapter* adapter, float missing, int nthread, const std::string&,
-    DataSplitMode data_split_mode);
 
 SparsePage SparsePage::GetTranspose(int num_columns, int32_t n_threads) const {
   SparsePage transpose;

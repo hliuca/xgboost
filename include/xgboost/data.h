@@ -106,10 +106,10 @@ class MetaInfo {
   MetaInfo& operator=(MetaInfo&& that) = default;
   MetaInfo& operator=(MetaInfo const& that) = delete;
 
-  /*!
-   * \brief Validate all metainfo.
+  /**
+   * @brief Validate all metainfo.
    */
-  void Validate(int32_t device) const;
+  void Validate(DeviceOrd device) const;
 
   MetaInfo Slice(common::Span<int32_t const> ridxs) const;
 
@@ -559,8 +559,7 @@ class DMatrix {
    *
    * \param uri The URI of input.
    * \param silent Whether print information during loading.
-   * \param data_split_mode In distributed mode, split the input according this mode; otherwise,
-   *                        it's just an indicator on how the input was split beforehand.
+   * \param data_split_mode Indicate how the data was split beforehand.
    * \return The created DMatrix.
    */
   static DMatrix* Load(const std::string& uri, bool silent = true,

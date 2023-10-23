@@ -98,7 +98,7 @@ TEST(EllpackPage, FromCategoricalBasic) {
   Context ctx{MakeCUDACtx(0)};
   auto p = BatchParam{max_bins, tree::TrainParam::DftSparseThreshold()};
   auto ellpack = EllpackPage(&ctx, m.get(), p);
-  auto accessor = ellpack.Impl()->GetDeviceAccessor(0);
+  auto accessor = ellpack.Impl()->GetDeviceAccessor(FstCU());
   ASSERT_EQ(kCats, accessor.NumBins());
 
   auto x_copy = x;
@@ -156,13 +156,12 @@ TEST(EllpackPage, Copy) {
   auto page = (*dmat->GetBatches<EllpackPage>(&ctx, param).begin()).Impl();
 
   // Create an empty result page.
-  EllpackPageImpl result(0, page->Cuts(), page->is_dense, page->row_stride,
-                         kRows);
+  EllpackPageImpl result(FstCU(), page->Cuts(), page->is_dense, page->row_stride, kRows);
 
   // Copy batch pages into the result page.
   size_t offset = 0;
   for (auto& batch : dmat->GetBatches<EllpackPage>(&ctx, param)) {
-    size_t num_elements = result.Copy(0, batch.Impl(), offset);
+    size_t num_elements = result.Copy(FstCU(), batch.Impl(), offset);
     offset += num_elements;
   }
 
@@ -176,10 +175,12 @@ TEST(EllpackPage, Copy) {
     EXPECT_EQ(impl->base_rowid, current_row);
 
     for (size_t i = 0; i < impl->Size(); i++) {
-      dh::LaunchN(kCols, ReadRowFunction(impl->GetDeviceAccessor(0), current_row, row_d.data().get()));
+      dh::LaunchN(kCols, ReadRowFunction(impl->GetDeviceAccessor(FstCU()), current_row,
+                                         row_d.data().get()));
       thrust::copy(row_d.begin(), row_d.end(), row.begin());
 
-      dh::LaunchN(kCols, ReadRowFunction(result.GetDeviceAccessor(0), current_row, row_result_d.data().get()));
+      dh::LaunchN(kCols, ReadRowFunction(result.GetDeviceAccessor(FstCU()), current_row,
+                                         row_result_d.data().get()));
       thrust::copy(row_result_d.begin(), row_result_d.end(), row_result.begin());
 
       EXPECT_EQ(row, row_result);
@@ -203,8 +204,7 @@ TEST(EllpackPage, Compact) {
   auto page = (*dmat->GetBatches<EllpackPage>(&ctx, param).begin()).Impl();
 
   // Create an empty result page.
-  EllpackPageImpl result(0, page->Cuts(), page->is_dense, page->row_stride,
-                         kCompactedRows);
+  EllpackPageImpl result(FstCU(), page->Cuts(), page->is_dense, page->row_stride, kCompactedRows);
 
   // Compact batch pages into the result page.
   std::vector<size_t> row_indexes_h {
@@ -213,7 +213,7 @@ TEST(EllpackPage, Compact) {
   thrust::device_vector<size_t> row_indexes_d = row_indexes_h;
   common::Span<size_t> row_indexes_span(row_indexes_d.data().get(), kRows);
   for (auto& batch : dmat->GetBatches<EllpackPage>(&ctx, param)) {
-    result.Compact(0, batch.Impl(), row_indexes_span);
+    result.Compact(FstCU(), batch.Impl(), row_indexes_span);
   }
 
   size_t current_row = 0;
@@ -232,7 +232,7 @@ TEST(EllpackPage, Compact) {
         continue;
       }
 
-      dh::LaunchN(kCols, ReadRowFunction(impl->GetDeviceAccessor(0),
+      dh::LaunchN(kCols, ReadRowFunction(impl->GetDeviceAccessor(FstCU()),
                                          current_row, row_d.data().get()));
 #if defined(XGBOOST_USE_CUDA)
       dh::safe_cuda(cudaDeviceSynchronize());
@@ -242,7 +242,7 @@ TEST(EllpackPage, Compact) {
       thrust::copy(row_d.begin(), row_d.end(), row.begin());
 
       dh::LaunchN(kCols,
-                  ReadRowFunction(result.GetDeviceAccessor(0), compacted_row,
+                  ReadRowFunction(result.GetDeviceAccessor(FstCU()), compacted_row,
                                   row_result_d.data().get()));
       thrust::copy(row_result_d.begin(), row_result_d.end(), row_result.begin());
 

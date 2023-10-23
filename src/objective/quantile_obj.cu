@@ -70,16 +70,16 @@ class QuantileRegression : public ObjFunction {
     out_gpair->Reshape(info.num_row_, n_targets);
     auto gpair = out_gpair->View(ctx_->Device());
 
-    info.weights_.SetDevice(ctx_->gpu_id);
-    common::OptionalWeights weight{ctx_->IsCPU() ? info.weights_.ConstHostSpan()
-                                                 : info.weights_.ConstDeviceSpan()};
+    info.weights_.SetDevice(ctx_->Device());
+    common::OptionalWeights weight{ctx_->IsCUDA() ? info.weights_.ConstDeviceSpan()
+                                                  : info.weights_.ConstHostSpan()};
 
-    preds.SetDevice(ctx_->gpu_id);
+    preds.SetDevice(ctx_->Device());
     auto predt = linalg::MakeVec(&preds);
     auto n_samples = info.num_row_;
 
-    alpha_.SetDevice(ctx_->gpu_id);
-    auto alpha = ctx_->IsCPU() ? alpha_.ConstHostSpan() : alpha_.ConstDeviceSpan();
+    alpha_.SetDevice(ctx_->Device());
+    auto alpha = ctx_->IsCUDA() ? alpha_.ConstDeviceSpan() : alpha_.ConstHostSpan();
 
     linalg::ElementWiseKernel(
         ctx_, gpair, [=] XGBOOST_DEVICE(std::size_t i, GradientPair const&) mutable {
@@ -103,11 +103,48 @@ class QuantileRegression : public ObjFunction {
     CHECK(!alpha_.Empty());
 
     auto n_targets = this->Targets(info);
-    base_score->SetDevice(ctx_->gpu_id);
+    base_score->SetDevice(ctx_->Device());
     base_score->Reshape(n_targets);
 
     double sw{0};
-    if (ctx_->IsCPU()) {
+    if (ctx_->IsCUDA()) {
+#if defined(XGBOOST_USE_CUDA) || defined(XGBOOST_USE_HIP)
+      alpha_.SetDevice(ctx_->Device());
+      auto d_alpha = alpha_.ConstDeviceSpan();
+      auto d_labels = info.labels.View(ctx_->Device());
+      auto seg_it = dh::MakeTransformIterator<std::size_t>(
+          thrust::make_counting_iterator(0ul),
+          [=] XGBOOST_DEVICE(std::size_t i) { return i * d_labels.Shape(0); });
+      CHECK_EQ(d_labels.Shape(1), 1);
+      auto val_it = dh::MakeTransformIterator<float>(thrust::make_counting_iterator(0ul),
+                                                     [=] XGBOOST_DEVICE(std::size_t i) {
+                                                       auto sample_idx = i % d_labels.Shape(0);
+                                                       return d_labels(sample_idx, 0);
+                                                     });
+      auto n = d_labels.Size() * d_alpha.size();
+      CHECK_EQ(base_score->Size(), d_alpha.size());
+      if (info.weights_.Empty()) {
+        common::SegmentedQuantile(ctx_, d_alpha.data(), seg_it, seg_it + d_alpha.size() + 1, val_it,
+                                  val_it + n, base_score->Data());
+        sw = info.num_row_;
+      } else {
+        info.weights_.SetDevice(ctx_->Device());
+        auto d_weights = info.weights_.ConstDeviceSpan();
+        auto weight_it = dh::MakeTransformIterator<float>(thrust::make_counting_iterator(0ul),
+                                                          [=] XGBOOST_DEVICE(std::size_t i) {
+                                                            auto sample_idx = i % d_labels.Shape(0);
+                                                            return d_weights[sample_idx];
+                                                          });
+        common::SegmentedWeightedQuantile(ctx_, d_alpha.data(), seg_it, seg_it + d_alpha.size() + 1,
+                                          val_it, val_it + n, weight_it, weight_it + n,
+                                          base_score->Data());
+        sw = dh::Reduce(ctx_->CUDACtx()->CTP(), dh::tcbegin(d_weights), dh::tcend(d_weights), 0.0,
+                        thrust::plus<double>{});
+      }
+#else
+      common::AssertGPUSupport();
+#endif  // defined(XGBOOST_USE_CUDA)
+    } else {
       auto quantiles = base_score->HostView();
       auto h_weights = info.weights_.ConstHostVector();
       if (info.weights_.Empty()) {
@@ -127,43 +164,6 @@ class QuantileRegression : public ObjFunction {
                                                   linalg::cend(h_labels), std::cbegin(h_weights));
         }
       }
-    } else {
-#if defined(XGBOOST_USE_CUDA) || defined(XGBOOST_USE_HIP)
-      alpha_.SetDevice(ctx_->gpu_id);
-      auto d_alpha = alpha_.ConstDeviceSpan();
-      auto d_labels = info.labels.View(ctx_->Device());
-      auto seg_it = dh::MakeTransformIterator<std::size_t>(
-          thrust::make_counting_iterator(0ul),
-          [=] XGBOOST_DEVICE(std::size_t i) { return i * d_labels.Shape(0); });
-      CHECK_EQ(d_labels.Shape(1), 1);
-      auto val_it = dh::MakeTransformIterator<float>(thrust::make_counting_iterator(0ul),
-                                                     [=] XGBOOST_DEVICE(std::size_t i) {
-                                                       auto sample_idx = i % d_labels.Shape(0);
-                                                       return d_labels(sample_idx, 0);
-                                                     });
-      auto n = d_labels.Size() * d_alpha.size();
-      CHECK_EQ(base_score->Size(), d_alpha.size());
-      if (info.weights_.Empty()) {
-        common::SegmentedQuantile(ctx_, d_alpha.data(), seg_it, seg_it + d_alpha.size() + 1, val_it,
-                                  val_it + n, base_score->Data());
-        sw = info.num_row_;
-      } else {
-        info.weights_.SetDevice(ctx_->gpu_id);
-        auto d_weights = info.weights_.ConstDeviceSpan();
-        auto weight_it = dh::MakeTransformIterator<float>(thrust::make_counting_iterator(0ul),
-                                                          [=] XGBOOST_DEVICE(std::size_t i) {
-                                                            auto sample_idx = i % d_labels.Shape(0);
-                                                            return d_weights[sample_idx];
-                                                          });
-        common::SegmentedWeightedQuantile(ctx_, d_alpha.data(), seg_it, seg_it + d_alpha.size() + 1,
-                                          val_it, val_it + n, weight_it, weight_it + n,
-                                          base_score->Data());
-        sw = dh::Reduce(ctx_->CUDACtx()->CTP(), dh::tcbegin(d_weights), dh::tcend(d_weights), 0.0,
-                        thrust::plus<double>{});
-      }
-#else
-      common::AssertGPUSupport();
-#endif  // defined(XGBOOST_USE_CUDA) || defined(XGBOOST_USE_HIP)
     }
 
     // For multiple quantiles, we should extend the base score to a vector instead of

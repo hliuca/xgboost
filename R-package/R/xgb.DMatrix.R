@@ -18,7 +18,12 @@
 #'
 #' @examples
 #' data(agaricus.train, package='xgboost')
-#' dtrain <- with(agaricus.train, xgb.DMatrix(data, label = label, nthread = 2))
+#' ## Keep the number of threads to 1 for examples
+#' nthread <- 1
+#' data.table::setDTthreads(nthread)
+#' dtrain <- with(
+#'   agaricus.train, xgb.DMatrix(data, label = label, nthread = nthread)
+#' )
 #' xgb.DMatrix.save(dtrain, 'xgb.DMatrix.data')
 #' dtrain <- xgb.DMatrix('xgb.DMatrix.data')
 #' if (file.exists('xgb.DMatrix.data')) file.remove('xgb.DMatrix.data')
@@ -112,7 +117,7 @@ xgb.get.DMatrix <- function(data, label, missing, weight, nthread) {
       stop("xgboost: invalid input data")
     }
   }
-  return (dtrain)
+  return(dtrain)
 }
 
 

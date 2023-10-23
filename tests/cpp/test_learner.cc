@@ -655,33 +655,11 @@ TEST_F(InitBaseScore, InitWithPredict) { this->TestInitWithPredt(); }
 TEST_F(InitBaseScore, UpdateProcess) { this->TestUpdateProcess(); }
 
 class TestColumnSplit : public ::testing::TestWithParam<std::string> {
-  static auto MakeFmat(std::string const& obj) {
-    auto constexpr kRows = 10, kCols = 10;
-    auto p_fmat = RandomDataGenerator{kRows, kCols, 0}.GenerateDMatrix(true);
-    auto& h_upper = p_fmat->Info().labels_upper_bound_.HostVector();
-    auto& h_lower = p_fmat->Info().labels_lower_bound_.HostVector();
-    h_lower.resize(kRows);
-    h_upper.resize(kRows);
-    for (size_t i = 0; i < kRows; ++i) {
-      h_lower[i] = 1;
-      h_upper[i] = 10;
-    }
-    if (obj.find("rank:") != std::string::npos) {
-      auto h_label = p_fmat->Info().labels.HostView();
-      std::size_t k = 0;
-      for (auto& v : h_label) {
-        v = k % 2 == 0;
-        ++k;
-      }
-    }
-    return p_fmat;
-  };
-
   void TestBaseScore(std::string objective, float expected_base_score, Json expected_model) {
     auto const world_size = collective::GetWorldSize();
     auto const rank = collective::GetRank();
 
-    auto p_fmat = MakeFmat(objective);
+    auto p_fmat = MakeFmatForObjTest(objective);
     std::shared_ptr<DMatrix> sliced{p_fmat->SliceCol(world_size, rank)};
     std::unique_ptr<Learner> learner{Learner::Create({sliced})};
     learner->SetParam("tree_method", "approx");
@@ -705,7 +683,7 @@ class TestColumnSplit : public ::testing::TestWithParam<std::string> {
 
  public:
   void Run(std::string objective) {
-    auto p_fmat = MakeFmat(objective);
+    auto p_fmat = MakeFmatForObjTest(objective);
     std::unique_ptr<Learner> learner{Learner::Create({p_fmat})};
     learner->SetParam("tree_method", "approx");
     learner->SetParam("objective", objective);
@@ -740,4 +718,112 @@ INSTANTIATE_TEST_SUITE_P(ColumnSplitObjective, TestColumnSplit,
                          [](const ::testing::TestParamInfo<TestColumnSplit::ParamType>& info) {
                            return ObjTestNameGenerator(info);
                          });
+
+namespace {
+Json GetModelWithArgs(std::shared_ptr<DMatrix> dmat, std::string const& tree_method,
+                      std::string const& device, Args const& args) {
+  std::unique_ptr<Learner> learner{Learner::Create({dmat})};
+  learner->SetParam("tree_method", tree_method);
+  learner->SetParam("device", device);
+  learner->SetParam("objective", "reg:logistic");
+  learner->SetParams(args);
+  learner->UpdateOneIter(0, dmat);
+  Json model{Object{}};
+  learner->SaveModel(&model);
+  return model;
+}
+
+void VerifyColumnSplitWithArgs(std::string const& tree_method, bool use_gpu, Args const& args,
+                               Json const& expected_model) {
+  auto const world_size = collective::GetWorldSize();
+  auto const rank = collective::GetRank();
+  auto p_fmat = MakeFmatForObjTest("");
+  std::shared_ptr<DMatrix> sliced{p_fmat->SliceCol(world_size, rank)};
+  std::string device = "cpu";
+  if (use_gpu) {
+    auto gpu_id = common::AllVisibleGPUs() == 1 ? 0 : rank;
+    device = "cuda:" + std::to_string(gpu_id);
+  }
+  auto model = GetModelWithArgs(sliced, tree_method, device, args);
+  ASSERT_EQ(model, expected_model);
+}
+
+void TestColumnSplitWithArgs(std::string const& tree_method, bool use_gpu, Args const& args) {
+  auto p_fmat = MakeFmatForObjTest("");
+  std::string device = use_gpu ? "cuda:0" : "cpu";
+  auto model = GetModelWithArgs(p_fmat, tree_method, device, args);
+
+  auto world_size{3};
+  if (use_gpu) {
+    world_size = common::AllVisibleGPUs();
+    // Simulate MPU on a single GPU.
+    if (world_size == 1) {
+      world_size = 3;
+    }
+  }
+  RunWithInMemoryCommunicator(world_size, VerifyColumnSplitWithArgs, tree_method, use_gpu, args,
+                              model);
+}
+
+void TestColumnSplitColumnSampler(std::string const& tree_method, bool use_gpu) {
+  Args args{{"colsample_bytree", "0.5"}, {"colsample_bylevel", "0.6"}, {"colsample_bynode", "0.7"}};
+  TestColumnSplitWithArgs(tree_method, use_gpu, args);
+}
+
+void TestColumnSplitInteractionConstraints(std::string const& tree_method, bool use_gpu) {
+  Args args{{"interaction_constraints", "[[0, 5, 7], [2, 8, 9], [1, 3, 6]]"}};
+  TestColumnSplitWithArgs(tree_method, use_gpu, args);
+}
+
+void TestColumnSplitMonotoneConstraints(std::string const& tree_method, bool use_gpu) {
+  Args args{{"monotone_constraints", "(1,-1,0,1,1,-1,-1,0,0,1)"}};
+  TestColumnSplitWithArgs(tree_method, use_gpu, args);
+}
+}  // anonymous namespace
+
+TEST(ColumnSplitColumnSampler, Approx) { TestColumnSplitColumnSampler("approx", false); }
+
+TEST(ColumnSplitColumnSampler, Hist) { TestColumnSplitColumnSampler("hist", false); }
+
+#if defined(XGBOOST_USE_CUDA)
+TEST(MGPUColumnSplitColumnSampler, GPUApprox) { TestColumnSplitColumnSampler("approx", true); }
+
+TEST(MGPUColumnSplitColumnSampler, GPUHist) { TestColumnSplitColumnSampler("hist", true); }
+#endif  // defined(XGBOOST_USE_CUDA)
+
+TEST(ColumnSplitInteractionConstraints, Approx) {
+  TestColumnSplitInteractionConstraints("approx", false);
+}
+
+TEST(ColumnSplitInteractionConstraints, Hist) {
+  TestColumnSplitInteractionConstraints("hist", false);
+}
+
+#if defined(XGBOOST_USE_CUDA)
+TEST(MGPUColumnSplitInteractionConstraints, GPUApprox) {
+  TestColumnSplitInteractionConstraints("approx", true);
+}
+
+TEST(MGPUColumnSplitInteractionConstraints, GPUHist) {
+  TestColumnSplitInteractionConstraints("hist", true);
+}
+#endif  // defined(XGBOOST_USE_CUDA)
+
+TEST(ColumnSplitMonotoneConstraints, Approx) {
+  TestColumnSplitMonotoneConstraints("approx", false);
+}
+
+TEST(ColumnSplitMonotoneConstraints, Hist) {
+  TestColumnSplitMonotoneConstraints("hist", false);
+}
+
+#if defined(XGBOOST_USE_CUDA)
+TEST(MGPUColumnSplitMonotoneConstraints, GPUApprox) {
+  TestColumnSplitMonotoneConstraints("approx", true);
+}
+
+TEST(MGPUColumnSplitMonotoneConstraints, GPUHist) {
+  TestColumnSplitMonotoneConstraints("hist", true);
+}
+#endif  // defined(XGBOOST_USE_CUDA)
 }  // namespace xgboost

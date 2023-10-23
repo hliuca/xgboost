@@ -1,13 +1,15 @@
 /**
- * Copyright (c) 2019-2023, XGBoost Contributors
+ * Copyright 2019-2023, XGBoost Contributors
  */
 #include <gtest/gtest.h>
 
 #include <fstream>
+#include <iterator>  // for back_inserter
 #include <map>
 
 #include "../../../src/common/charconv.h"
 #include "../../../src/common/io.h"
+#include "../../../src/common/json_utils.h"
 #include "../../../src/common/threading_utils.h"  // for ParallelFor
 #include "../filesystem.h"                        // dmlc::TemporaryDirectory
 #include "../helpers.h"
@@ -689,6 +691,18 @@ TEST(Json, TypeCheck) {
     ASSERT_NE(err.find("Number"), std::string::npos);
     ASSERT_NE(err.find("I32Array"), std::string::npos);
     ASSERT_NE(err.find("foo"), std::string::npos);
+  }
+}
+
+TEST(Json, Dump) {
+  auto str = GetModelStr();
+  auto jobj = Json::Load(str);
+  std::string result_s = Json::Dump(jobj);
+
+  std::vector<char> result_v = Json::Dump<std::vector<char>>(jobj);
+  ASSERT_EQ(result_s.size(), result_v.size());
+  for (std::size_t i = 0; i < result_s.size(); ++i) {
+    ASSERT_EQ(result_s[i], result_v[i]);
   }
 }
 }  // namespace xgboost

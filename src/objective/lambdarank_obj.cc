@@ -103,19 +103,19 @@ class LambdaRankObj : public FitIntercept {
 
   // Update position biased for unbiased click data
   void UpdatePositionBias() {
-    li_full_.SetDevice(ctx_->gpu_id);
-    lj_full_.SetDevice(ctx_->gpu_id);
-    li_.SetDevice(ctx_->gpu_id);
-    lj_.SetDevice(ctx_->gpu_id);
+    li_full_.SetDevice(ctx_->Device());
+    lj_full_.SetDevice(ctx_->Device());
+    li_.SetDevice(ctx_->Device());
+    lj_.SetDevice(ctx_->Device());
 
-    if (ctx_->IsCPU()) {
-      cpu_impl::LambdaRankUpdatePositionBias(ctx_, li_full_.View(ctx_->Device()),
-                                             lj_full_.View(ctx_->Device()), &ti_plus_, &tj_minus_,
-                                             &li_, &lj_, p_cache_);
-    } else {
+    if (ctx_->IsCUDA()) {
       cuda_impl::LambdaRankUpdatePositionBias(ctx_, li_full_.View(ctx_->Device()),
                                               lj_full_.View(ctx_->Device()), &ti_plus_, &tj_minus_,
                                               &li_, &lj_, p_cache_);
+    } else {
+      cpu_impl::LambdaRankUpdatePositionBias(ctx_, li_full_.View(ctx_->Device()),
+                                             lj_full_.View(ctx_->Device()), &ti_plus_, &tj_minus_,
+                                             &li_, &lj_, p_cache_);
     }
 
     li_full_.Data()->Fill(0.0);

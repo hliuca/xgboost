@@ -8,11 +8,9 @@
 #include "xgboost/context.h"             // Context
 #include "xgboost/host_device_vector.h"  // HostDeviceVector
 
-namespace xgboost {
-namespace common {
-namespace cuda_impl {
+namespace xgboost::common::cuda_impl {
 double Reduce(Context const* ctx, HostDeviceVector<float> const& values) {
-  values.SetDevice(ctx->gpu_id);
+  values.SetDevice(ctx->Device());
   auto const d_values = values.ConstDeviceSpan();
   dh::XGBCachingDeviceAllocator<char> alloc;
 
@@ -24,6 +22,4 @@ double Reduce(Context const* ctx, HostDeviceVector<float> const& values) {
                     thrust::plus<float>{});
 #endif
 }
-}  // namespace cuda_impl
-}  // namespace common
-}  // namespace xgboost
+}  // namespace xgboost::common::cuda_impl

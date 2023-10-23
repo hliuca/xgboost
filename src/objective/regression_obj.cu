@@ -116,7 +116,7 @@ class RegLossObj : public FitIntercept {
 
     size_t const ndata = preds.Size();
     out_gpair->SetDevice(ctx_->Device());
-    auto device = ctx_->gpu_id;
+    auto device = ctx_->Device();
 
     bool is_null_weight = info.weights_.Size() == 0;
     auto scale_pos_weight = param_.scale_pos_weight;
@@ -124,7 +124,7 @@ class RegLossObj : public FitIntercept {
     additional_input_.HostVector().begin()[1] = is_null_weight;
 
     const size_t nthreads = ctx_->Threads();
-    bool on_device = device >= 0;
+    bool on_device = device.IsCUDA();
     // On CPU we run the transformation each thread processing a contigious block of data
     // for better performance.
     const size_t n_data_blocks = std::max(static_cast<size_t>(1), (on_device ? ndata : nthreads));
@@ -175,7 +175,7 @@ class RegLossObj : public FitIntercept {
           _preds[_idx] = Loss::PredTransform(_preds[_idx]);
         },
         common::Range{0, static_cast<int64_t>(io_preds->Size())}, this->ctx_->Threads(),
-        io_preds->DeviceIdx())
+        io_preds->Device())
         .Eval(io_preds);
   }
 
@@ -246,16 +246,16 @@ class PseudoHuberRegression : public FitIntercept {
     CHECK_NE(slope, 0.0) << "slope for pseudo huber cannot be 0.";
     auto labels = info.labels.View(ctx_->Device());
 
-    out_gpair->SetDevice(ctx_->gpu_id);
+    out_gpair->SetDevice(ctx_->Device());
     out_gpair->Reshape(info.num_row_, this->Targets(info));
     auto gpair = out_gpair->View(ctx_->Device());
 
-    preds.SetDevice(ctx_->gpu_id);
+    preds.SetDevice(ctx_->Device());
     auto predt = linalg::MakeVec(&preds);
 
-    info.weights_.SetDevice(ctx_->gpu_id);
-    common::OptionalWeights weight{ctx_->IsCPU() ? info.weights_.ConstHostSpan()
-                                                 : info.weights_.ConstDeviceSpan()};
+    info.weights_.SetDevice(ctx_->Device());
+    common::OptionalWeights weight{ctx_->IsCUDA() ? info.weights_.ConstDeviceSpan()
+                                                  : info.weights_.ConstHostSpan()};
 
     linalg::ElementWiseKernel(ctx_, labels, [=] XGBOOST_DEVICE(size_t i, float const y) mutable {
       auto sample_id = std::get<0>(linalg::UnravelIndex(i, labels.Shape()));
@@ -286,6 +286,13 @@ class PseudoHuberRegression : public FitIntercept {
       return;
     }
     FromJson(in["pseudo_huber_param"], &param_);
+  }
+  [[nodiscard]] Json DefaultMetricConfig() const override {
+    CHECK(param_.GetInitialised());
+    Json config{Object{}};
+    config["name"] = String{this->DefaultEvalMetric()};
+    config["pseudo_huber_param"] = ToJson(param_);
+    return config;
   }
 };
 
@@ -320,7 +327,7 @@ class PoissonRegression : public FitIntercept {
     size_t const ndata = preds.Size();
     out_gpair->SetDevice(ctx_->Device());
     out_gpair->Reshape(info.num_row_, this->Targets(info));
-    auto device = ctx_->gpu_id;
+    auto device = ctx_->Device();
     label_correct_.Resize(1);
     label_correct_.Fill(1);
 
@@ -362,7 +369,7 @@ class PoissonRegression : public FitIntercept {
           _preds[_idx] = expf(_preds[_idx]);
         },
         common::Range{0, static_cast<int64_t>(io_preds->Size())}, this->ctx_->Threads(),
-        io_preds->DeviceIdx())
+        io_preds->Device())
         .Eval(io_preds);
   }
   void EvalTransform(HostDeviceVector<bst_float> *io_preds) override {
@@ -505,7 +512,7 @@ class GammaRegression : public FitIntercept {
     CHECK_NE(info.labels.Size(), 0U) << "label set cannot be empty";
     CHECK_EQ(preds.Size(), info.labels.Size()) << "labels are not correctly provided";
     const size_t ndata = preds.Size();
-    auto device = ctx_->gpu_id;
+    auto device = ctx_->Device();
     out_gpair->SetDevice(ctx_->Device());
     out_gpair->Reshape(info.num_row_, this->Targets(info));
     label_correct_.Resize(1);
@@ -548,7 +555,7 @@ class GammaRegression : public FitIntercept {
           _preds[_idx] = expf(_preds[_idx]);
         },
         common::Range{0, static_cast<int64_t>(io_preds->Size())}, this->ctx_->Threads(),
-        io_preds->DeviceIdx())
+        io_preds->Device())
         .Eval(io_preds);
   }
   void EvalTransform(HostDeviceVector<bst_float> *io_preds) override {
@@ -606,7 +613,7 @@ class TweedieRegression : public FitIntercept {
     out_gpair->SetDevice(ctx_->Device());
     out_gpair->Reshape(info.num_row_, this->Targets(info));
 
-    auto device = ctx_->gpu_id;
+    auto device = ctx_->Device();
     label_correct_.Resize(1);
     label_correct_.Fill(1);
 
@@ -653,7 +660,7 @@ class TweedieRegression : public FitIntercept {
           _preds[_idx] = expf(_preds[_idx]);
         },
         common::Range{0, static_cast<int64_t>(io_preds->Size())}, this->ctx_->Threads(),
-        io_preds->DeviceIdx())
+        io_preds->Device())
         .Eval(io_preds);
   }
 
@@ -704,11 +711,11 @@ class MeanAbsoluteError : public ObjFunction {
     out_gpair->Reshape(info.num_row_, this->Targets(info));
     auto gpair = out_gpair->View(ctx_->Device());
 
-    preds.SetDevice(ctx_->gpu_id);
+    preds.SetDevice(ctx_->Device());
     auto predt = linalg::MakeVec(&preds);
-    info.weights_.SetDevice(ctx_->gpu_id);
-    common::OptionalWeights weight{ctx_->IsCPU() ? info.weights_.ConstHostSpan()
-                                                 : info.weights_.ConstDeviceSpan()};
+    info.weights_.SetDevice(ctx_->Device());
+    common::OptionalWeights weight{ctx_->IsCUDA() ? info.weights_.ConstDeviceSpan()
+                                                  : info.weights_.ConstHostSpan()};
 
     linalg::ElementWiseKernel(ctx_, labels, [=] XGBOOST_DEVICE(std::size_t i, float y) mutable {
       auto sign = [](auto x) {

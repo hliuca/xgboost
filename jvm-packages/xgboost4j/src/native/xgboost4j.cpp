@@ -686,6 +686,85 @@ JNIEXPORT jint JNICALL Java_ml_dmlc_xgboost4j_java_XGBoostJNI_XGBoosterPredict
 
 /*
  * Class:     ml_dmlc_xgboost4j_java_XGBoostJNI
+ * Method:    XGBoosterPredictFromDense
+ * Signature: (J[FJJFIII[F[[F)I
+ */
+JNIEXPORT jint JNICALL Java_ml_dmlc_xgboost4j_java_XGBoostJNI_XGBoosterPredictFromDense(
+    JNIEnv *jenv, jclass jcls, jlong jhandle, jfloatArray jdata, jlong num_rows, jlong num_features,
+    jfloat missing, jint iteration_begin, jint iteration_end, jint predict_type,
+    jfloatArray jmargin, jobjectArray jout) {
+  API_BEGIN();
+  BoosterHandle handle = reinterpret_cast<BoosterHandle>(jhandle);
+
+  /**
+   * Create array interface.
+   */
+  namespace linalg = xgboost::linalg;
+  jfloat *data = jenv->GetFloatArrayElements(jdata, nullptr);
+  xgboost::Context ctx;
+  auto t_data = linalg::MakeTensorView(
+      ctx.Device(),
+      xgboost::common::Span{data, static_cast<std::size_t>(num_rows * num_features)}, num_rows,
+      num_features);
+  auto s_array = linalg::ArrayInterfaceStr(t_data);
+
+  /**
+   * Create configuration object.
+   */
+  xgboost::Json config{xgboost::Object{}};
+  config["cache_id"] = xgboost::Integer{};
+  config["type"] = xgboost::Integer{static_cast<std::int32_t>(predict_type)};
+  config["iteration_begin"] = xgboost::Integer{static_cast<xgboost::bst_layer_t>(iteration_begin)};
+  config["iteration_end"] = xgboost::Integer{static_cast<xgboost::bst_layer_t>(iteration_end)};
+  config["missing"] = xgboost::Number{static_cast<float>(missing)};
+  config["strict_shape"] = xgboost::Boolean{true};
+  std::string s_config;
+  xgboost::Json::Dump(config, &s_config);
+
+  /**
+   * Handle base margin
+   */
+  BoosterHandle proxy{nullptr};
+
+  float *margin{nullptr};
+  if (jmargin) {
+    margin = jenv->GetFloatArrayElements(jmargin, nullptr);
+    JVM_CHECK_CALL(XGProxyDMatrixCreate(&proxy));
+    JVM_CHECK_CALL(
+        XGDMatrixSetFloatInfo(proxy, "base_margin", margin, jenv->GetArrayLength(jmargin)));
+  }
+
+  bst_ulong const *out_shape;
+  bst_ulong out_dim;
+  float const *result;
+  auto ret = XGBoosterPredictFromDense(handle, s_array.c_str(), s_config.c_str(), proxy, &out_shape,
+                                       &out_dim, &result);
+
+  jenv->ReleaseFloatArrayElements(jdata, data, 0);
+  if (proxy) {
+    XGDMatrixFree(proxy);
+    jenv->ReleaseFloatArrayElements(jmargin, margin, 0);
+  }
+
+  if (ret != 0) {
+    return ret;
+  }
+
+  std::size_t n{1};
+  for (std::size_t i = 0; i < out_dim; ++i) {
+    n *= out_shape[i];
+  }
+
+  jfloatArray jarray = jenv->NewFloatArray(n);
+
+  jenv->SetFloatArrayRegion(jarray, 0, n, result);
+  jenv->SetObjectArrayElement(jout, 0, jarray);
+
+  API_END();
+}
+
+/*
+ * Class:     ml_dmlc_xgboost4j_java_XGBoostJNI
  * Method:    XGBoosterLoadModel
  * Signature: (JLjava/lang/String;)V
  */
@@ -907,33 +986,6 @@ JNIEXPORT jint JNICALL Java_ml_dmlc_xgboost4j_java_XGBoostJNI_XGBoosterSetAttr
 
 /*
  * Class:     ml_dmlc_xgboost4j_java_XGBoostJNI
- * Method:    XGBoosterLoadRabitCheckpoint
- * Signature: (J[I)I
- */
-JNIEXPORT jint JNICALL Java_ml_dmlc_xgboost4j_java_XGBoostJNI_XGBoosterLoadRabitCheckpoint
-  (JNIEnv *jenv , jclass jcls, jlong jhandle, jintArray jout) {
-  BoosterHandle handle = (BoosterHandle) jhandle;
-  int version;
-  int ret = XGBoosterLoadRabitCheckpoint(handle, &version);
-  JVM_CHECK_CALL(ret);
-  jint jversion = version;
-  jenv->SetIntArrayRegion(jout, 0, 1, &jversion);
-  return ret;
-}
-
-/*
- * Class:     ml_dmlc_xgboost4j_java_XGBoostJNI
- * Method:    XGBoosterSaveRabitCheckpoint
- * Signature: (J)I
- */
-JNIEXPORT jint JNICALL Java_ml_dmlc_xgboost4j_java_XGBoostJNI_XGBoosterSaveRabitCheckpoint
-  (JNIEnv *jenv, jclass jcls, jlong jhandle) {
-  BoosterHandle handle = (BoosterHandle) jhandle;
-  return XGBoosterSaveRabitCheckpoint(handle);
-}
-
-/*
- * Class:     ml_dmlc_xgboost4j_java_XGBoostJNI
  * Method:    XGBoosterGetNumFeature
  * Signature: (J[J)I
  */
@@ -945,6 +997,17 @@ JNIEXPORT jint JNICALL Java_ml_dmlc_xgboost4j_java_XGBoostJNI_XGBoosterGetNumFea
   JVM_CHECK_CALL(ret);
   jlong jnum_feature = num_feature;
   jenv->SetLongArrayRegion(jout, 0, 1, &jnum_feature);
+  return ret;
+}
+
+JNIEXPORT jint JNICALL Java_ml_dmlc_xgboost4j_java_XGBoostJNI_XGBoosterGetNumBoostedRound(
+    JNIEnv *jenv, jclass, jlong jhandle, jintArray jout) {
+  BoosterHandle handle = (BoosterHandle)jhandle;
+  std::int32_t n_rounds{0};
+  auto ret = XGBoosterBoostedRounds(handle, &n_rounds);
+  JVM_CHECK_CALL(ret);
+  jint jn_rounds = n_rounds;
+  jenv->SetIntArrayRegion(jout, 0, 1, &jn_rounds);
   return ret;
 }
 

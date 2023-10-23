@@ -149,24 +149,24 @@ class MultiClassMetricsReduction {
 
 #endif  // XGBOOST_USE_CUDA || defined(XGBOOST_USE_HIP)
 
-  PackedReduceResult Reduce(const Context& tparam, int device, size_t n_class,
+  PackedReduceResult Reduce(const Context& ctx, DeviceOrd device, size_t n_class,
                             const HostDeviceVector<bst_float>& weights,
                             const HostDeviceVector<bst_float>& labels,
                             const HostDeviceVector<bst_float>& preds) {
     PackedReduceResult result;
 
-    if (device < 0) {
+    if (device.IsCPU()) {
       result =
-          CpuReduceMetrics(weights, labels, preds, n_class, tparam.Threads());
+          CpuReduceMetrics(weights, labels, preds, n_class, ctx.Threads());
     }
 #if defined(XGBOOST_USE_CUDA) || defined(XGBOOST_USE_HIP)
     else {  // NOLINT
-      device_ = tparam.gpu_id;
+      device_ = ctx.Device();
       preds.SetDevice(device_);
       labels.SetDevice(device_);
       weights.SetDevice(device_);
 
-      dh::safe_cuda(cudaSetDevice(device_));
+      dh::safe_cuda(cudaSetDevice(device_.ordinal));
       result = DeviceReduceMetrics(weights, labels, preds, n_class);
     }
 #endif  // defined(XGBOOST_USE_CUDA) || defined(XGBOOST_USE_HIP)
@@ -176,8 +176,8 @@ class MultiClassMetricsReduction {
  private:
 #if defined(XGBOOST_USE_CUDA) || defined(XGBOOST_USE_HIP)
   dh::PinnedMemory label_error_;
-  int device_{-1};
-#endif  // defined(XGBOOST_USE_CUDA) || defined(XGBOOST_USE_HIP)
+  DeviceOrd device_{DeviceOrd::CPU()};
+#endif  // defined(XGBOOST_USE_CUDA)
 };
 
 /*!
@@ -198,7 +198,7 @@ struct EvalMClassBase : public MetricNoCache {
       CHECK_GE(nclass, 1U)
           << "mlogloss and merror are only used for multi-class classification,"
           << " use logloss for binary classification";
-      int device = ctx_->gpu_id;
+      auto device = ctx_->Device();
       auto result =
           reducer_.Reduce(*ctx_, device, nclass, info.weights_, *info.labels.Data(), preds);
       dat[0] = result.Residue();

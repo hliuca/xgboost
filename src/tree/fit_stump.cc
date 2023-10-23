@@ -19,8 +19,7 @@
 #include "xgboost/linalg.h"                // TensorView, Tensor, Constant
 #include "xgboost/logging.h"               // CHECK_EQ
 
-namespace xgboost {
-namespace tree {
+namespace xgboost::tree {
 namespace cpu_impl {
 void FitStump(Context const* ctx, MetaInfo const& info,
               linalg::TensorView<GradientPair const, 2> gpair,
@@ -68,13 +67,12 @@ inline void FitStump(Context const*, MetaInfo const&, linalg::TensorView<Gradien
 
 void FitStump(Context const* ctx, MetaInfo const& info, linalg::Matrix<GradientPair> const& gpair,
               bst_target_t n_targets, linalg::Vector<float>* out) {
-  out->SetDevice(ctx->gpu_id);
+  out->SetDevice(ctx->Device());
   out->Reshape(n_targets);
 
   gpair.SetDevice(ctx->Device());
   auto gpair_t = gpair.View(ctx->Device());
-  ctx->IsCPU() ? cpu_impl::FitStump(ctx, info, gpair_t, out->HostView())
-      : cuda_impl::FitStump(ctx, info, gpair_t, out->View(ctx->Device()));
+  ctx->IsCUDA() ? cuda_impl::FitStump(ctx, info, gpair_t, out->View(ctx->Device()))
+                : cpu_impl::FitStump(ctx, info, gpair_t, out->HostView());
 }
-}  // namespace tree
-}  // namespace xgboost
+}  // namespace xgboost::tree

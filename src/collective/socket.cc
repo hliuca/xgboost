@@ -3,6 +3,7 @@
  */
 #include "xgboost/collective/socket.h"
 
+#include <array>         // for array
 #include <cstddef>       // std::size_t
 #include <cstdint>       // std::int32_t
 #include <cstring>       // std::memcpy, std::memset
@@ -92,13 +93,18 @@ std::size_t TCPSocket::Recv(std::string *p_str) {
 
   conn = TCPSocket::Create(addr.Domain());
   CHECK_EQ(static_cast<std::int32_t>(conn.Domain()), static_cast<std::int32_t>(addr.Domain()));
-  conn.SetNonBlock(true);
+  auto non_blocking = conn.NonBlocking();
+  auto rc = conn.NonBlocking(true);
+  if (!rc.OK()) {
+    return Fail("Failed to set socket option.", std::move(rc));
+  }
 
   Result last_error;
-  auto log_failure = [&host, &last_error](Result err, char const *file, std::int32_t line) {
+  auto log_failure = [&host, &last_error, port](Result err, char const *file, std::int32_t line) {
     last_error = std::move(err);
     LOG(WARNING) << std::filesystem::path{file}.filename().string() << "(" << line
-                 << "): Failed to connect to:" << host << " Error:" << last_error.Report();
+                 << "): Failed to connect to:" << host << ":" << port
+                 << " Error:" << last_error.Report();
   };
 
   for (std::int32_t attempt = 0; attempt < std::max(retry, 1); ++attempt) {
@@ -112,44 +118,56 @@ std::size_t TCPSocket::Recv(std::string *p_str) {
     }
 
     auto rc = connect(conn.Handle(), addr_handle, addr_len);
-    if (rc != 0) {
-      auto errcode = system::LastError();
-      if (!system::ErrorWouldBlock(errcode)) {
-        log_failure(Fail("connect failed.", std::error_code{errcode, std::system_category()}),
-                    __FILE__, __LINE__);
-        continue;
-      }
-
-      rabit::utils::PollHelper poll;
-      poll.WatchWrite(conn);
-      auto result = poll.Poll(timeout);
-      if (!result.OK()) {
-        log_failure(std::move(result), __FILE__, __LINE__);
-        continue;
-      }
-      if (!poll.CheckWrite(conn)) {
-        log_failure(Fail("poll failed.", std::error_code{errcode, std::system_category()}),
-                    __FILE__, __LINE__);
-        continue;
-      }
-      result = conn.GetSockError();
-      if (!result.OK()) {
-        log_failure(std::move(result), __FILE__, __LINE__);
-        continue;
-      }
-
-      conn.SetNonBlock(false);
-      return Success();
-
-    } else {
-      conn.SetNonBlock(false);
-      return Success();
+    if (rc == 0) {
+      return conn.NonBlocking(non_blocking);
     }
+
+    auto errcode = system::LastError();
+    if (!system::ErrorWouldBlock(errcode)) {
+      log_failure(Fail("connect failed.", std::error_code{errcode, std::system_category()}),
+                  __FILE__, __LINE__);
+      continue;
+    }
+
+    rabit::utils::PollHelper poll;
+    poll.WatchWrite(conn);
+    auto result = poll.Poll(timeout);
+    if (!result.OK()) {
+      // poll would fail if there's a socket error, we log the root cause instead of the
+      // poll failure.
+      auto sockerr = conn.GetSockError();
+      if (!sockerr.OK()) {
+        result = std::move(sockerr);
+      }
+      log_failure(std::move(result), __FILE__, __LINE__);
+      continue;
+    }
+    if (!poll.CheckWrite(conn)) {
+      log_failure(Fail("poll failed.", std::error_code{errcode, std::system_category()}), __FILE__,
+                  __LINE__);
+      continue;
+    }
+    result = conn.GetSockError();
+    if (!result.OK()) {
+      log_failure(std::move(result), __FILE__, __LINE__);
+      continue;
+    }
+
+    return conn.NonBlocking(non_blocking);
   }
 
   std::stringstream ss;
   ss << "Failed to connect to " << host << ":" << port;
   conn.Close();
   return Fail(ss.str(), std::move(last_error));
+}
+
+[[nodiscard]] Result GetHostName(std::string *p_out) {
+  std::array<char, HOST_NAME_MAX> buf;
+  if (gethostname(&buf[0], HOST_NAME_MAX) != 0) {
+    return system::FailWithCode("Failed to get host name.");
+  }
+  *p_out = buf.data();
+  return Success();
 }
 }  // namespace xgboost::collective

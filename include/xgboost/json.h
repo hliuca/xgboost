@@ -372,6 +372,19 @@ class Json {
   /*! \brief Use your own JsonWriter. */
   static void Dump(Json json, JsonWriter* writer);
 
+  template <typename Container = std::string>
+  static Container Dump(Json json) {
+    if constexpr (std::is_same_v<Container, std::string>) {
+      std::string str;
+      Dump(json, &str);
+      return str;
+    } else {
+      std::vector<char> str;
+      Dump(json, &str);
+      return str;
+    }
+  }
+
   Json() = default;
 
   // number
@@ -594,44 +607,6 @@ using Integer = JsonInteger;
 using Boolean = JsonBoolean;
 using String  = JsonString;
 using Null    = JsonNull;
-
-// Utils tailored for XGBoost.
-namespace detail {
-template <typename Head>
-bool TypeCheckImpl(Json const& value) {
-  return IsA<Head>(value);
-}
-
-template <typename Head, typename... JT>
-std::enable_if_t<sizeof...(JT) != 0, bool> TypeCheckImpl(Json const& value) {
-  return IsA<Head>(value) || TypeCheckImpl<JT...>(value);
-}
-
-template <typename Head>
-std::string TypeCheckError() {
-  return "`" + Head{}.TypeStr() + "`";
-}
-
-template <typename Head, typename... JT>
-std::enable_if_t<sizeof...(JT) != 0, std::string> TypeCheckError() {
-  return "`" + Head{}.TypeStr() + "`, " + TypeCheckError<JT...>();
-}
-}  // namespace detail
-
-/**
- * \brief Type check for JSON-based parameters
- *
- * \tparam JT    Expected JSON types.
- * \param  value Value to be checked.
- */
-template <typename... JT>
-void TypeCheck(Json const& value, StringView name) {
-  if (!detail::TypeCheckImpl<JT...>(value)) {
-    LOG(FATAL) << "Invalid type for: `" << name << "`, expecting one of the: {`"
-               << detail::TypeCheckError<JT...>() << "}, got: `" << value.GetValue().TypeStr()
-               << "`";
-  }
-}
 
 /**
  * \brief Convert XGBoost parameter to JSON object.

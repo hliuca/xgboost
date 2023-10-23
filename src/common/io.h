@@ -8,7 +8,7 @@
 #define XGBOOST_COMMON_IO_H_
 
 #include <dmlc/io.h>
-#include <rabit/rabit.h>
+#include <rabit/internal/io.h>  // for MemoryFixSizeBuffer, MemoryBufferStream
 
 #include <algorithm>    // for min, fill_n, copy_n
 #include <array>        // for array
@@ -382,7 +382,8 @@ class PrivateMmapConstStream : public AlignedResourceReadStream {
    * @param length    See the `length` parameter of `mmap` for details.
    */
   explicit PrivateMmapConstStream(std::string path, std::size_t offset, std::size_t length)
-      : AlignedResourceReadStream{std::make_shared<MmapResource>(path, offset, length)} {}
+      : AlignedResourceReadStream{std::shared_ptr<MmapResource>{  // NOLINT
+            new MmapResource{std::move(path), offset, length}}} {}
   ~PrivateMmapConstStream() noexcept(false) override;
 };
 

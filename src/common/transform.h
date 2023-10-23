@@ -62,8 +62,8 @@ class Transform {
   template <typename Functor>
   struct Evaluator {
    public:
-    Evaluator(Functor func, Range range, int32_t n_threads, int32_t device_idx)
-        : func_(func), range_{std::move(range)}, n_threads_{n_threads}, device_{device_idx} {}
+    Evaluator(Functor func, Range range, int32_t n_threads, DeviceOrd device)
+        : func_(func), range_{std::move(range)}, n_threads_{n_threads}, device_{device} {}
 
     /*!
      * \brief Evaluate the functor with input pointers to HostDeviceVector.
@@ -73,7 +73,7 @@ class Transform {
      */
     template <typename... HDV>
     void Eval(HDV... vectors) const {
-      bool on_device = device_ >= 0;
+      bool on_device = device_.IsCUDA();
 
       if (on_device) {
         LaunchCUDA(func_, vectors...);
@@ -118,11 +118,11 @@ class Transform {
     }
     // Recursive unpack for Shard.
     template <typename T>
-    void UnpackShard(int device, const HostDeviceVector<T> *vector) const {
+    void UnpackShard(DeviceOrd device, const HostDeviceVector<T> *vector) const {
       vector->SetDevice(device);
     }
     template <typename Head, typename... Rest>
-    void UnpackShard(int device,
+    void UnpackShard(DeviceOrd device,
                      const HostDeviceVector<Head> *_vector,
                      const HostDeviceVector<Rest> *... _vectors) const {
       _vector->SetDevice(device);
@@ -142,13 +142,7 @@ class Transform {
       // granularity is used in data vector.
       size_t shard_size = range_size;
       Range shard_range {0, static_cast<Range::DifferenceType>(shard_size)};
-
-#if defined(XGBOOST_USE_HIP)
-      dh::safe_cuda(hipSetDevice(device_));
-#elif defined(XGBOOST_USE_CUDA)
-      dh::safe_cuda(cudaSetDevice(device_));
-#endif
-
+      dh::safe_cuda(cudaSetDevice(device_.ordinal));
       const int kGrids =
           static_cast<int>(DivRoundUp(*(range_.end()), kBlockThreads));
       if (kGrids == 0) {
@@ -182,7 +176,7 @@ class Transform {
     /*! \brief Range object specifying parallel threads index range. */
     Range range_;
     int32_t n_threads_;
-    int32_t device_;
+    DeviceOrd device_;
   };
 
  public:
@@ -200,8 +194,8 @@ class Transform {
    */
   template <typename Functor>
   static Evaluator<Functor> Init(Functor func, Range const range, int32_t n_threads,
-                                 int32_t device_idx) {
-    return Evaluator<Functor>{func, std::move(range), n_threads, device_idx};
+                                 DeviceOrd device) {
+    return Evaluator<Functor>{func, std::move(range), n_threads, device};
   }
 };
 
