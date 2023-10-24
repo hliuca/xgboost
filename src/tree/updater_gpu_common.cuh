@@ -22,9 +22,7 @@
 #include "gpu_hist/histogram.cuh"
 #include "param.h"
 
-namespace xgboost {
-namespace tree {
-
+namespace xgboost::tree {
 struct GPUTrainingParam {
   // minimum amount of hessian(weight) allowed in a child
   float min_child_weight;
@@ -144,5 +142,4 @@ struct SumCallbackOp {
     return old_prefix;
   }
 };
-}  // namespace tree
-}  // namespace xgboost
+}  // namespace xgboost::tree
