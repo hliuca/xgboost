@@ -25,36 +25,20 @@ struct TestStatus {
 
  public:
   TestStatus () {
-#if defined(XGBOOST_USE_CUDA)
     dh::safe_cuda(cudaMalloc(&status_, sizeof(int)));
     int h_status = 1;
     dh::safe_cuda(cudaMemcpy(status_, &h_status,
                              sizeof(int), cudaMemcpyHostToDevice));
-#elif defined(XGBOOST_USE_HIP)
-    dh::safe_cuda(hipMalloc(&status_, sizeof(int)));
-    int h_status = 1;
-    dh::safe_cuda(hipMemcpy(status_, &h_status,
-                             sizeof(int), hipMemcpyHostToDevice));
-#endif
   }
   ~TestStatus() {
-#if defined(XGBOOST_USE_CUDA)
     dh::safe_cuda(cudaFree(status_));
-#elif defined(XGBOOST_USE_HIP)
-    dh::safe_cuda(hipFree(status_));
-#endif
   }
 
   int Get() {
     int h_status;
 
-#if defined(XGBOOST_USE_CUDA)
     dh::safe_cuda(cudaMemcpy(&h_status, status_,
                              sizeof(int), cudaMemcpyDeviceToHost));
-#elif defined(XGBOOST_USE_HIP)
-    dh::safe_cuda(hipMemcpy(&h_status, status_,
-                             sizeof(int), hipMemcpyDeviceToHost));
-#endif
 
     return h_status;
   }
@@ -112,22 +96,14 @@ TEST(GPUSpan, FromOther) {
 }
 
 TEST(GPUSpan, Assignment) {
-#if defined(XGBOOST_USE_CUDA)
   dh::safe_cuda(cudaSetDevice(0));
-#elif defined(XGBOOST_USE_HIP)
-  dh::safe_cuda(hipSetDevice(0));
-#endif
   TestStatus status;
   dh::LaunchN(16, TestAssignment{status.Data()});
   ASSERT_EQ(status.Get(), 1);
 }
 
 TEST(GPUSpan, TestStatus) {
-#if defined(XGBOOST_USE_CUDA)
   dh::safe_cuda(cudaSetDevice(0));
-#elif defined(XGBOOST_USE_HIP)
-  dh::safe_cuda(hipSetDevice(0));
-#endif
   TestStatus status;
   dh::LaunchN(16, TestTestStatus{status.Data()});
   ASSERT_EQ(status.Get(), -1);
@@ -150,11 +126,7 @@ struct TestEqual {
 };
 
 TEST(GPUSpan, WithTrust) {
-#if defined(XGBOOST_USE_CUDA)
   dh::safe_cuda(cudaSetDevice(0));
-#elif defined(XGBOOST_USE_HIP)
-  dh::safe_cuda(hipSetDevice(0));
-#endif
   // Not adviced to initialize span with host_vector, since h_vec.data() is
   // a host function.
   thrust::host_vector<float> h_vec (16);
@@ -191,22 +163,14 @@ TEST(GPUSpan, WithTrust) {
 }
 
 TEST(GPUSpan, BeginEnd) {
-#if defined(XGBOOST_USE_CUDA)
   dh::safe_cuda(cudaSetDevice(0));
-#elif defined(XGBOOST_USE_HIP)
-  dh::safe_cuda(hipSetDevice(0));
-#endif
   TestStatus status;
   dh::LaunchN(16, TestBeginEnd{status.Data()});
   ASSERT_EQ(status.Get(), 1);
 }
 
 TEST(GPUSpan, RBeginREnd) {
-#if defined(XGBOOST_USE_CUDA)
   dh::safe_cuda(cudaSetDevice(0));
-#elif defined(XGBOOST_USE_HIP)
-  dh::safe_cuda(hipSetDevice(0));
-#endif
   TestStatus status;
   dh::LaunchN(16, TestRBeginREnd{status.Data()});
   ASSERT_EQ(status.Get(), 1);
@@ -238,22 +202,14 @@ TEST(GPUSpan, Modify) {
 }
 
 TEST(GPUSpan, Observers) {
-#if defined(XGBOOST_USE_CUDA)
   dh::safe_cuda(cudaSetDevice(0));
-#elif defined(XGBOOST_USE_HIP)
-  dh::safe_cuda(hipSetDevice(0));
-#endif
   TestStatus status;
   dh::LaunchN(16, TestObservers{status.Data()});
   ASSERT_EQ(status.Get(), 1);
 }
 
 TEST(GPUSpan, Compare) {
-#if defined(XGBOOST_USE_CUDA)
   dh::safe_cuda(cudaSetDevice(0));
-#elif defined(XGBOOST_USE_HIP)
-  dh::safe_cuda(hipSetDevice(0));
-#endif
   TestStatus status;
   dh::LaunchN(16, TestIterCompare{status.Data()});
   ASSERT_EQ(status.Get(), 1);
@@ -273,11 +229,7 @@ struct TestElementAccess {
 };
 
 TEST(GPUSpanDeathTest, ElementAccess) {
-#if defined(XGBOOST_USE_CUDA)
   dh::safe_cuda(cudaSetDevice(0));
-#elif defined(XGBOOST_USE_HIP)
-  dh::safe_cuda(hipSetDevice(0));
-#endif
   auto test_element_access = []() {
     thrust::host_vector<float> h_vec (16);
     InitializeRange(h_vec.begin(), h_vec.end());
@@ -375,13 +327,8 @@ void TestFrontBack() {
         // make sure the termination happens inside this test.
         try {
           dh::LaunchN(1, [=] __device__(size_t) { s.front(); });
-#if defined(XGBOOST_USE_CUDA)
           dh::safe_cuda(cudaDeviceSynchronize());
           dh::safe_cuda(cudaGetLastError());
-#elif defined(XGBOOST_USE_HIP)
-          dh::safe_cuda(hipDeviceSynchronize());
-          dh::safe_cuda(hipGetLastError());
-#endif
         } catch (dmlc::Error const& e) {
           std::terminate();
         }
@@ -391,13 +338,8 @@ void TestFrontBack() {
       {
         try {
           dh::LaunchN(1, [=] __device__(size_t) { s.back(); });
-#if defined(XGBOOST_USE_CUDA)
           dh::safe_cuda(cudaDeviceSynchronize());
           dh::safe_cuda(cudaGetLastError());
-#elif defined(XGBOOST_USE_HIP)
-          dh::safe_cuda(hipDeviceSynchronize());
-          dh::safe_cuda(hipGetLastError());
-#endif
         } catch (dmlc::Error const& e) {
           std::terminate();
         }
@@ -447,66 +389,42 @@ TEST(GPUSpanDeathTest, Subspan) {
 }
 
 TEST(GPUSpanIter, Construct) {
-#if defined(XGBOOST_USE_CUDA)
   dh::safe_cuda(cudaSetDevice(0));
-#elif defined(XGBOOST_USE_HIP)
-  dh::safe_cuda(hipSetDevice(0));
-#endif
   TestStatus status;
   dh::LaunchN(16, TestIterConstruct{status.Data()});
   ASSERT_EQ(status.Get(), 1);
 }
 
 TEST(GPUSpanIter, Ref) {
-#if defined(XGBOOST_USE_CUDA)
   dh::safe_cuda(cudaSetDevice(0));
-#elif defined(XGBOOST_USE_HIP)
-  dh::safe_cuda(hipSetDevice(0));
-#endif
   TestStatus status;
   dh::LaunchN(16, TestIterRef{status.Data()});
   ASSERT_EQ(status.Get(), 1);
 }
 
 TEST(GPUSpanIter, Calculate) {
-#if defined(XGBOOST_USE_CUDA)
   dh::safe_cuda(cudaSetDevice(0));
-#elif defined(XGBOOST_USE_HIP)
-  dh::safe_cuda(hipSetDevice(0));
-#endif
   TestStatus status;
   dh::LaunchN(16, TestIterCalculate{status.Data()});
   ASSERT_EQ(status.Get(), 1);
 }
 
 TEST(GPUSpanIter, Compare) {
-#if defined(XGBOOST_USE_CUDA)
   dh::safe_cuda(cudaSetDevice(0));
-#elif defined(XGBOOST_USE_HIP)
-  dh::safe_cuda(hipSetDevice(0));
-#endif
   TestStatus status;
   dh::LaunchN(16, TestIterCompare{status.Data()});
   ASSERT_EQ(status.Get(), 1);
 }
 
 TEST(GPUSpan, AsBytes) {
-#if defined(XGBOOST_USE_CUDA)
   dh::safe_cuda(cudaSetDevice(0));
-#elif defined(XGBOOST_USE_HIP)
-  dh::safe_cuda(hipSetDevice(0));
-#endif
   TestStatus status;
   dh::LaunchN(16, TestAsBytes{status.Data()});
   ASSERT_EQ(status.Get(), 1);
 }
 
 TEST(GPUSpan, AsWritableBytes) {
-#if defined(XGBOOST_USE_CUDA)
   dh::safe_cuda(cudaSetDevice(0));
-#elif defined(XGBOOST_USE_HIP)
-  dh::safe_cuda(hipSetDevice(0));
-#endif
   TestStatus status;
   dh::LaunchN(16, TestAsWritableBytes{status.Data()});
   ASSERT_EQ(status.Get(), 1);

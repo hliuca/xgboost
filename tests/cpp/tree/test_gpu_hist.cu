@@ -31,11 +31,7 @@
 namespace xgboost::tree {
 TEST(GpuHist, DeviceHistogram) {
   // Ensures that node allocates correctly after reaching `kStopGrowingSize`.
-#if defined(XGBOOST_USE_CUDA)
   dh::safe_cuda(cudaSetDevice(0));
-#elif defined(XGBOOST_USE_HIP)
-  dh::safe_cuda(hipSetDevice(0));
-#endif
   constexpr size_t kNBins = 128;
   constexpr int kNNodes = 4;
   constexpr size_t kStopGrowing = kNNodes * kNBins * 2u;
@@ -138,13 +134,8 @@ void TestBuildHist(bool use_shared_memory_histograms) {
   // d_hist.data stored in float, not gradient pair
   thrust::host_vector<GradientPairInt64> h_result (node_histogram.size());
 
-#if defined(XGBOOST_USE_CUDA)
   dh::safe_cuda(cudaMemcpy(h_result.data(), node_histogram.data(), node_histogram.size_bytes(),
                            cudaMemcpyDeviceToHost));
-#elif defined(XGBOOST_USE_HIP)
-  dh::safe_cuda(hipMemcpy(h_result.data(), node_histogram.data(), node_histogram.size_bytes(),
-                           hipMemcpyDeviceToHost));
-#endif
 
   std::vector<GradientPairPrecise> solution = GetHostHistGpair();
   for (size_t i = 0; i < h_result.size(); ++i) {

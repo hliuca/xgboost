@@ -724,27 +724,14 @@ class RMMAllocator {
   int n_gpu;
   RMMAllocator() : n_gpu(common::AllVisibleGPUs()) {
     int current_device;
-#if defined(XGBOOST_USE_CUDA)
     CHECK_EQ(cudaGetDevice(&current_device), cudaSuccess);
-#elif defined(XGBOOST_USE_HIP)
-    CHECK_EQ(hipGetDevice(&current_device), hipSuccess);
-#endif
     for (int i = 0; i < n_gpu; ++i) {
-#if defined(XGBOOST_USE_CUDA)
       CHECK_EQ(cudaSetDevice(i), cudaSuccess);
-#elif defined(XGBOOST_USE_HIP)
-      CHECK_EQ(hipSetDevice(i), hipSuccess);
-#endif
-
       cuda_mr.push_back(std::make_unique<CUDAMemoryResource>());
       pool_mr.push_back(std::make_unique<PoolMemoryResource>(cuda_mr[i].get()));
     }
 
-#if defined(XGBOOST_USE_CUDA)
     CHECK_EQ(cudaSetDevice(current_device), cudaSuccess);
-#elif defined(XGBOOST_USE_HIP)
-    CHECK_EQ(hipSetDevice(current_device), hipSuccess);
-#endif
   }
   ~RMMAllocator() = default;
 };

@@ -218,11 +218,7 @@ TEST_F(MGPUPredictorTest, LesserFeaturesColumnSplit) {
 
 // Very basic test of empty model
 TEST(GPUPredictor, ShapStump) {
-#if defined(XGBOOST_USE_CUDA)
   cudaSetDevice(0);
-#elif defined(XGBOOST_USE_HIP)
-  hipSetDevice(0);
-#endif
 
   auto ctx = MakeCUDACtx(0);
   LearnerModelParam mparam{MakeMP(1, .5, 1, ctx.Device())};

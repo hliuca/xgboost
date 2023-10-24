@@ -180,10 +180,6 @@ TEST(Allocator, OOM) {
   ASSERT_THROW({dh::caching_device_vector<char> vec(size);}, dmlc::Error);
   ASSERT_THROW({dh::device_vector<char> vec(size);}, dmlc::Error);
   // Clear last error so we don't fail subsequent tests
-#if defined(XGBOOST_USE_CUDA)
   cudaGetLastError();
-#elif defined(XGBOOST_USE_HIP)
-  hipGetLastError();
-#endif
 }
 }  // namespace xgboost

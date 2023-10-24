@@ -76,7 +76,7 @@ TEST(Stats, Median) {
     Median(&ctx, values, weights, &out);
     m = out(0);
     ASSERT_EQ(m, .5f);
-#endif  // defined(XGBOOST_USE_CUDA) || defined(XGBOOST_USE_HIP)
+#endif  // defined(XGBOOST_USE_CUDA)
   }
 
   {
@@ -94,7 +94,7 @@ TEST(Stats, Median) {
     Median(&ctx, values, weights, &out);
     ASSERT_EQ(out(0), .5f);
     ASSERT_EQ(out(1), .5f);
-#endif  // defined(XGBOOST_USE_CUDA) || defined(XGBOOST_USE_HIP)
+#endif  // defined(XGBOOST_USE_CUDA)
   }
 }
 

@@ -40,25 +40,13 @@ TEST(ArrayInterface, Stream) {
 TEST(ArrayInterface, Ptr) {
   std::vector<float> h_data(10);
   ASSERT_FALSE(ArrayInterfaceHandler::IsCudaPtr(h_data.data()));
-#if defined(XGBOOST_USE_CUDA)
   dh::safe_cuda(cudaGetLastError());
-#elif defined(XGBOOST_USE_HIP)
-  dh::safe_cuda(hipGetLastError());
-#endif
 
   dh::device_vector<float> d_data(10);
   ASSERT_TRUE(ArrayInterfaceHandler::IsCudaPtr(d_data.data().get()));
-#if defined(XGBOOST_USE_CUDA)
   dh::safe_cuda(cudaGetLastError());
-#elif defined(XGBOOST_USE_HIP)
-  dh::safe_cuda(hipGetLastError());
-#endif
 
   ASSERT_FALSE(ArrayInterfaceHandler::IsCudaPtr(nullptr));
-#if defined(XGBOOST_USE_CUDA)
   dh::safe_cuda(cudaGetLastError());
-#elif defined(XGBOOST_USE_HIP)
-  dh::safe_cuda(hipGetLastError());
-#endif
 }
 }  // namespace xgboost
