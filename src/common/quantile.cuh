@@ -184,15 +184,15 @@ class SketchContainer {
 
     d_column_scan = this->columns_ptr_.DeviceSpan();
 
-#if defined(XGBOOST_USE_HIP)
+#if defined(XGBOOST_USE_CUDA)
     size_t n_uniques = dh::SegmentedUnique(
-        thrust::hip::par(alloc), d_column_scan.data(),
+        thrust::cuda::par(alloc), d_column_scan.data(),
         d_column_scan.data() + d_column_scan.size(), entries.data(),
         entries.data() + entries.size(), scan_out.DevicePointer(),
         entries.data(), detail::SketchUnique{}, key_comp);
-#elif defined(XGBOOST_USE_CUDA)
+#elif defined(XGBOOST_USE_HIP)
     size_t n_uniques = dh::SegmentedUnique(
-        thrust::cuda::par(alloc), d_column_scan.data(),
+        thrust::hip::par(alloc), d_column_scan.data(),
         d_column_scan.data() + d_column_scan.size(), entries.data(),
         entries.data() + entries.size(), scan_out.DevicePointer(),
         entries.data(), detail::SketchUnique{}, key_comp);

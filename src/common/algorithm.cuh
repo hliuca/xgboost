@@ -11,10 +11,10 @@
 #include <cstddef>             // size_t
 #include <cstdint>             // int32_t
 
-#if defined(XGBOOST_USE_HIP)
-#include <hipcub/hipcub.hpp>
-#elif defined(XGBOOST_USE_CUDA)
+#if defined(XGBOOST_USE_CUDA)
 #include <cub/cub.cuh>         // DispatchSegmentedRadixSort,NullType,DoubleBuffer
+#elif defined(XGBOOST_USE_HIP)
+#include <hipcub/hipcub.hpp>
 #endif
 
 #include <iterator>            // distance

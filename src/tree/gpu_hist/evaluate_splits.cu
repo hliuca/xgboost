@@ -11,7 +11,9 @@
 #include "evaluate_splits.cuh"
 #include "expand_entry.cuh"
 
-#if defined(XGBOOST_USE_HIP)
+#if defined(XGBOOST_USE_CUDA)
+#define WARP_SIZE 32
+#elif defined(XGBOOST_USE_HIP)
 #include <hip/hip_cooperative_groups.h>
 
 #ifdef __AMDGCN_WAVEFRONT_SIZE
@@ -20,8 +22,6 @@
 #endif
 
 #define WARP_SIZE WAVEFRONT_SIZE
-#elif defined(XGBOOST_USE_CUDA)
-#define WARP_SIZE 32
 #endif
 
 #if defined(XGBOOST_USE_HIP)

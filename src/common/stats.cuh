@@ -217,11 +217,11 @@ void SegmentedWeightedQuantile(Context const* ctx, AlphaIt alpha_it, SegIt seg_b
   auto scan_val = dh::MakeTransformIterator<float>(thrust::make_counting_iterator(0ul),
                                                    detail::WeightOp<WIter>{w_begin, d_sorted_idx});
 
-#if defined(XGBOOST_USE_HIP)
-  thrust::inclusive_scan_by_key(thrust::hip::par(caching), scan_key, scan_key + n_weights,
-                                scan_val, weights_cdf.begin());
-#elif defined(XGBOOST_USE_CUDA)
+#if defined(XGBOOST_USE_CUDA)
   thrust::inclusive_scan_by_key(thrust::cuda::par(caching), scan_key, scan_key + n_weights,
+                                scan_val, weights_cdf.begin());
+#elif defined(XGBOOST_USE_HIP)
+  thrust::inclusive_scan_by_key(thrust::hip::par(caching), scan_key, scan_key + n_weights,
                                 scan_val, weights_cdf.begin());
 #endif
 
