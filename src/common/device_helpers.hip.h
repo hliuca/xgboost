@@ -1099,7 +1099,13 @@ inline void CUDAEvent::Record(CUDAStreamView stream) {  // NOLINT
   dh::safe_cuda(hipEventRecord(event_, hipStream_t{stream}));
 }
 
-inline CUDAStreamView DefaultStream() { return CUDAStreamView{hipStreamDefault}; }
+inline CUDAStreamView DefaultStream() {
+#ifdef HIP_API_PER_THREAD_DEFAULT_STREAM
+  return CUDAStreamView{hipStreamPerThread};
+#else
+  return CUDAStreamView{hipStreamDefault};
+#endif
+}
 
 class CUDAStream {
   hipStream_t stream_;
