@@ -204,6 +204,20 @@ macro(xgboost_link_nccl target)
   endif (BUILD_STATIC_LIB)
 endmacro(xgboost_link_nccl)
 
+macro(xgboost_link_rccl target)
+  if(BUILD_STATIC_LIB)
+    target_include_directories(${target} PUBLIC ${RCCL_INCLUDE_DIR})
+    target_compile_definitions(${target} PUBLIC -DXGBOOST_USE_RCCL=1)
+    target_link_directories(${target} PUBLIC ${HIP_LIB_INSTALL_DIR})
+    target_link_libraries(${target} PUBLIC ${RCCL_LIBRARY})
+  else()
+    target_include_directories(${target} PRIVATE ${RCCL_INCLUDE_DIR})
+    target_compile_definitions(${target} PRIVATE -DXGBOOST_USE_RCCL=1)
+    target_link_directories(${target} PUBLIC ${HIP_LIB_INSTALL_DIR})
+    target_link_libraries(${target} PRIVATE ${RCCL_LIBRARY})
+  endif()
+endmacro()
+
 # compile options
 macro(xgboost_target_properties target)
   set_target_properties(${target} PROPERTIES
@@ -308,6 +322,10 @@ macro(xgboost_target_link_libraries target)
   if (USE_NCCL)
     xgboost_link_nccl(${target})
   endif (USE_NCCL)
+
+  if(USE_RCCL)
+    xgboost_link_rccl(${target})
+  endif()
 
   if (USE_NVTX)
     target_link_libraries(${target} PRIVATE CUDA::nvToolsExt)
