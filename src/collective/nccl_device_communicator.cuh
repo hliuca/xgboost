@@ -87,7 +87,11 @@ class NcclDeviceCommunicator : public DeviceCommunicator {
       return;
     }
 
+#if defined(XGBOOST_USE_CUDA)
     dh::safe_cuda(cudaSetDevice(device_ordinal_));
+#elif defined(XGBOOST_USE_HIP)
+    dh::safe_cuda(hipSetDevice(device_ordinal_));
+#endif
     dh::safe_nccl(ncclAllReduce(send_receive_buffer, send_receive_buffer, count,
                                 GetNcclDataType(data_type), GetNcclRedOp(op), nccl_comm_,
                                 cuda_stream_));
@@ -145,22 +149,22 @@ class NcclDeviceCommunicator : public DeviceCommunicator {
 
  private:
   static constexpr std::size_t kUuidLength =
-#if defined(XGBOOST_USE_HIP)
-      sizeof(std::declval<hipDeviceProp>().uuid) / sizeof(uint64_t);
-#else
+#if defined(XGBOOST_USE_CUDA)
       sizeof(std::declval<cudaDeviceProp>().uuid) / sizeof(uint64_t);
+#elif defined(XGBOOST_USE_HIP)
+      sizeof(hipUUID) / sizeof(uint64_t);
 #endif
 
   void GetCudaUUID(xgboost::common::Span<uint64_t, kUuidLength> const &uuid) const {
-#if defined(XGBOOST_USE_HIP)
-    hipDeviceProp prob{};
-    dh::safe_cuda(hipGetDeviceProperties(&prob, device_ordinal_));
-#else
+#if defined(XGBOOST_USE_CUDA)
     cudaDeviceProp prob{};
     dh::safe_cuda(cudaGetDeviceProperties(&prob, device_ordinal_));
-#endif
-
     std::memcpy(uuid.data(), static_cast<void *>(&(prob.uuid)), sizeof(prob.uuid));
+#elif defined(XGBOOST_USE_HIP)
+    hipUUID id;
+    hipDeviceGetUuid(&id, device_ordinal_);
+    std::memcpy(uuid.data(), static_cast<void *>(&id), sizeof(id));
+#endif
   }
 
   static std::string PrintUUID(xgboost::common::Span<uint64_t, kUuidLength> const &uuid) {
