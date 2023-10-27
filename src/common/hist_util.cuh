@@ -17,14 +17,6 @@
 #include "quantile.cuh"
 #include "xgboost/span.h"  // for IterSpan
 
-#if defined(XGBOOST_USE_HIP)
-namespace cub = hipcub;
-
-namespace thrust {
-    namespace cuda = thrust::hip;
-}
-#endif
-
 namespace xgboost::common {
 namespace cuda {
 /**

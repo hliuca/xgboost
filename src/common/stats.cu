@@ -15,10 +15,6 @@
 #include "xgboost/host_device_vector.h"  // HostDeviceVector
 #include "xgboost/linalg.h"              // linalg::TensorView, UnravelIndex, Apply
 
-#if defined(XGBOOST_USE_HIP)
-namespace cub = hipcub;
-#endif
-
 namespace xgboost::common::cuda_impl {
 void Median(Context const* ctx, linalg::TensorView<float const, 2> t,
             common::OptionalWeights weights, linalg::Tensor<float, 1>* out) {

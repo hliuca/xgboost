@@ -22,12 +22,6 @@
 #include "transform_iterator.h"  // MakeIndexTransformIter
 #include "xgboost/span.h"
 
-#ifdef XGBOOST_USE_HIP
-namespace thrust {
-    namespace cuda = thrust::hip;
-}
-#endif
-
 namespace xgboost {
 namespace common {
 

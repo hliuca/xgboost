@@ -16,12 +16,6 @@
 #include "row_partitioner.cuh"
 #include "xgboost/base.h"
 
-#if defined(XGBOOST_USE_HIP)
-namespace thrust {
-    namespace cuda = thrust::hip;
-}
-#endif
-
 namespace xgboost {
 namespace tree {
 namespace {

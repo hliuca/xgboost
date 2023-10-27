@@ -8,12 +8,6 @@
 #include "xgboost/context.h"             // Context
 #include "xgboost/host_device_vector.h"  // HostDeviceVector
 
-#ifdef XGBOOST_USE_HIP
-namespace thrust {
-    namespace cuda = thrust::hip;
-}
-#endif
-
 namespace xgboost::common::cuda_impl {
 double Reduce(Context const* ctx, HostDeviceVector<float> const& values) {
   values.SetDevice(ctx->Device());

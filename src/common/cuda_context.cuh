@@ -6,12 +6,6 @@
 #include <thrust/execution_policy.h>
 #include "device_helpers.cuh"
 
-#ifdef XGBOOST_USE_HIP
-namespace thrust {
-    namespace cuda = thrust::hip;
-}
-#endif
-
 namespace xgboost {
 struct CUDAContext {
  private:

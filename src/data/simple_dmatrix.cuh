@@ -13,12 +13,6 @@
 #include "../common/error_msg.h"  // for InfInData
 #include "device_adapter.cuh"     // for HasInfInData
 
-#if defined(XGBOOST_USE_HIP)
-namespace thrust {
-    namespace cuda = thrust::hip;
-}
-#endif
-
 namespace xgboost::data {
 
 #if defined(XGBOOST_USE_CUDA)

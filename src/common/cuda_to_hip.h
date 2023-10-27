@@ -54,4 +54,18 @@
 #define cudaDevAttrMultiProcessorCount                hipDeviceAttributeMultiprocessorCount
 #define cudaOccupancyMaxActiveBlocksPerMultiprocessor hipOccupancyMaxActiveBlocksPerMultiprocessor
 
+namespace thrust {
+    namespace hip {
+    }
+}
+
+namespace thrust {
+    namespace cuda = thrust::hip;
+}
+
+namespace hipcub {
+}
+
+namespace cub = hipcub;
+
 #endif

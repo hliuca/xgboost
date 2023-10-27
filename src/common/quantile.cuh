@@ -10,12 +10,6 @@
 #include "timer.h"
 #include "categorical.h"
 
-#if defined(XGBOOST_USE_HIP)
-namespace thrust {
-    namespace cuda = thrust::hip;
-}
-#endif
-
 namespace xgboost {
 namespace common {
 

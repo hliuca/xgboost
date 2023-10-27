@@ -21,12 +21,6 @@
 #include "xgboost/logging.h"  // CHECK_EQ
 #include "xgboost/span.h"     // span
 
-#if defined(XGBOOST_USE_HIP)
-namespace thrust {
-    namespace cuda = thrust::hip;
-}
-#endif
-
 namespace xgboost::tree::cuda_impl {
 void FitStump(Context const* ctx, MetaInfo const& info,
               linalg::TensorView<GradientPair const, 2> gpair, linalg::VectorView<float> out) {

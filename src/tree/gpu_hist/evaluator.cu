@@ -12,12 +12,6 @@
 #include "evaluate_splits.cuh"
 #include "xgboost/data.h"
 
-#if defined(XGBOOST_USE_HIP)
-namespace thrust {
-    namespace cuda = thrust::hip;
-}
-#endif
-
 namespace xgboost::tree {
 void GPUHistEvaluator::Reset(common::HistogramCuts const &cuts, common::Span<FeatureType const> ft,
                              bst_feature_t n_features, TrainParam const &param,

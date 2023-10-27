@@ -16,12 +16,6 @@
 #include "simple_batch_iterator.h"
 #include "sparse_page_source.h"
 
-#if defined(XGBOOST_USE_HIP)
-namespace thrust {
-    namespace cuda = thrust::hip;
-}
-#endif
-
 namespace xgboost::data {
 void IterativeDMatrix::InitFromCUDA(Context const* ctx, BatchParam const& p,
                                     DataIterHandle iter_handle, float missing,

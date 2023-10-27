@@ -19,11 +19,6 @@
 #include "xgboost/context.h"
 
 namespace xgboost {
-
-#if defined(XGBOOST_USE_HIP)
-namespace cub = hipcub;
-#endif
-
 namespace obj {
 namespace detail {
 void EncodeTreeLeafDevice(Context const* ctx, common::Span<bst_node_t const> position,

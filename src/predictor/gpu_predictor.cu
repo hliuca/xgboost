@@ -29,12 +29,6 @@
 #include "xgboost/tree_model.h"
 #include "xgboost/tree_updater.h"
 
-#if defined(XGBOOST_USE_HIP)
-namespace thrust {
-    namespace cuda = thrust::hip;
-}
-#endif
-
 namespace xgboost::predictor {
 DMLC_REGISTRY_FILE_TAG(gpu_predictor);
 

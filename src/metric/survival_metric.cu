@@ -25,12 +25,6 @@
 #include "../common/device_helpers.cuh"
 #endif  // XGBOOST_USE_CUDA || XGBOOST_USE_HIP
 
-#if defined(XGBOOST_USE_HIP)
-namespace thrust {
-    namespace cuda = thrust::hip;
-}
-#endif
-
 using AFTParam = xgboost::common::AFTParam;
 using ProbabilityDistributionType = xgboost::common::ProbabilityDistributionType;
 template <typename Distribution>

@@ -26,12 +26,6 @@
 #include "quantile.h"
 #include "xgboost/host_device_vector.h"
 
-#ifdef XGBOOST_USE_HIP
-namespace thrust {
-    namespace cuda = thrust::hip;
-}
-#endif
-
 namespace xgboost::common {
 constexpr float SketchContainer::kFactor;
 

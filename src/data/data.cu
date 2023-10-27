@@ -15,13 +15,6 @@
 #include "xgboost/json.h"
 #include "xgboost/logging.h"
 
-#if defined(XGBOOST_USE_HIP)
-namespace cub = hipcub;
-namespace thrust {
-    namespace cuda = thrust::hip;
-}
-#endif
-
 namespace xgboost {
 namespace {
 auto SetDeviceToPtr(void const* ptr) {

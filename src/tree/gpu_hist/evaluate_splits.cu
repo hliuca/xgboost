@@ -24,10 +24,6 @@
 #define WARP_SIZE WAVEFRONT_SIZE
 #endif
 
-#if defined(XGBOOST_USE_HIP)
-namespace cub = hipcub;
-#endif
-
 namespace xgboost::tree {
 // With constraints
 XGBOOST_DEVICE float LossChangeMissing(const GradientPairInt64 &scan,

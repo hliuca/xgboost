@@ -26,8 +26,6 @@
 
 #if defined(XGBOOST_USE_HIP)
 #include <hipcub/hipcub.hpp>
-
-namespace cub = hipcub;
 #endif
 
 namespace xgboost::metric {
