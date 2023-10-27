@@ -17,6 +17,9 @@
 
 #if defined(XGBOOST_USE_HIP)
 namespace cub = hipcub;
+namespace thrust {
+    namespace cuda = thrust::hip;
+}
 #endif
 
 namespace xgboost {
@@ -122,13 +125,8 @@ void CopyQidImpl(ArrayInterface<1> array_interface, std::vector<bst_group_t>* p_
   group_ptr_.resize(h_num_runs_out + 1, 0);
   dh::XGBCachingDeviceAllocator<char> alloc;
 
-#if defined(XGBOOST_USE_CUDA)
   thrust::inclusive_scan(thrust::cuda::par(alloc), cnt.begin(),
                          cnt.begin() + h_num_runs_out, cnt.begin());
-#elif defined(XGBOOST_USE_HIP)
-  thrust::inclusive_scan(thrust::hip::par(alloc), cnt.begin(),
-                         cnt.begin() + h_num_runs_out, cnt.begin());
-#endif
 
   thrust::copy(cnt.begin(), cnt.begin() + h_num_runs_out,
                group_ptr_.begin() + 1);

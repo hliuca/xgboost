@@ -13,6 +13,12 @@
 #include "../common/error_msg.h"  // for InfInData
 #include "device_adapter.cuh"     // for HasInfInData
 
+#if defined(XGBOOST_USE_HIP)
+namespace thrust {
+    namespace cuda = thrust::hip;
+}
+#endif
+
 namespace xgboost::data {
 
 #if defined(XGBOOST_USE_CUDA)
@@ -69,15 +75,9 @@ void CountRowOffsets(const AdapterBatchT& batch, common::Span<bst_row_t> offset,
   });
 
   dh::XGBCachingDeviceAllocator<char> alloc;
-#if defined(XGBOOST_USE_CUDA)
   thrust::exclusive_scan(thrust::cuda::par(alloc), thrust::device_pointer_cast(offset.data()),
                          thrust::device_pointer_cast(offset.data() + offset.size()),
                          thrust::device_pointer_cast(offset.data()));
-#elif defined(XGBOOST_USE_HIP)
-  thrust::exclusive_scan(thrust::hip::par(alloc), thrust::device_pointer_cast(offset.data()),
-                         thrust::device_pointer_cast(offset.data() + offset.size()),
-                         thrust::device_pointer_cast(offset.data()));
-#endif
 }
 
 template <typename AdapterBatchT>

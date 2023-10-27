@@ -21,6 +21,12 @@
 #include "xgboost/logging.h"  // CHECK_EQ
 #include "xgboost/span.h"     // span
 
+#if defined(XGBOOST_USE_HIP)
+namespace thrust {
+    namespace cuda = thrust::hip;
+}
+#endif
+
 namespace xgboost::tree::cuda_impl {
 void FitStump(Context const* ctx, MetaInfo const& info,
               linalg::TensorView<GradientPair const, 2> gpair, linalg::VectorView<float> out) {
@@ -45,11 +51,7 @@ void FitStump(Context const* ctx, MetaInfo const& info,
 
   dh::XGBCachingDeviceAllocator<char> alloc;
 
-#if defined(XGBOOST_USE_CUDA)
   auto policy = thrust::cuda::par(alloc);
-#elif defined(XGBOOST_USE_HIP)
-  auto policy = thrust::hip::par(alloc);
-#endif
 
   thrust::reduce_by_key(policy, key_it, key_it + gpair.Size(), grad_it,
                         thrust::make_discard_iterator(), dh::tbegin(d_sum.Values()));

@@ -17,6 +17,12 @@
 #include "adapter.h"
 #include "array_interface.h"
 
+#if defined(XGBOOST_USE_HIP)
+namespace thrust {
+    namespace cuda = thrust::hip;
+}
+#endif
+
 namespace xgboost {
 namespace data {
 
@@ -246,17 +252,10 @@ std::size_t GetRowCounts(const AdapterBatchT batch, common::Span<bst_row_t> offs
   });
 
   dh::XGBCachingDeviceAllocator<char> alloc;
-#if defined(XGBOOST_USE_CUDA)
   bst_row_t row_stride =
       dh::Reduce(thrust::cuda::par(alloc), thrust::device_pointer_cast(offset.data()),
                  thrust::device_pointer_cast(offset.data()) + offset.size(),
                  static_cast<bst_row_t>(0), thrust::maximum<bst_row_t>());
-#elif defined(XGBOOST_USE_HIP)
-  bst_row_t row_stride =
-      dh::Reduce(thrust::hip::par(alloc), thrust::device_pointer_cast(offset.data()),
-                 thrust::device_pointer_cast(offset.data()) + offset.size(),
-                 static_cast<bst_row_t>(0), thrust::maximum<bst_row_t>());
-#endif
   return row_stride;
 }
 
@@ -280,13 +279,8 @@ bool NoInfInData(AdapterBatchT const& batch, IsValidFunctor is_valid) {
   // intervals to early stop. But we expect all data to be valid here, using small
   // intervals only decreases performance due to excessive kernel launch and stream
   // synchronization.
-#if defined(XGBOOST_USE_CUDA)
   auto valid = dh::Reduce(thrust::cuda::par(alloc), value_iter, value_iter + batch.Size(), true,
                           thrust::logical_and<>{});
-#elif defined(XGBOOST_USE_HIP)
-  auto valid = dh::Reduce(thrust::hip::par(alloc), value_iter, value_iter + batch.Size(), true,
-                          thrust::logical_and<>{});
-#endif
   return valid;
 }
 };  // namespace data

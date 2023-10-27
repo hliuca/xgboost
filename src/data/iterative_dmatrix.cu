@@ -16,6 +16,12 @@
 #include "simple_batch_iterator.h"
 #include "sparse_page_source.h"
 
+#if defined(XGBOOST_USE_HIP)
+namespace thrust {
+    namespace cuda = thrust::hip;
+}
+#endif
+
 namespace xgboost::data {
 void IterativeDMatrix::InitFromCUDA(Context const* ctx, BatchParam const& p,
                                     DataIterHandle iter_handle, float missing,
@@ -86,11 +92,7 @@ void IterativeDMatrix::InitFromCUDA(Context const* ctx, BatchParam const& p,
                             return GetRowCounts(value, row_counts_span, get_device(), missing);
                           }));
 
-#if defined(XGBOOST_USE_CUDA)
     nnz += thrust::reduce(thrust::cuda::par(alloc), row_counts.begin(), row_counts.end());
-#elif defined(XGBOOST_USE_HIP)
-    nnz += thrust::reduce(thrust::hip::par(alloc), row_counts.begin(), row_counts.end());
-#endif
 
     batches++;
   } while (iter.Next());

@@ -26,6 +26,12 @@
 #include "quantile.h"
 #include "xgboost/host_device_vector.h"
 
+#ifdef XGBOOST_USE_HIP
+namespace thrust {
+    namespace cuda = thrust::hip;
+}
+#endif
+
 namespace xgboost::common {
 constexpr float SketchContainer::kFactor;
 
@@ -112,7 +118,6 @@ void SortByWeight(dh::device_vector<float>* weights, dh::device_vector<Entry>* s
   // Sort both entries and wegihts.
   dh::XGBDeviceAllocator<char> alloc;
   CHECK_EQ(weights->size(), sorted_entries->size());
-#if defined(XGBOOST_USE_CUDA)
   thrust::sort_by_key(thrust::cuda::par(alloc), sorted_entries->begin(), sorted_entries->end(),
                       weights->begin(), detail::EntryCompareOp());
 
@@ -122,17 +127,6 @@ void SortByWeight(dh::device_vector<float>* weights, dh::device_vector<Entry>* s
       thrust::cuda::par(caching), sorted_entries->begin(), sorted_entries->end(), weights->begin(),
       weights->begin(),
       [=] __device__(const Entry& a, const Entry& b) { return a.index == b.index; });
-#elif defined(XGBOOST_USE_HIP)
-  thrust::sort_by_key(thrust::hip::par(alloc), sorted_entries->begin(), sorted_entries->end(),
-                      weights->begin(), detail::EntryCompareOp());
-
-  // Scan weights
-  dh::XGBCachingDeviceAllocator<char> caching;
-  thrust::inclusive_scan_by_key(
-      thrust::hip::par(caching), sorted_entries->begin(), sorted_entries->end(), weights->begin(),
-      weights->begin(),
-      [=] __device__(const Entry& a, const Entry& b) { return a.index == b.index; });
-#endif
 }
 
 void RemoveDuplicatedCategories(DeviceOrd device, MetaInfo const& info, Span<bst_row_t> d_cuts_ptr,

@@ -19,6 +19,10 @@
 
 #if defined(XGBOOST_USE_HIP)
 namespace cub = hipcub;
+
+namespace thrust {
+    namespace cuda = thrust::hip;
+}
 #endif
 
 namespace xgboost::common {
@@ -175,18 +179,10 @@ void GetColumnSizesScan(DeviceOrd device, size_t num_columns, std::size_t num_cu
         return thrust::min(num_cuts_per_feature, column_size);
       });
 
-#if defined(XGBOOST_USE_CUDA)
   thrust::exclusive_scan(thrust::cuda::par(alloc), cut_ptr_it,
                          cut_ptr_it + column_sizes_scan->size(), cuts_ptr->DevicePointer());
   thrust::exclusive_scan(thrust::cuda::par(alloc), column_sizes_scan->begin(),
                          column_sizes_scan->end(), column_sizes_scan->begin());
-#elif defined(XGBOOST_USE_HIP)
-  thrust::exclusive_scan(thrust::hip::par(alloc), cut_ptr_it,
-                         cut_ptr_it + column_sizes_scan->size(),
-                         cuts_ptr->DevicePointer());
-  thrust::exclusive_scan(thrust::hip::par(alloc), column_sizes_scan->begin(),
-                         column_sizes_scan->end(), column_sizes_scan->begin());
-#endif
 }
 
 inline size_t constexpr BytesPerElement(bool has_weight) {
@@ -309,13 +305,8 @@ void ProcessSlidingWindow(AdapterBatch const &batch, MetaInfo const &info,
                                  &sorted_entries);
   dh::XGBDeviceAllocator<char> alloc;
 
-#if defined(XGBOOST_USE_CUDA)
   thrust::sort(thrust::cuda::par(alloc), sorted_entries.begin(),
                sorted_entries.end(), detail::EntryCompareOp());
-#elif defined(XGBOOST_USE_HIP)
-  thrust::sort(thrust::hip::par(alloc), sorted_entries.begin(),
-               sorted_entries.end(), detail::EntryCompareOp());
-#endif
 
   if (sketch_container->HasCategorical()) {
     auto d_cuts_ptr = cuts_ptr.DeviceSpan();
@@ -374,19 +365,11 @@ void ProcessWeightedSlidingWindow(Batch batch, MetaInfo const& info,
           return weights[group_idx];
         });
 
-#if defined(XGBOOST_USE_CUDA)
     auto retit = thrust::copy_if(thrust::cuda::par(alloc),
                                  weight_iter + begin, weight_iter + end,
                                  batch_iter + begin,
                                  d_temp_weights.data(),  // output
                                  is_valid);
-#elif defined(XGBOOST_USE_HIP)
-    auto retit = thrust::copy_if(thrust::hip::par(alloc),
-                                 weight_iter + begin, weight_iter + end,
-                                 batch_iter + begin,
-                                 d_temp_weights.data(),  // output
-                                 is_valid);
-#endif
 
     CHECK_EQ(retit - d_temp_weights.data(), d_temp_weights.size());
   } else {
@@ -397,19 +380,11 @@ void ProcessWeightedSlidingWindow(Batch batch, MetaInfo const& info,
           return weights[batch.GetElement(idx).row_idx];
         });
 
-#if defined(XGBOOST_USE_CUDA)
     auto retit = thrust::copy_if(thrust::cuda::par(alloc),
                                  weight_iter + begin, weight_iter + end,
                                  batch_iter + begin,
                                  d_temp_weights.data(),  // output
                                  is_valid);
-#elif defined(XGBOOST_USE_HIP)
-    auto retit = thrust::copy_if(thrust::hip::par(alloc),
-                                 weight_iter + begin, weight_iter + end,
-                                 batch_iter + begin,
-                                 d_temp_weights.data(),  // output
-                                 is_valid);
-#endif
 
     CHECK_EQ(retit - d_temp_weights.data(), d_temp_weights.size());
   }

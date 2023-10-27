@@ -29,6 +29,12 @@
 #include "xgboost/tree_model.h"
 #include "xgboost/tree_updater.h"
 
+#if defined(XGBOOST_USE_HIP)
+namespace thrust {
+    namespace cuda = thrust::hip;
+}
+#endif
+
 namespace xgboost::predictor {
 DMLC_REGISTRY_FILE_TAG(gpu_predictor);
 
@@ -512,7 +518,6 @@ void ExtractPaths(
         return PathInfo{static_cast<int64_t>(idx), path_length, tree_idx};
       });
 
-#if defined(XGBOOST_USE_CUDA)
   auto end = thrust::copy_if(
       thrust::cuda::par(alloc), nodes_transform,
       nodes_transform + d_nodes.size(), info.begin(),
@@ -525,20 +530,6 @@ void ExtractPaths(
   thrust::exclusive_scan(thrust::cuda::par(alloc), length_iterator,
                          length_iterator + info.size() + 1,
                          path_segments.begin());
-#elif defined(XGBOOST_USE_HIP)
-  auto end = thrust::copy_if(
-      thrust::hip::par(alloc), nodes_transform,
-      nodes_transform + d_nodes.size(), info.begin(),
-      [=] __device__(const PathInfo& e) { return e.leaf_position != -1; });
-  info.resize(end - info.begin());
-  auto length_iterator = dh::MakeTransformIterator<size_t>(
-      info.begin(),
-      [=] __device__(const PathInfo& info) { return info.length; });
-  dh::caching_device_vector<size_t> path_segments(info.size() + 1);
-  thrust::exclusive_scan(thrust::hip::par(alloc), length_iterator,
-                         length_iterator + info.size() + 1,
-                         path_segments.begin());
-#endif
 
   paths->resize(path_segments.back());
 

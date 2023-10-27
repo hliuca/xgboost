@@ -16,6 +16,12 @@
 #include "row_partitioner.cuh"
 #include "xgboost/base.h"
 
+#if defined(XGBOOST_USE_HIP)
+namespace thrust {
+    namespace cuda = thrust::hip;
+}
+#endif
+
 namespace xgboost {
 namespace tree {
 namespace {
@@ -60,13 +66,8 @@ GradientQuantiser::GradientQuantiser(common::Span<GradientPair const> gpair, Met
 
   thrust::device_ptr<GradientPair const> gpair_beg{gpair.data()};
   auto beg = thrust::make_transform_iterator(gpair_beg, Clip());
-#if defined(XGBOOST_USE_CUDA)
   Pair p =
       dh::Reduce(thrust::cuda::par(alloc), beg, beg + gpair.size(), Pair{}, thrust::plus<Pair>{});
-#elif defined(XGBOOST_USE_HIP)
-  Pair p =
-      dh::Reduce(thrust::hip::par(alloc), beg, beg + gpair.size(), Pair{}, thrust::plus<Pair>{});
-#endif
 
   // Treat pair as array of 4 primitive types to allreduce
   using ReduceT = typename decltype(p.first)::ValueT;

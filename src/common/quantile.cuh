@@ -10,6 +10,12 @@
 #include "timer.h"
 #include "categorical.h"
 
+#if defined(XGBOOST_USE_HIP)
+namespace thrust {
+    namespace cuda = thrust::hip;
+}
+#endif
+
 namespace xgboost {
 namespace common {
 
@@ -184,19 +190,11 @@ class SketchContainer {
 
     d_column_scan = this->columns_ptr_.DeviceSpan();
 
-#if defined(XGBOOST_USE_CUDA)
     size_t n_uniques = dh::SegmentedUnique(
         thrust::cuda::par(alloc), d_column_scan.data(),
         d_column_scan.data() + d_column_scan.size(), entries.data(),
         entries.data() + entries.size(), scan_out.DevicePointer(),
         entries.data(), detail::SketchUnique{}, key_comp);
-#elif defined(XGBOOST_USE_HIP)
-    size_t n_uniques = dh::SegmentedUnique(
-        thrust::hip::par(alloc), d_column_scan.data(),
-        d_column_scan.data() + d_column_scan.size(), entries.data(),
-        entries.data() + entries.size(), scan_out.DevicePointer(),
-        entries.data(), detail::SketchUnique{}, key_comp);
-#endif
 
     this->columns_ptr_.Copy(scan_out);
     CHECK(!this->columns_ptr_.HostCanRead());

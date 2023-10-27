@@ -22,6 +22,12 @@
 #include "transform_iterator.h"  // MakeIndexTransformIter
 #include "xgboost/span.h"
 
+#ifdef XGBOOST_USE_HIP
+namespace thrust {
+    namespace cuda = thrust::hip;
+}
+#endif
+
 namespace xgboost {
 namespace common {
 
@@ -147,7 +153,6 @@ common::Span<thrust::tuple<uint64_t, uint64_t>> MergePath(
   // We reuse the memory for storing merge path.
   common::Span<Tuple> merge_path{reinterpret_cast<Tuple *>(out.data()), out.size()};
   // Determine the merge path, 0 if element is from x, 1 if it's from y.
-#if defined(XGBOOST_USE_CUDA)
   thrust::merge_by_key(
       thrust::cuda::par(alloc), x_merge_key_it, x_merge_key_it + d_x.size(),
       y_merge_key_it, y_merge_key_it + d_y.size(), x_merge_val_it,
@@ -160,36 +165,15 @@ common::Span<thrust::tuple<uint64_t, uint64_t>> MergePath(
         }
         return l_column_id < r_column_id;
       });
-#elif defined(XGBOOST_USE_HIP)
-  thrust::merge_by_key(
-      thrust::hip::par(alloc), x_merge_key_it, x_merge_key_it + d_x.size(),
-      y_merge_key_it, y_merge_key_it + d_y.size(), x_merge_val_it,
-      y_merge_val_it, thrust::make_discard_iterator(), merge_path.data(),
-      [=] __device__(auto const &l, auto const &r) -> bool {
-        auto l_column_id = thrust::get<0>(l);
-        auto r_column_id = thrust::get<0>(r);
-        if (l_column_id == r_column_id) {
-          return thrust::get<1>(l).value < thrust::get<1>(r).value;
-        }
-        return l_column_id < r_column_id;
-      });
-#endif
 
   // Compute output ptr
   auto transform_it =
       thrust::make_zip_iterator(thrust::make_tuple(x_ptr.data(), y_ptr.data()));
 
-#if defined(XGBOOST_USE_CUDA)
   thrust::transform(
       thrust::cuda::par(alloc), transform_it, transform_it + x_ptr.size(),
       out_ptr.data(),
       [] __device__(auto const& t) { return thrust::get<0>(t) + thrust::get<1>(t); });
-#elif defined(XGBOOST_USE_HIP)
-  thrust::transform(
-      thrust::hip::par(alloc), transform_it, transform_it + x_ptr.size(),
-      out_ptr.data(),
-      [] __device__(auto const& t) { return thrust::get<0>(t) + thrust::get<1>(t); });
-#endif
 
   // 0^th is the indicator, 1^th is placeholder
   auto get_ind = []XGBOOST_DEVICE(Tuple const& t) { return thrust::get<0>(t); };
@@ -215,7 +199,6 @@ common::Span<thrust::tuple<uint64_t, uint64_t>> MergePath(
   // comparison, index of y is incremented by 1 from y_0 to y_1, and at the same time, y_0
   // is landed into output as the first element in merge result.  The scan result is the
   // subscript of x and y.
-#if defined(XGBOOST_USE_CUDA)
   thrust::exclusive_scan_by_key(
       thrust::cuda::par(alloc), scan_key_it, scan_key_it + merge_path.size(),
       scan_val_it, merge_path.data(),
@@ -224,16 +207,6 @@ common::Span<thrust::tuple<uint64_t, uint64_t>> MergePath(
       [=] __device__(Tuple const &l, Tuple const &r) -> Tuple {
         return thrust::make_tuple(get_x(l) + get_x(r), get_y(l) + get_y(r));
       });
-#elif defined(XGBOOST_USE_HIP)
-  thrust::exclusive_scan_by_key(
-      thrust::hip::par(alloc), scan_key_it, scan_key_it + merge_path.size(),
-      scan_val_it, merge_path.data(),
-      thrust::make_tuple<uint64_t, uint64_t>(0ul, 0ul),
-      thrust::equal_to<size_t>{},
-      [=] __device__(Tuple const &l, Tuple const &r) -> Tuple {
-        return thrust::make_tuple(get_x(l) + get_x(r), get_y(l) + get_y(r));
-      });
-#endif
 
   return merge_path;
 }
@@ -414,7 +387,6 @@ size_t SketchContainer::ScanInput(Span<SketchEntry> entries, Span<OffsetT> d_col
   // Reverse scan to accumulate weights into first duplicated element on left.
   auto val_it = thrust::make_reverse_iterator(dh::tend(entries));
 
-#if defined(XGBOOST_USE_CUDA)
   thrust::inclusive_scan_by_key(
       thrust::cuda::par(alloc), key_it, key_it + entries.size(),
       val_it, val_it,
@@ -428,21 +400,6 @@ size_t SketchContainer::ScanInput(Span<SketchEntry> entries, Span<OffsetT> d_col
         }
         return l;
       });
-#elif defined(XGBOOST_USE_HIP)
-  thrust::inclusive_scan_by_key(
-      thrust::hip::par(alloc), key_it, key_it + entries.size(),
-      val_it, val_it,
-      thrust::equal_to<size_t>{},
-      [] __device__(SketchEntry const &r, SketchEntry const &l) {
-        // Only accumulate for the first type of duplication.
-        if (l.value - r.value == 0 && l.rmin - r.rmin != 0) {
-          auto w = l.wmin + r.wmin;
-          SketchEntry v{l.rmin, l.rmin + w, w, l.value};
-          return v;
-        }
-        return l;
-      });
-#endif
 
   auto d_columns_ptr_out = columns_ptr_b_.DeviceSpan();
   // thrust unique_by_key preserves the first element.
@@ -691,7 +648,6 @@ void SketchContainer::MakeCuts(HistogramCuts* p_cuts, bool is_column_split) {
     // track of the unique keys (feature indices) after the thrust::reduce_by_key` call.
     dh::caching_device_vector<size_t> d_max_keys(d_in_columns_ptr.size() - 1);
     dh::caching_device_vector<SketchEntry> d_max_values(d_in_columns_ptr.size() - 1);
-#if defined(XGBOOST_USE_CUDA)
     auto new_end = thrust::reduce_by_key(
         thrust::cuda::par(alloc), key_it, key_it + in_cut_values.size(), val_it, d_max_keys.begin(),
         d_max_values.begin(), thrust::equal_to<bst_feature_t>{},
@@ -705,21 +661,6 @@ void SketchContainer::MakeCuts(HistogramCuts* p_cuts, bool is_column_split) {
                                                          default_entry);
     thrust::scatter(thrust::cuda::par(alloc), d_max_values.begin(), d_max_values.end(),
                     d_max_keys.begin(), d_max_results.begin());
-#elif defined(XGBOOST_USE_HIP)
-    auto new_end = thrust::reduce_by_key(
-        thrust::hip::par(alloc), key_it, key_it + in_cut_values.size(), val_it, d_max_keys.begin(),
-        d_max_values.begin(), thrust::equal_to<bst_feature_t>{},
-        [] __device__(auto l, auto r) { return l.value > r.value ? l : r; });
-    d_max_keys.erase(new_end.first, d_max_keys.end());
-    d_max_values.erase(new_end.second, d_max_values.end());
-
-    // The device vector needs to be initialized explicitly since we may have some missing columns.
-    SketchEntry default_entry{};
-    dh::caching_device_vector<SketchEntry> d_max_results(d_in_columns_ptr.size() - 1,
-                                                         default_entry);
-    thrust::scatter(thrust::hip::par(alloc), d_max_values.begin(), d_max_values.end(),
-                    d_max_keys.begin(), d_max_results.begin());
-#endif
     dh::CopyDeviceSpanToVector(&max_values, dh::ToSpan(d_max_results));
     auto max_it = MakeIndexTransformIter([&](auto i) {
       if (IsCat(h_feature_types, i)) {
