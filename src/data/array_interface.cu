@@ -20,7 +20,10 @@ void ArrayInterfaceHandler::SyncCudaStream(std::int64_t stream) {
        *   case where 0 might be given should either use None, 1, or 2 instead for
        *   clarity.
        */
+    /* ignored for HIP */
+#if !defined(XGBOOST_USE_HIP)
       LOG(FATAL) << "Invalid stream ID in array interface: " << stream;
+#endif
     case 1:
       // default legacy stream
       break;
