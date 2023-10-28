@@ -38,6 +38,8 @@
 #include "xgboost/logging.h"
 #include "xgboost/span.h"
 
+#include "cuda_to_hip.h"
+
 #ifdef XGBOOST_USE_RCCL
 #include "rccl.h"
 #endif  // XGBOOST_USE_RCCL
@@ -107,7 +109,7 @@ inline ncclResult_t ThrowOnNcclError(ncclResult_t code, const char *file, int li
     if (code == ncclUnhandledCudaError) {
       // nccl usually preserves the last error so we can get more details.
       auto err = hipPeekAtLastError();
-      ss << "  CUDA error: " << thrust::system_error(err, thrust::cuda_category()).what() << "\n";
+      ss << "  CUDA error: " << thrust::system_error(err, thrust::hip_category()).what() << "\n";
     } else if (code == ncclSystemError) {
       ss << "  This might be caused by a network configuration issue. Please consider specifying "
             "the network interface for RCCL via environment variables listed in its reference: "

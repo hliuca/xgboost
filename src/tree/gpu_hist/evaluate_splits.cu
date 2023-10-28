@@ -1,5 +1,5 @@
-/*!
- * Copyright 2020-2022 by XGBoost Contributors
+/**
+ * Copyright 2020-2023, XGBoost Contributors
  */
 #include <algorithm>  // std::max
 #include <vector>
@@ -24,13 +24,7 @@
 #define WARP_SIZE 32
 #endif
 
-namespace xgboost {
-#if defined(XGBOOST_USE_HIP)
-namespace cub = hipcub;
-#endif
-
-namespace tree {
-
+namespace xgboost::tree {
 // With constraints
 XGBOOST_DEVICE float LossChangeMissing(const GradientPairInt64 &scan,
                                        const GradientPairInt64 &missing,
@@ -352,11 +346,11 @@ __device__ void SetCategoricalSplit(const EvaluateSplitSharedInputs &shared_inpu
                                     common::Span<common::CatBitField::value_type> out,
                                     DeviceSplitCandidate *p_out_split) {
   auto &out_split = *p_out_split;
-  out_split.split_cats = common::CatBitField{out};
+  auto out_cats = common::CatBitField{out};
 
   // Simple case for one hot split
   if (common::UseOneHot(shared_inputs.FeatureBins(fidx), shared_inputs.param.max_cat_to_onehot)) {
-    out_split.split_cats.Set(common::AsCat(out_split.thresh));
+    out_cats.Set(common::AsCat(out_split.thresh));
     return;
   }
 
@@ -376,7 +370,7 @@ __device__ void SetCategoricalSplit(const EvaluateSplitSharedInputs &shared_inpu
   assert(partition > 0 && "Invalid partition.");
   thrust::for_each(thrust::seq, beg, beg + partition, [&](size_t c) {
     auto cat = shared_inputs.feature_values[c - node_offset];
-    out_split.SetCat(cat);
+    out_cats.Set(common::AsCat(cat));
   });
 }
 
@@ -429,15 +423,9 @@ void GPUHistEvaluator::CopyToHost(const std::vector<bst_node_t> &nidx) {
   for (auto idx : nidx) {
     copy_stream_.View().Wait(event);
 
-#if defined(XGBOOST_USE_CUDA)
     dh::safe_cuda(cudaMemcpyAsync(
         h_cats.GetNodeCatStorage(idx).data(), d_cats.GetNodeCatStorage(idx).data(),
         d_cats.GetNodeCatStorage(idx).size_bytes(), cudaMemcpyDeviceToHost, copy_stream_.View()));
-#elif defined(XGBOOST_USE_HIP)
-    dh::safe_cuda(hipMemcpyAsync(
-        h_cats.GetNodeCatStorage(idx).data(), d_cats.GetNodeCatStorage(idx).data(),
-        d_cats.GetNodeCatStorage(idx).size_bytes(), hipMemcpyDeviceToHost, copy_stream_.View()));
-#endif
   }
 }
 
@@ -471,8 +459,7 @@ void GPUHistEvaluator::EvaluateSplits(
 
     if (split.is_cat) {
       SetCategoricalSplit(shared_inputs, d_sorted_idx, fidx, i,
-                          device_cats_accessor.GetNodeCatStorage(input.nidx),
-                          &out_splits[i]);
+                          device_cats_accessor.GetNodeCatStorage(input.nidx), &out_splits[i]);
     }
 
     float base_weight =
@@ -501,15 +488,8 @@ GPUExpandEntry GPUHistEvaluator::EvaluateSingleSplit(
                        dh::ToSpan(out_entries));
   GPUExpandEntry root_entry;
 
-#if defined(XGBOOST_USE_CUDA)
   dh::safe_cuda(cudaMemcpyAsync(&root_entry, out_entries.data().get(), sizeof(GPUExpandEntry),
                                 cudaMemcpyDeviceToHost));
-#elif defined(XGBOOST_USE_HIP)
-  dh::safe_cuda(hipMemcpyAsync(&root_entry, out_entries.data().get(), sizeof(GPUExpandEntry),
-                                hipMemcpyDeviceToHost));
-#endif
   return root_entry;
 }
-
-}  // namespace tree
-}  // namespace xgboost
+}  // namespace xgboost::tree

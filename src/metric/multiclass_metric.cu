@@ -104,7 +104,6 @@ class MultiClassMetricsReduction {
 
     dh::XGBCachingDeviceAllocator<char> alloc;
 
-#if defined(XGBOOST_USE_CUDA)
     PackedReduceResult result = thrust::transform_reduce(
         thrust::cuda::par(alloc),
         begin, end,
@@ -122,26 +121,6 @@ class MultiClassMetricsReduction {
         },
         PackedReduceResult(),
         thrust::plus<PackedReduceResult>());
-#elif defined(XGBOOST_USE_HIP)
-    PackedReduceResult result = thrust::transform_reduce(
-        thrust::hip::par(alloc),
-        begin, end,
-        [=] XGBOOST_DEVICE(size_t idx) {
-          bst_float weight = is_null_weight ? 1.0f : s_weights[idx];
-          bst_float residue = 0;
-          auto label = static_cast<int>(s_labels[idx]);
-          if (label >= 0 && label < static_cast<int32_t>(n_class)) {
-            residue = EvalRowPolicy::EvalRow(
-                label, &s_preds[idx * n_class], n_class) * weight;
-          } else {
-            s_label_error[0] = label;
-          }
-          return PackedReduceResult{ residue, weight };
-        },
-        PackedReduceResult(),
-        thrust::plus<PackedReduceResult>());
-#endif
-
     CheckLabelError(s_label_error[0], n_class);
 
     return result;
@@ -166,11 +145,7 @@ class MultiClassMetricsReduction {
       labels.SetDevice(device_);
       weights.SetDevice(device_);
 
-#if defined(XGBOOST_USE_CUDA)
       dh::safe_cuda(cudaSetDevice(device_));
-#elif defined(XGBOOST_USE_HIP)
-      dh::safe_cuda(hipSetDevice(device_));
-#endif
 
       result = DeviceReduceMetrics(weights, labels, preds, n_class);
     }

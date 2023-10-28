@@ -96,12 +96,7 @@ GPUBinaryAUC(common::Span<float const> predts, MetaInfo const &info,
   auto labels = info.labels.View(device);
   auto weights = info.weights_.ConstDeviceSpan();
 
-#if defined(XGBOOST_USE_HIP)
-  dh::safe_cuda(hipSetDevice(device));
-#elif defined(XGBOOST_USE_CUDA)
   dh::safe_cuda(cudaSetDevice(device));
-#endif
-
   CHECK_NE(labels.Size(), 0);
   CHECK_EQ(labels.Size(), predts.size());
 
@@ -132,17 +127,10 @@ GPUBinaryAUC(common::Span<float const> predts, MetaInfo const &info,
       thrust::make_counting_iterator(0),
       [=] XGBOOST_DEVICE(size_t i) { return predts[d_sorted_idx[i]]; });
 
-#if defined(XGBOOST_USE_HIP)
-  auto end_unique = thrust::unique_by_key_copy(
-      thrust::hip::par(alloc), uni_key, uni_key + d_sorted_idx.size(),
-      dh::tbegin(d_unique_idx), thrust::make_discard_iterator(),
-      dh::tbegin(d_unique_idx));
-#elif defined(XGBOOST_USE_CUDA)
   auto end_unique = thrust::unique_by_key_copy(
       thrust::cuda::par(alloc), uni_key, uni_key + d_sorted_idx.size(),
       dh::tbegin(d_unique_idx), thrust::make_discard_iterator(),
       dh::tbegin(d_unique_idx));
-#endif
 
   d_unique_idx = d_unique_idx.subspan(0, end_unique.second - dh::tbegin(d_unique_idx));
 
@@ -184,12 +172,7 @@ GPUBinaryAUC(common::Span<float const> predts, MetaInfo const &info,
 
   Pair last = cache->fptp.back();
 
-#if defined(XGBOOST_USE_HIP)
-  double auc = thrust::reduce(thrust::hip::par(alloc), in, in + d_unique_idx.size());
-#elif defined(XGBOOST_USE_CUDA)
   double auc = thrust::reduce(thrust::cuda::par(alloc), in, in + d_unique_idx.size());
-#endif
-
   return std::make_tuple(last.first, last.second, auc);
 }
 
@@ -244,15 +227,9 @@ double ScaleClasses(common::Span<double> results, common::Span<double> local_are
   double tp_sum;
   double auc_sum;
 
-#if defined(XGBOOST_USE_HIP)
-  thrust::tie(auc_sum, tp_sum) =
-      thrust::reduce(thrust::hip::par(alloc), reduce_in, reduce_in + n_classes,
-                     Pair{0.0, 0.0}, PairPlus<double, double>{});
-#elif defined(XGBOOST_USE_CUDA)
   thrust::tie(auc_sum, tp_sum) =
       thrust::reduce(thrust::cuda::par(alloc), reduce_in, reduce_in + n_classes,
                      Pair{0.0, 0.0}, PairPlus<double, double>{});
-#endif
 
   if (tp_sum != 0 && !std::isnan(auc_sum)) {
     auc_sum /= tp_sum;
@@ -334,15 +311,9 @@ void SegmentedReduceAUC(common::Span<size_t const> d_unique_idx,
         return auc;
       });
 
-#if defined(XGBOOST_USE_HIP)
-  thrust::reduce_by_key(thrust::hip::par(alloc), key_in,
-                        key_in + d_unique_idx.size(), val_in,
-                        thrust::make_discard_iterator(), dh::tbegin(d_auc));
-#elif defined(XGBOOST_USE_CUDA)
   thrust::reduce_by_key(thrust::cuda::par(alloc), key_in,
                         key_in + d_unique_idx.size(), val_in,
                         thrust::make_discard_iterator(), dh::tbegin(d_auc));
-#endif
 }
 
 /**
@@ -352,11 +323,7 @@ void SegmentedReduceAUC(common::Span<size_t const> d_unique_idx,
 template <bool scale, typename Fn>
 double GPUMultiClassAUCOVR(MetaInfo const &info, int32_t device, common::Span<uint32_t> d_class_ptr,
                            size_t n_classes, std::shared_ptr<DeviceAUCCache> cache, Fn area_fn) {
-#if defined(XGBOOST_USE_HIP)
-  dh::safe_cuda(hipSetDevice(device));
-#elif defined(XGBOOST_USE_CUDA)
   dh::safe_cuda(cudaSetDevice(device));
-#endif
 
   /**
    * Sorted idx
@@ -419,18 +386,6 @@ double GPUMultiClassAUCOVR(MetaInfo const &info, int32_t device, common::Span<ui
   dh::TemporaryArray<uint32_t> unique_class_ptr(d_class_ptr.size());
   auto d_unique_class_ptr = dh::ToSpan(unique_class_ptr);
 
-#if defined(XGBOOST_USE_HIP)
-  auto n_uniques = dh::SegmentedUniqueByKey(
-      thrust::hip::par(alloc),
-      dh::tbegin(d_class_ptr),
-      dh::tend(d_class_ptr),
-      uni_key,
-      uni_key + d_sorted_idx.size(),
-      dh::tbegin(d_unique_idx),
-      d_unique_class_ptr.data(),
-      dh::tbegin(d_unique_idx),
-      thrust::equal_to<thrust::pair<uint32_t, float>>{});
-#elif defined(XGBOOST_USE_CUDA)
   auto n_uniques = dh::SegmentedUniqueByKey(
       thrust::cuda::par(alloc),
       dh::tbegin(d_class_ptr),
@@ -441,7 +396,6 @@ double GPUMultiClassAUCOVR(MetaInfo const &info, int32_t device, common::Span<ui
       d_unique_class_ptr.data(),
       dh::tbegin(d_unique_idx),
       thrust::equal_to<thrust::pair<uint32_t, float>>{});
-#endif
 
   d_unique_idx = d_unique_idx.subspan(0, n_uniques);
 
@@ -561,15 +515,9 @@ std::pair<double, std::uint32_t> GPURankingAUC(Context const *ctx, common::Span<
       thrust::make_counting_iterator(0),
       [=] XGBOOST_DEVICE(size_t i) { return d_group_ptr[i + 1] - d_group_ptr[i]; });
 
-#if defined(XGBOOST_USE_HIP)
-  size_t n_valid = thrust::count_if(
-      thrust::hip::par(alloc), check_it, check_it + group_ptr.size() - 1,
-      [=] XGBOOST_DEVICE(size_t len) { return len >= 3; });
-#elif defined(XGBOOST_USE_CUDA)
   size_t n_valid = thrust::count_if(
       thrust::cuda::par(alloc), check_it, check_it + group_ptr.size() - 1,
       [=] XGBOOST_DEVICE(size_t len) { return len >= 3; });
-#endif
 
   if (n_valid < info.group_ptr_.size() - 1) {
     InvalidGroupAUC();
@@ -667,13 +615,8 @@ std::pair<double, std::uint32_t> GPURankingAUC(Context const *ctx, common::Span<
   /**
    * Scale the AUC with number of items in each group.
    */
-#if defined(XGBOOST_USE_HIP)
-  double auc = thrust::reduce(thrust::hip::par(alloc), dh::tbegin(s_d_auc),
-                              dh::tend(s_d_auc), 0.0);
-#elif defined(XGBOOST_USE_CUDA)
   double auc = thrust::reduce(thrust::cuda::par(alloc), dh::tbegin(s_d_auc),
                               dh::tend(s_d_auc), 0.0);
-#endif
 
   return std::make_pair(auc, n_valid);
 }
@@ -702,15 +645,9 @@ std::tuple<double, double, double> GPUBinaryPRAUC(common::Span<float const> pred
   dh::XGBCachingDeviceAllocator<char> alloc;
   double total_pos, total_neg;
 
-#if defined(XGBOOST_USE_HIP)
-  thrust::tie(total_pos, total_neg) =
-      thrust::reduce(thrust::hip::par(alloc), it, it + labels.Size(),
-                     Pair{0.0, 0.0}, PairPlus<double, double>{});
-#elif defined(XGBOOST_USE_CUDA)
   thrust::tie(total_pos, total_neg) =
       thrust::reduce(thrust::cuda::par(alloc), it, it + labels.Size(),
                      Pair{0.0, 0.0}, PairPlus<double, double>{});
-#endif
 
   if (total_pos <= 0.0 || total_neg <= 0.0) {
     return {0.0f, 0.0f, 0.0f};
@@ -763,17 +700,10 @@ double GPUMultiClassPRAUC(Context const *ctx, common::Span<float const> predts,
       });
   dh::XGBCachingDeviceAllocator<char> alloc;
 
-#if defined(XGBOOST_USE_HIP)
-  thrust::reduce_by_key(thrust::hip::par(alloc), key_it,
-                        key_it + predts.size(), val_it,
-                        thrust::make_discard_iterator(), totals.begin(),
-                        thrust::equal_to<size_t>{}, PairPlus<double, double>{});
-#elif defined(XGBOOST_USE_CUDA)
   thrust::reduce_by_key(thrust::cuda::par(alloc), key_it,
                         key_it + predts.size(), val_it,
                         thrust::make_discard_iterator(), totals.begin(),
                         thrust::equal_to<size_t>{}, PairPlus<double, double>{});
-#endif
 
   /**
    * Calculate AUC
@@ -842,18 +772,6 @@ GPURankingPRAUCImpl(common::Span<float const> predts, MetaInfo const &info,
   dh::TemporaryArray<uint32_t> unique_class_ptr(d_group_ptr.size());
   auto d_unique_class_ptr = dh::ToSpan(unique_class_ptr);
 
-#if defined(XGBOOST_USE_HIP)
-  auto n_uniques = dh::SegmentedUniqueByKey(
-      thrust::hip::par(alloc),
-      dh::tbegin(d_group_ptr),
-      dh::tend(d_group_ptr),
-      uni_key,
-      uni_key + d_sorted_idx.size(),
-      dh::tbegin(d_unique_idx),
-      d_unique_class_ptr.data(),
-      dh::tbegin(d_unique_idx),
-      thrust::equal_to<thrust::pair<uint32_t, float>>{});
-#elif defined(XGBOOST_USE_CUDA)
   auto n_uniques = dh::SegmentedUniqueByKey(
       thrust::cuda::par(alloc),
       dh::tbegin(d_group_ptr),
@@ -864,7 +782,6 @@ GPURankingPRAUCImpl(common::Span<float const> predts, MetaInfo const &info,
       d_unique_class_ptr.data(),
       dh::tbegin(d_unique_idx),
       thrust::equal_to<thrust::pair<uint32_t, float>>{});
-#endif
 
   d_unique_idx = d_unique_idx.subspan(0, n_uniques);
 
@@ -917,15 +834,9 @@ GPURankingPRAUCImpl(common::Span<float const> predts, MetaInfo const &info,
           return thrust::make_pair(0.0, static_cast<uint32_t>(1));
         });
 
-#if defined(XGBOOST_USE_HIP)
-    thrust::tie(auc, invalid_groups) = thrust::reduce(
-        thrust::hip::par(alloc), it, it + n_groups,
-        thrust::pair<double, uint32_t>(0.0, 0), PairPlus<double, uint32_t>{});
-#elif defined(XGBOOST_USE_CUDA)
     thrust::tie(auc, invalid_groups) = thrust::reduce(
         thrust::cuda::par(alloc), it, it + n_groups,
         thrust::pair<double, uint32_t>(0.0, 0), PairPlus<double, uint32_t>{});
-#endif
   }
   return std::make_pair(auc, n_groups - invalid_groups);
 }
@@ -934,11 +845,7 @@ std::pair<double, std::uint32_t> GPURankingPRAUC(Context const *ctx,
                                                  common::Span<float const> predts,
                                                  MetaInfo const &info,
                                                  std::shared_ptr<DeviceAUCCache> *p_cache) {
-#if defined(XGBOOST_USE_HIP)
-  dh::safe_cuda(hipSetDevice(ctx->gpu_id));
-#elif defined(XGBOOST_USE_CUDA)
   dh::safe_cuda(cudaSetDevice(ctx->gpu_id));
-#endif
 
   if (predts.empty()) {
     return std::make_pair(0.0, static_cast<uint32_t>(0));
@@ -962,17 +869,10 @@ std::pair<double, std::uint32_t> GPURankingPRAUC(Context const *ctx,
   dh::XGBDeviceAllocator<char> alloc;
   auto labels = info.labels.View(ctx->gpu_id);
 
-#if defined(XGBOOST_USE_HIP)
-  if (thrust::any_of(thrust::hip::par(alloc), dh::tbegin(labels.Values()),
-                     dh::tend(labels.Values()), PRAUCLabelInvalid{})) {
-    InvalidLabels();
-  }
-#elif defined(XGBOOST_USE_CUDA)
   if (thrust::any_of(thrust::cuda::par(alloc), dh::tbegin(labels.Values()),
                      dh::tend(labels.Values()), PRAUCLabelInvalid{})) {
     InvalidLabels();
   }
-#endif
 
   /**
    * Get total positive/negative for each group.
@@ -994,17 +894,10 @@ std::pair<double, std::uint32_t> GPURankingPRAUC(Context const *ctx,
         return thrust::make_pair(y * w, (1.0 - y) * w);
       });
 
-#if defined(XGBOOST_USE_HIP)
-  thrust::reduce_by_key(thrust::hip::par(alloc), key_it,
-                        key_it + predts.size(), val_it,
-                        thrust::make_discard_iterator(), totals.begin(),
-                        thrust::equal_to<size_t>{}, PairPlus<double, double>{});
-#elif defined(XGBOOST_USE_CUDA)
   thrust::reduce_by_key(thrust::cuda::par(alloc), key_it,
                         key_it + predts.size(), val_it,
                         thrust::make_discard_iterator(), totals.begin(),
                         thrust::equal_to<size_t>{}, PairPlus<double, double>{});
-#endif
 
   /**
    * Calculate AUC

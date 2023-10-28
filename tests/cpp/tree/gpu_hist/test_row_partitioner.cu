@@ -72,19 +72,13 @@ void TestSortPositionBatch(const std::vector<int>& ridx_in, const std::vector<Se
     total_rows += segments.at(i).Size();
   }
 
-#if defined(XGBOOST_USE_CUDA)
   dh::safe_cuda(cudaMemcpyAsync(d_batch_info.data().get(), h_batch_info.data(),
                                 h_batch_info.size() * sizeof(PerNodeData<int>), cudaMemcpyDefault,
                                 nullptr));
-#elif defined(XGBOOST_USE_HIP)
-  dh::safe_cuda(hipMemcpyAsync(d_batch_info.data().get(), h_batch_info.data(),
-                                h_batch_info.size() * sizeof(PerNodeData<int>), hipMemcpyDefault,
-                                nullptr));
-#endif
   dh::device_vector<int8_t> tmp;
   SortPositionBatch<uint32_t, decltype(op), int>(dh::ToSpan(d_batch_info), dh::ToSpan(ridx),
                                                  dh::ToSpan(ridx_tmp), dh::ToSpan(counts),
-                                                 total_rows, op, &tmp, nullptr);
+                                                 total_rows, op, &tmp);
 
   auto op_without_data = [=] __device__(auto ridx) { return ridx % 2 == 0; };
   for (size_t i = 0; i < segments.size(); i++) {

@@ -25,14 +25,10 @@ SimpleDMatrix::SimpleDMatrix(AdapterT* adapter, float missing, std::int32_t nthr
                                                                       : adapter->DeviceIdx();
   CHECK_GE(device, 0);
 
-#if defined(XGBOOST_USE_CUDA)
   dh::safe_cuda(cudaSetDevice(device));
-#elif defined(XGBOOST_USE_HIP)
-  dh::safe_cuda(hipSetDevice(device));
-#endif
 
   Context ctx;
-  ctx.Init(Args{{"nthread", std::to_string(nthread)}, {"gpu_id", std::to_string(device)}});
+  ctx.Init(Args{{"nthread", std::to_string(nthread)}, {"device", DeviceOrd::CUDA(device).Name()}});
 
   CHECK(adapter->NumRows() != kAdapterUnknownSize);
   CHECK(adapter->NumColumns() != kAdapterUnknownSize);

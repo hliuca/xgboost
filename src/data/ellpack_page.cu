@@ -4,12 +4,17 @@
 #include <thrust/iterator/discard_iterator.h>
 #include <thrust/iterator/transform_output_iterator.h>
 
+#include <algorithm>  // for copy
+#include <utility>    // for move
+#include <vector>     // for vector
+
 #include "../common/categorical.h"
+#include "../common/cuda_context.cuh"
 #include "../common/hist_util.cuh"
-#include "../common/random.h"
 #include "../common/transform_iterator.h"  // MakeIndexTransformIter
 #include "./ellpack_page.cuh"
 #include "device_adapter.cuh"  // for HasInfInData
+#include "ellpack_page.h"
 #include "gradient_index.h"
 #include "xgboost/data.h"
 
@@ -31,6 +36,16 @@ EllpackPage::EllpackPage(EllpackPage&& that) { std::swap(impl_, that.impl_); }
 size_t EllpackPage::Size() const { return impl_->Size(); }
 
 void EllpackPage::SetBaseRowId(std::size_t row_id) { impl_->SetBaseRowId(row_id); }
+
+[[nodiscard]] common::HistogramCuts& EllpackPage::Cuts() {
+  CHECK(impl_);
+  return impl_->Cuts();
+}
+
+[[nodiscard]] common::HistogramCuts const& EllpackPage::Cuts() const {
+  CHECK(impl_);
+  return impl_->Cuts();
+}
 
 // Bin each input data entry, store the bin indices in compressed form.
 __global__ void CompressBinEllpackKernel(
@@ -92,11 +107,7 @@ EllpackPageImpl::EllpackPageImpl(int device, common::HistogramCuts cuts,
       n_rows(n_rows) {
   monitor_.Init("ellpack_page");
 
-#if defined(XGBOOST_USE_CUDA)
   dh::safe_cuda(cudaSetDevice(device));
-#elif defined(XGBOOST_USE_HIP)
-  dh::safe_cuda(hipSetDevice(device));
-#endif
 
   monitor_.Start("InitCompressedData");
   InitCompressedData(device);
@@ -117,18 +128,18 @@ EllpackPageImpl::EllpackPageImpl(int device, common::HistogramCuts cuts,
 EllpackPageImpl::EllpackPageImpl(Context const* ctx, DMatrix* dmat, const BatchParam& param)
     : is_dense(dmat->IsDense()) {
   monitor_.Init("ellpack_page");
-#if defined(XGBOOST_USE_CUDA)
   dh::safe_cuda(cudaSetDevice(ctx->gpu_id));
-#elif defined(XGBOOST_USE_HIP)
-  dh::safe_cuda(hipSetDevice(ctx->gpu_id));
-#endif
 
   n_rows = dmat->Info().num_row_;
 
   monitor_.Start("Quantiles");
   // Create the quantile sketches for the dmatrix and initialize HistogramCuts.
   row_stride = GetRowStride(dmat);
-  cuts_ = common::DeviceSketch(ctx->gpu_id, dmat, param.max_bin);
+  if (!param.hess.empty()) {
+    cuts_ = common::DeviceSketchWithHessian(ctx, dmat, param.max_bin, param.hess);
+  } else {
+    cuts_ = common::DeviceSketch(ctx, dmat, param.max_bin);
+  }
   monitor_.Stop("Quantiles");
 
   monitor_.Start("InitCompressedData");
@@ -311,11 +322,7 @@ EllpackPageImpl::EllpackPageImpl(AdapterBatch batch, float missing, int device, 
                                  common::Span<size_t> row_counts_span,
                                  common::Span<FeatureType const> feature_types, size_t row_stride,
                                  size_t n_rows, common::HistogramCuts const& cuts) {
-#if defined(XGBOOST_USE_CUDA)
   dh::safe_cuda(cudaSetDevice(device));
-#elif defined(XGBOOST_USE_HIP)
-  dh::safe_cuda(hipSetDevice(device));
-#endif
 
   *this = EllpackPageImpl(device, cuts, is_dense, row_stride, n_rows);
   CopyDataToEllpack(batch, feature_types, this, device, missing);
@@ -343,7 +350,8 @@ void CopyGHistToEllpack(GHistIndexMatrix const& page, common::Span<size_t const>
   auto d_csc_indptr = dh::ToSpan(csc_indptr);
 
   auto bin_type = page.index.GetBinTypeSize();
-  common::CompressedBufferWriter writer{page.cut.TotalBins() + 1};  // +1 for null value
+  common::CompressedBufferWriter writer{page.cut.TotalBins() +
+                                        static_cast<std::size_t>(1)};  // +1 for null value
 
   dh::LaunchN(row_stride * page.Size(), [=] __device__(size_t idx) mutable {
     auto ridx = idx / row_stride;
@@ -387,8 +395,10 @@ EllpackPageImpl::EllpackPageImpl(Context const* ctx, GHistIndexMatrix const& pag
 
   // copy gidx
   common::CompressedByteT* d_compressed_buffer = gidx_buffer.DevicePointer();
-  dh::device_vector<size_t> row_ptr(page.row_ptr);
+  dh::device_vector<size_t> row_ptr(page.row_ptr.size());
   auto d_row_ptr = dh::ToSpan(row_ptr);
+  dh::safe_cuda(cudaMemcpyAsync(d_row_ptr.data(), page.row_ptr.data(), d_row_ptr.size_bytes(),
+                                cudaMemcpyHostToDevice, ctx->CUDACtx()->Stream()));
 
   auto accessor = this->GetDeviceAccessor(ctx->gpu_id, ft);
   auto null = accessor.NullValue();
@@ -543,27 +553,15 @@ void EllpackPageImpl::CreateHistIndices(int device,
     if (row_batch.data.DeviceCanRead()) {
       auto const& d_data = row_batch.data.ConstDeviceSpan();
 
-#if defined(XGBOOST_USE_CUDA)
       dh::safe_cuda(cudaMemcpyAsync(
           entries_d.data().get(), d_data.data() + ent_cnt_begin,
           n_entries * sizeof(Entry), cudaMemcpyDefault));
-#elif defined(XGBOOST_USE_HIP)
-      dh::safe_cuda(hipMemcpyAsync(
-          entries_d.data().get(), d_data.data() + ent_cnt_begin,
-          n_entries * sizeof(Entry), hipMemcpyDefault));
-#endif
     } else {
       const std::vector<Entry>& data_vec = row_batch.data.ConstHostVector();
 
-#if defined(XGBOOST_USE_CUDA)
       dh::safe_cuda(cudaMemcpyAsync(
           entries_d.data().get(), data_vec.data() + ent_cnt_begin,
           n_entries * sizeof(Entry), cudaMemcpyDefault));
-#elif defined(XGBOOST_USE_HIP)
-      dh::safe_cuda(hipMemcpyAsync(
-          entries_d.data().get(), data_vec.data() + ent_cnt_begin,
-          n_entries * sizeof(Entry), hipMemcpyDefault));
-#endif
     }
 
     const dim3 block3(32, 8, 1);  // 256 threads

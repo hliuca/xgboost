@@ -59,13 +59,8 @@ GradientQuantiser::GradientQuantiser(common::Span<GradientPair const> gpair) {
 
   thrust::device_ptr<GradientPair const> gpair_beg{gpair.data()};
   auto beg = thrust::make_transform_iterator(gpair_beg, Clip());
-#if defined(XGBOOST_USE_CUDA)
   Pair p =
       dh::Reduce(thrust::cuda::par(alloc), beg, beg + gpair.size(), Pair{}, thrust::plus<Pair>{});
-#elif defined(XGBOOST_USE_HIP)
-  Pair p =
-      dh::Reduce(thrust::hip::par(alloc), beg, beg + gpair.size(), Pair{}, thrust::plus<Pair>{});
-#endif
 
   // Treat pair as array of 4 primitive types to allreduce
   using ReduceT = typename decltype(p.first)::ValueT;
@@ -265,11 +260,7 @@ void BuildGradientHistogram(CUDAContext const* ctx, EllpackDeviceAccessor const&
   // decide whether to use shared memory
   int device = 0;
 
-#if defined(XGBOOST_USE_CUDA)
   dh::safe_cuda(cudaGetDevice(&device));
-#elif defined(XGBOOST_USE_HIP)
-  dh::safe_cuda(hipGetDevice(&device));
-#endif
 
   // opt into maximum shared memory for the kernel if necessary
 #if defined(XGBOOST_USE_CUDA)
@@ -346,11 +337,7 @@ void BuildGradientHistogram(CUDAContext const* ctx, EllpackDeviceAccessor const&
     runit(SharedMemHistKernel<false, kBlockThreads, kItemsPerThread>);
   }
 
-#if defined(XGBOOST_USE_CUDA)
   dh::safe_cuda(cudaGetLastError());
-#elif defined(XGBOOST_USE_HIP)
-  dh::safe_cuda(hipGetLastError());
-#endif
 }
 
 }  // namespace tree

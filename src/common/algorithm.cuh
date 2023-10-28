@@ -185,13 +185,8 @@ void SegmentedArgSort(Context const *ctx, Span<U> values, Span<V> group_ptr,
       sorted_idx_out.data().get(), sorted_idx.size(), n_groups, group_ptr.data(),
       group_ptr.data() + 1, ctx->CUDACtx()->Stream());
 
-#if defined(XGBOOST_USE_HIP)
-  dh::safe_cuda(hipMemcpyAsync(sorted_idx.data(), sorted_idx_out.data().get(),
-                                sorted_idx.size_bytes(), hipMemcpyDeviceToDevice));
-#else
   dh::safe_cuda(cudaMemcpyAsync(sorted_idx.data(), sorted_idx_out.data().get(),
                                 sorted_idx.size_bytes(), cudaMemcpyDeviceToDevice));
-#endif
 }
 
 /**

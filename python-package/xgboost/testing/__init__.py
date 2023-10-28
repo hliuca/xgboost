@@ -25,6 +25,7 @@ from typing import (
     Set,
     Tuple,
     TypedDict,
+    TypeVar,
     Union,
 )
 
@@ -198,20 +199,20 @@ class IteratorForTest(xgb.core.DataIter):
         X: Sequence,
         y: Sequence,
         w: Optional[Sequence],
-        cache: Optional[str] = "./",
+        cache: Optional[str],
     ) -> None:
         assert len(X) == len(y)
         self.X = X
         self.y = y
         self.w = w
         self.it = 0
-        super().__init__(cache)
+        super().__init__(cache_prefix=cache)
 
     def next(self, input_data: Callable) -> int:
         if self.it == len(self.X):
             return 0
 
-        with pytest.raises(TypeError, match="keyword args"):
+        with pytest.raises(TypeError, match="Keyword argument"):
             input_data(self.X[self.it], self.y[self.it], None)
 
         # Use copy to make sure the iterator doesn't hold a reference to the data.
@@ -229,7 +230,7 @@ class IteratorForTest(xgb.core.DataIter):
 
     def as_arrays(
         self,
-    ) -> Tuple[Union[np.ndarray, sparse.csr_matrix], ArrayLike, ArrayLike]:
+    ) -> Tuple[Union[np.ndarray, sparse.csr_matrix], ArrayLike, Optional[ArrayLike]]:
         if isinstance(self.X[0], sparse.csr_matrix):
             X = sparse.vstack(self.X, format="csr")
         else:
@@ -243,7 +244,12 @@ class IteratorForTest(xgb.core.DataIter):
 
 
 def make_batches(
-    n_samples_per_batch: int, n_features: int, n_batches: int, use_cupy: bool = False
+    n_samples_per_batch: int,
+    n_features: int,
+    n_batches: int,
+    use_cupy: bool = False,
+    *,
+    vary_size: bool = False,
 ) -> Tuple[List[np.ndarray], List[np.ndarray], List[np.ndarray]]:
     X = []
     y = []
@@ -254,14 +260,23 @@ def make_batches(
         rng = cupy.random.RandomState(1994)
     else:
         rng = np.random.RandomState(1994)
-    for _ in range(n_batches):
-        _X = rng.randn(n_samples_per_batch, n_features)
-        _y = rng.randn(n_samples_per_batch)
-        _w = rng.uniform(low=0, high=1, size=n_samples_per_batch)
+    for i in range(n_batches):
+        n_samples = n_samples_per_batch + i * 10 if vary_size else n_samples_per_batch
+        _X = rng.randn(n_samples, n_features)
+        _y = rng.randn(n_samples)
+        _w = rng.uniform(low=0, high=1, size=n_samples)
         X.append(_X)
         y.append(_y)
         w.append(_w)
     return X, y, w
+
+
+def make_regression(
+    n_samples: int, n_features: int, use_cupy: bool
+) -> Tuple[ArrayLike, ArrayLike, ArrayLike]:
+    """Make a simple regression dataset."""
+    X, y, w = make_batches(n_samples, n_features, 1, use_cupy)
+    return X[0], y[0], w[0]
 
 
 def make_batches_sparse(
@@ -347,7 +362,9 @@ class TestDataset:
             if w is not None:
                 weight.append(w)
 
-        it = IteratorForTest(predictor, response, weight if weight else None)
+        it = IteratorForTest(
+            predictor, response, weight if weight else None, cache="cache"
+        )
         return xgb.DMatrix(it)
 
     def __repr__(self) -> str:
@@ -707,6 +724,9 @@ def predictor_equal(lhs: xgb.DMatrix, rhs: xgb.DMatrix) -> bool:
             np.array_equal(lcsr.indptr, rcsr.indptr),
         )
     )
+
+
+M = TypeVar("M", xgb.Booster, xgb.XGBModel)
 
 
 def eval_error_metric(predt: np.ndarray, dtrain: xgb.DMatrix) -> Tuple[str, np.float64]:

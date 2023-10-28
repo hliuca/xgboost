@@ -140,17 +140,10 @@ class HostDeviceVectorImpl {
       SetDevice();
       CHECK_EQ(this->DeviceIdx(), other->DeviceIdx());
 
-#if defined(XGBOOST_USE_CUDA)
       dh::safe_cuda(cudaMemcpyAsync(this->DevicePointer() + ori_size,
                                     ptr,
                                     other->Size() * sizeof(T),
                                     cudaMemcpyDeviceToDevice));
-#elif defined(XGBOOST_USE_HIP)
-      dh::safe_cuda(hipMemcpyAsync(this->DevicePointer() + ori_size,
-                                    ptr,
-                                    other->Size() * sizeof(T),
-                                    hipMemcpyDeviceToDevice));
-#endif
     }
   }
 
@@ -204,17 +197,10 @@ class HostDeviceVectorImpl {
     if (data_h_.size() != data_d_->size()) { data_h_.resize(data_d_->size()); }
     SetDevice();
 
-#if defined(XGBOOST_USE_CUDA)
     dh::safe_cuda(cudaMemcpy(data_h_.data(),
                              data_d_->data().get(),
                              data_d_->size() * sizeof(T),
                              cudaMemcpyDeviceToHost));
-#elif defined(XGBOOST_USE_HIP)
-    dh::safe_cuda(hipMemcpy(data_h_.data(),
-                             data_d_->data().get(),
-                             data_d_->size() * sizeof(T),
-                             hipMemcpyDeviceToHost));
-#endif
   }
 
   void LazySyncDevice(GPUAccess access) {
@@ -228,17 +214,10 @@ class HostDeviceVectorImpl {
     LazyResizeDevice(data_h_.size());
     SetDevice();
 
-#if defined(XGBOOST_USE_CUDA)
     dh::safe_cuda(cudaMemcpyAsync(data_d_->data().get(),
                                   data_h_.data(),
                                   data_d_->size() * sizeof(T),
                                   cudaMemcpyHostToDevice));
-#elif defined(XGBOOST_USE_HIP)
-    dh::safe_cuda(hipMemcpyAsync(data_d_->data().get(),
-                                  data_h_.data(),
-                                  data_d_->size() * sizeof(T),
-                                  hipMemcpyHostToDevice));
-#endif
     gpu_access_ = access;
   }
 
@@ -264,13 +243,8 @@ class HostDeviceVectorImpl {
       gpu_access_ = GPUAccess::kWrite;
       SetDevice();
 
-#if defined(XGBOOST_USE_CUDA)
       dh::safe_cuda(cudaMemcpyAsync(data_d_->data().get(), other->data_d_->data().get(),
                                     data_d_->size() * sizeof(T), cudaMemcpyDefault));
-#elif defined(XGBOOST_USE_HIP)
-      dh::safe_cuda(hipMemcpyAsync(data_d_->data().get(), other->data_d_->data().get(),
-                                    data_d_->size() * sizeof(T), hipMemcpyDefault));
-#endif
     }
   }
 
@@ -279,13 +253,8 @@ class HostDeviceVectorImpl {
     gpu_access_ = GPUAccess::kWrite;
     SetDevice();
 
-#if defined(XGBOOST_USE_CUDA)
     dh::safe_cuda(cudaMemcpyAsync(data_d_->data().get(), begin,
                                   data_d_->size() * sizeof(T), cudaMemcpyDefault));
-#elif defined(XGBOOST_USE_HIP)
-    dh::safe_cuda(hipMemcpyAsync(data_d_->data().get(), begin,
-                                  data_d_->size() * sizeof(T), hipMemcpyDefault));
-#endif
   }
 
   void LazyResizeDevice(size_t new_size) {
@@ -297,11 +266,7 @@ class HostDeviceVectorImpl {
   void SetDevice() {
     CHECK_GE(device_, 0);
     if (cudaSetDeviceHandler == nullptr) {
-#if defined(XGBOOST_USE_CUDA)
       dh::safe_cuda(cudaSetDevice(device_));
-#elif defined(XGBOOST_USE_HIP)
-      dh::safe_cuda(hipSetDevice(device_));
-#endif
     } else {
       (*cudaSetDeviceHandler)(device_);
     }
@@ -432,6 +397,11 @@ GPUAccess HostDeviceVector<T>::DeviceAccess() const {
 template <typename T>
 void HostDeviceVector<T>::SetDevice(int device) const {
   impl_->SetDevice(device);
+}
+
+template <typename T>
+void HostDeviceVector<T>::SetDevice(DeviceOrd device) const {
+  impl_->SetDevice(device.ordinal);
 }
 
 template <typename T>

@@ -21,8 +21,7 @@
 namespace xgboost {
 namespace common {
 void TestSegmentedArgSort() {
-  Context ctx;
-  ctx.gpu_id = 0;
+  auto ctx = MakeCUDACtx(0);
 
   size_t constexpr kElements = 100, kGroups = 3;
   dh::device_vector<size_t> sorted_idx(kElements, 0);
@@ -60,8 +59,7 @@ void TestSegmentedArgSort() {
 TEST(Algorithm, SegmentedArgSort) { TestSegmentedArgSort(); }
 
 TEST(Algorithm, GpuArgSort) {
-  Context ctx;
-  ctx.gpu_id = 0;
+  auto ctx = MakeCUDACtx(0);
 
   dh::device_vector<float> values(20);
   dh::Iota(dh::ToSpan(values));                                    // accending

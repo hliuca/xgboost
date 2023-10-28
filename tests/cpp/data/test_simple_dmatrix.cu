@@ -115,13 +115,8 @@ TEST(SimpleDMatrix, FromColumnarWithEmptyRows) {
     data.resize(kRows);
     thrust::sequence(data.begin(), data.end(), 0);
 
-#if defined(XGBOOST_USE_CUDA)
     dh::safe_cuda(cudaDeviceSynchronize());
     dh::safe_cuda(cudaGetLastError());
-#elif defined(XGBOOST_USE_HIP)
-    dh::safe_cuda(hipDeviceSynchronize());
-    dh::safe_cuda(hipGetLastError());
-#endif
 
     ASSERT_EQ(data.size(), kRows);
 

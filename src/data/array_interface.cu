@@ -20,7 +20,9 @@ void ArrayInterfaceHandler::SyncCudaStream(std::int64_t stream) {
        *   case where 0 might be given should either use None, 1, or 2 instead for
        *   clarity.
        */
+#ifndef XGBOOST_USE_HIP
       LOG(FATAL) << "Invalid stream ID in array interface: " << stream;
+#endif
     case 1:
       // default legacy stream
       break;
@@ -28,11 +30,7 @@ void ArrayInterfaceHandler::SyncCudaStream(std::int64_t stream) {
       // default per-thread stream
     default: {
       dh::CUDAEvent e;
-#if defined(XGBOOST_USE_CUDA)
       e.Record(dh::CUDAStreamView{reinterpret_cast<cudaStream_t>(stream)});
-#elif defined(XGBOOST_USE_HIP)
-      e.Record(dh::CUDAStreamView{reinterpret_cast<hipStream_t>(stream)});
-#endif
       dh::DefaultStream().Wait(e);
     }
   }

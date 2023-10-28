@@ -5,16 +5,12 @@
 #include <utility>
 
 #include "ellpack_page.cuh"
+#include "ellpack_page.h"  // for EllpackPage
 #include "ellpack_page_source.h"
 
-namespace xgboost {
-namespace data {
+namespace xgboost::data {
 void EllpackPageSource::Fetch() {
-#if defined(XGBOOST_USE_CUDA)
   dh::safe_cuda(cudaSetDevice(device_));
-#elif defined(XGBOOST_USE_HIP)
-  dh::safe_cuda(hipSetDevice(device_));
-#endif
   if (!this->ReadCache()) {
     if (count_ != 0 && !sync_) {
       // source is initialized to be the 0th page during construction, so when count_ is 0
@@ -31,5 +27,4 @@ void EllpackPageSource::Fetch() {
     this->WriteCache();
   }
 }
-}  // namespace data
-}  // namespace xgboost
+}  // namespace xgboost::data

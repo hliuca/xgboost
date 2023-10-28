@@ -35,21 +35,15 @@
 #endif
 
 #if defined(__CUDACC__) || defined(__HIP_PLATFORM_AMD__)
-#define GPUIDX 0
+#define GPUIDX (common::AllVisibleGPUs() == 1 ? 0 : collective::GetRank())
 #else
-#define GPUIDX -1
+#define GPUIDX (-1)
 #endif
 
 #if defined(__CUDACC__) || defined(__HIP_PLATFORM_AMD__)
 #define DeclareUnifiedDistributedTest(name) MGPU ## name
 #else
 #define DeclareUnifiedDistributedTest(name) name
-#endif
-
-#if defined(__CUDACC__) || defined(__HIP_PLATFORM_AMD__)
-#define WORLD_SIZE_FOR_TEST (xgboost::common::AllVisibleGPUs())
-#else
-#define WORLD_SIZE_FOR_TEST (3)
 #endif
 
 namespace xgboost {
@@ -183,7 +177,7 @@ class SimpleRealUniformDistribution {
 
     for (size_t k = m; k != 0; --k) {
       sum_value += static_cast<ResultT>((*rng)() - rng->Min()) * r_k;
-      r_k *= r;
+      r_k *= static_cast<ResultT>(r);
     }
 
     ResultT res = sum_value / r_k;
@@ -238,14 +232,17 @@ class RandomDataGenerator {
   bst_target_t n_targets_{1};
 
   std::int32_t device_{Context::kCpuId};
+  std::size_t n_batches_{0};
   std::uint64_t seed_{0};
   SimpleLCG lcg_;
 
-  std::size_t bins_{0};
+  bst_bin_t bins_{0};
   std::vector<FeatureType> ft_;
   bst_cat_t max_cat_;
 
   Json ArrayInterfaceImpl(HostDeviceVector<float>* storage, size_t rows, size_t cols) const;
+
+  void GenerateLabels(std::shared_ptr<DMatrix> p_fmat) const;
 
  public:
   RandomDataGenerator(bst_row_t rows, size_t cols, float sparsity)
@@ -263,12 +260,16 @@ class RandomDataGenerator {
     device_ = d;
     return *this;
   }
+  RandomDataGenerator& Batches(std::size_t n_batches) {
+    n_batches_ = n_batches;
+    return *this;
+  }
   RandomDataGenerator& Seed(uint64_t s) {
     seed_ = s;
     lcg_.Seed(seed_);
     return *this;
   }
-  RandomDataGenerator& Bins(size_t b) {
+  RandomDataGenerator& Bins(bst_bin_t b) {
     bins_ = b;
     return *this;
   }
@@ -309,12 +310,17 @@ class RandomDataGenerator {
   void GenerateCSR(HostDeviceVector<float>* value, HostDeviceVector<bst_row_t>* row_ptr,
                    HostDeviceVector<bst_feature_t>* columns) const;
 
-  std::shared_ptr<DMatrix> GenerateDMatrix(bool with_label = false, bool float_label = true,
-                                           size_t classes = 1) const;
+  [[nodiscard]] std::shared_ptr<DMatrix> GenerateDMatrix(bool with_label = false,
+                                                         bool float_label = true,
+                                                         size_t classes = 1) const;
+
+  [[nodiscard]] std::shared_ptr<DMatrix> GenerateSparsePageDMatrix(std::string prefix,
+                                                                   bool with_label) const;
+
 #if defined(XGBOOST_USE_CUDA) || defined(XGBOOST_USE_HIP)
-  std::shared_ptr<DMatrix> GenerateDeviceDMatrix();
+  std::shared_ptr<DMatrix> GenerateDeviceDMatrix(bool with_label);
 #endif
-  std::shared_ptr<DMatrix> GenerateQuantileDMatrix();
+  std::shared_ptr<DMatrix> GenerateQuantileDMatrix(bool with_label);
 };
 
 // Generate an empty DMatrix, mostly for its meta info.
@@ -322,15 +328,14 @@ inline std::shared_ptr<DMatrix> EmptyDMatrix() {
   return RandomDataGenerator{0, 0, 0.0}.GenerateDMatrix();
 }
 
-inline std::vector<float>
-GenerateRandomCategoricalSingleColumn(int n, size_t num_categories) {
+inline std::vector<float> GenerateRandomCategoricalSingleColumn(int n, size_t num_categories) {
   std::vector<float> x(n);
   std::mt19937 rng(0);
   std::uniform_int_distribution<size_t> dist(0, num_categories - 1);
   std::generate(x.begin(), x.end(), [&]() { return dist(rng); });
   // Make sure each category is present
-  for(size_t i = 0; i < num_categories; i++) {
-    x[i] = i;
+  for (size_t i = 0; i < num_categories; i++) {
+    x[i] = static_cast<decltype(x)::value_type>(i);
   }
   return x;
 }
@@ -444,11 +449,11 @@ class ArrayIterForTest {
   size_t static constexpr Cols() { return 13; }
 
  public:
-  std::string AsArray() const { return interface_; }
+  [[nodiscard]] std::string AsArray() const { return interface_; }
 
   virtual int Next() = 0;
   virtual void Reset() { iter_ = 0; }
-  size_t Iter() const { return iter_; }
+  [[nodiscard]] std::size_t Iter() const { return iter_; }
   auto Proxy() -> decltype(proxy_) { return proxy_; }
 
   explicit ArrayIterForTest(float sparsity, size_t rows, size_t cols, size_t batches);
@@ -511,11 +516,15 @@ inline LearnerModelParam MakeMP(bst_feature_t n_features, float base_score, uint
 
 inline std::int32_t AllThreadsForTest() { return Context{}.Threads(); }
 
-template <typename Function, typename... Args>
+template <bool use_nccl = false, typename Function, typename... Args>
 void RunWithInMemoryCommunicator(int32_t world_size, Function&& function, Args&&... args) {
   auto run = [&](auto rank) {
     Json config{JsonObject()};
-    config["xgboost_communicator"] = String("in-memory");
+    if constexpr (use_nccl) {
+      config["xgboost_communicator"] = String("in-memory-nccl");
+    } else {
+      config["xgboost_communicator"] = String("in-memory");
+    }
     config["in_memory_world_size"] = world_size;
     config["in_memory_rank"] = rank;
     xgboost::collective::Init(config);
@@ -537,16 +546,35 @@ void RunWithInMemoryCommunicator(int32_t world_size, Function&& function, Args&&
 #endif
 }
 
-class DeclareUnifiedDistributedTest(MetricTest) : public ::testing::Test {
+class BaseMGPUTest : public ::testing::Test {
  protected:
   int world_size_;
+  bool use_nccl_{false};
 
   void SetUp() override {
-    world_size_ = WORLD_SIZE_FOR_TEST;
-    if (world_size_ <= 1) {
-      GTEST_SKIP() << "Skipping MGPU test with # GPUs = " << world_size_;
+    auto const n_gpus = common::AllVisibleGPUs();
+    if (n_gpus <= 1) {
+      // Use a single GPU to simulate distributed environment.
+      world_size_ = 3;
+      // NCCL doesn't like sharing a single GPU, so we use the adapter instead.
+      use_nccl_ = false;
+    } else {
+      // Use multiple GPUs for real.
+      world_size_ = n_gpus;
+      use_nccl_ = true;
+    }
+  }
+
+  template <typename Function, typename... Args>
+  void DoTest(Function&& function, Args&&... args) {
+    if (use_nccl_) {
+      RunWithInMemoryCommunicator<true>(world_size_, function, args...);
+    } else {
+      RunWithInMemoryCommunicator<false>(world_size_, function, args...);
     }
   }
 };
+
+class DeclareUnifiedDistributedTest(MetricTest) : public BaseMGPUTest{};
 
 }  // namespace xgboost

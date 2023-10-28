@@ -15,8 +15,7 @@
 #include "../common/timer.h"
 #include "./param.h"
 
-namespace xgboost {
-namespace linear {
+namespace xgboost::linear {
 
 DMLC_REGISTRY_FILE_TAG(updater_gpu_coordinate);
 
@@ -29,7 +28,7 @@ DMLC_REGISTRY_FILE_TAG(updater_gpu_coordinate);
 class GPUCoordinateUpdater : public LinearUpdater {  // NOLINT
  public:
   // set training parameter
-  void Configure(Args const& args) override {
+  void Configure(Args const &args) override {
     tparam_.UpdateAllowUnknown(args);
     coord_param_.UpdateAllowUnknown(args);
     selector_.reset(FeatureSelector::Create(tparam_.feature_selector));
@@ -41,8 +40,9 @@ class GPUCoordinateUpdater : public LinearUpdater {  // NOLINT
     FromJson(config.at("linear_train_param"), &tparam_);
     FromJson(config.at("coordinate_param"), &coord_param_);
   }
-  void SaveConfig(Json* p_out) const override {
-    auto& out = *p_out;
+  void SaveConfig(Json *p_out) const override {
+    LOG(DEBUG) << "Save config for GPU updater.";
+    auto &out = *p_out;
     out["linear_train_param"] = ToJson(tparam_);
     out["coordinate_param"] = ToJson(coord_param_);
   }
@@ -60,11 +60,7 @@ class GPUCoordinateUpdater : public LinearUpdater {  // NOLINT
       return;
     }
 
-#if defined(XGBOOST_USE_CUDA)
     dh::safe_cuda(cudaSetDevice(ctx_->gpu_id));
-#elif defined(XGBOOST_USE_HIP)
-    dh::safe_cuda(hipSetDevice(ctx_->gpu_id));
-#endif
 
     // The begin and end indices for the section of each column associated with
     // this device
@@ -92,17 +88,10 @@ class GPUCoordinateUpdater : public LinearUpdater {  // NOLINT
       auto col = page[fidx];
       auto seg = column_segments[fidx];
 
-#if defined(XGBOOST_USE_CUDA)
       dh::safe_cuda(cudaMemcpy(
           data_.data().get() + row_ptr_[fidx],
           col.data() + seg.first,
           sizeof(Entry) * (seg.second - seg.first), cudaMemcpyHostToDevice));
-#elif defined(XGBOOST_USE_HIP)
-      dh::safe_cuda(hipMemcpy(
-          data_.data().get() + row_ptr_[fidx],
-          col.data() + seg.first,
-          sizeof(Entry) * (seg.second - seg.first), hipMemcpyHostToDevice));
-#endif
     }
   }
 
@@ -114,10 +103,9 @@ class GPUCoordinateUpdater : public LinearUpdater {  // NOLINT
     monitor_.Stop("LazyInitDevice");
 
     monitor_.Start("UpdateGpair");
-    auto &in_gpair_host = in_gpair->ConstHostVector();
     // Update gpair
     if (ctx_->gpu_id >= 0) {
-      this->UpdateGpair(in_gpair_host);
+      this->UpdateGpair(in_gpair->ConstHostVector());
     }
     monitor_.Stop("UpdateGpair");
 
@@ -182,11 +170,7 @@ class GPUCoordinateUpdater : public LinearUpdater {  // NOLINT
 
   // This needs to be public because of the __device__ lambda.
   GradientPair GetBiasGradient(int group_idx, int num_group) {
-#if defined(XGBOOST_USE_CUDA)
     dh::safe_cuda(cudaSetDevice(ctx_->gpu_id));
-#elif defined(XGBOOST_USE_HIP)
-    dh::safe_cuda(hipSetDevice(ctx_->gpu_id));
-#endif
 
     auto counting = thrust::make_counting_iterator(0ull);
     auto f = [=] __device__(size_t idx) {
@@ -211,11 +195,7 @@ class GPUCoordinateUpdater : public LinearUpdater {  // NOLINT
 
   // This needs to be public because of the __device__ lambda.
   GradientPair GetGradient(int group_idx, int num_group, int fidx) {
-#if defined(XGBOOST_USE_CUDA)
     dh::safe_cuda(cudaSetDevice(ctx_->gpu_id));
-#elif defined(XGBOOST_USE_HIP)
-    dh::safe_cuda(hipSetDevice(ctx_->gpu_id));
-#endif
 
     common::Span<xgboost::Entry> d_col = dh::ToSpan(data_).subspan(row_ptr_[fidx]);
     size_t col_size = row_ptr_[fidx + 1] - row_ptr_[fidx];
@@ -249,17 +229,10 @@ class GPUCoordinateUpdater : public LinearUpdater {  // NOLINT
   }
 
   void UpdateGpair(const std::vector<GradientPair> &host_gpair) {
-#if defined(XGBOOST_USE_CUDA)
     dh::safe_cuda(cudaMemcpyAsync(
         gpair_.data().get(),
         host_gpair.data(),
         gpair_.size() * sizeof(GradientPair), cudaMemcpyHostToDevice));
-#elif defined(XGBOOST_USE_HIP)
-    dh::safe_cuda(hipMemcpyAsync(
-        gpair_.data().get(),
-        host_gpair.data(),
-        gpair_.size() * sizeof(GradientPair), hipMemcpyHostToDevice));
-#endif
   }
 
   // training parameter
@@ -279,5 +252,4 @@ XGBOOST_REGISTER_LINEAR_UPDATER(GPUCoordinateUpdater, "gpu_coord_descent")
         "Update linear model according to coordinate descent algorithm. GPU "
         "accelerated.")
     .set_body([]() { return new GPUCoordinateUpdater(); });
-}  // namespace linear
-}  // namespace xgboost
+}  // namespace xgboost::linear

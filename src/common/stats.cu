@@ -19,10 +19,6 @@ namespace xgboost {
 namespace common {
 namespace cuda_impl {
 
-#if defined(XGBOOST_USE_HIP)
-namespace cub = hipcub;
-#endif
-
 void Median(Context const* ctx, linalg::TensorView<float const, 2> t,
             common::OptionalWeights weights, linalg::Tensor<float, 1>* out) {
   CHECK_GE(t.Shape(1), 1);

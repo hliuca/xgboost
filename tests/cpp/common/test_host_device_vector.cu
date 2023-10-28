@@ -19,15 +19,9 @@ namespace {
 void SetDeviceForTest(int device) {
   int n_devices;
 
-#if defined(XGBOOST_USE_CUDA)
   dh::safe_cuda(cudaGetDeviceCount(&n_devices));
   device %= n_devices;
   dh::safe_cuda(cudaSetDevice(device));
-#elif defined(XGBOOST_USE_HIP)
-  dh::safe_cuda(hipGetDeviceCount(&n_devices));
-  device %= n_devices;
-  dh::safe_cuda(hipSetDevice(device));
-#endif
 }
 }  // namespace
 

@@ -70,28 +70,12 @@ PackedReduceResult Reduce(Context const* ctx, MetaInfo const& info, Fn&& loss) {
     double weights_sum = std::accumulate(weight_tloc.cbegin(), weight_tloc.cend(), 0.0);
     result = PackedReduceResult{residue_sum, weights_sum};
   } else {
-#if defined(XGBOOST_USE_CUDA)
+#if defined(XGBOOST_USE_CUDA) || defined(XGBOOST_USE_HIP)
     dh::XGBCachingDeviceAllocator<char> alloc;
     thrust::counting_iterator<size_t> begin(0);
     thrust::counting_iterator<size_t> end = begin + labels.Size();
     result = thrust::transform_reduce(
         thrust::cuda::par(alloc), begin, end,
-        [=] XGBOOST_DEVICE(size_t i) {
-          auto idx = linalg::UnravelIndex(i, labels.Shape());
-          auto sample_id = std::get<0>(idx);
-          auto target_id = std::get<1>(idx);
-          auto res = loss(i, sample_id, target_id);
-          float v{std::get<0>(res)}, wt{std::get<1>(res)};
-          return PackedReduceResult{v, wt};
-        },
-        PackedReduceResult{}, thrust::plus<PackedReduceResult>());
-#elif defined(XGBOOST_USE_HIP)
-    dh::XGBCachingDeviceAllocator<char> alloc;
-    thrust::counting_iterator<size_t> begin(0);
-    thrust::counting_iterator<size_t> end = begin + labels.Size();
-
-    result = thrust::transform_reduce(
-        thrust::hip::par(alloc), begin, end,
         [=] XGBOOST_DEVICE(size_t i) {
           auto idx = linalg::UnravelIndex(i, labels.Shape());
           auto sample_id = std::get<0>(idx);

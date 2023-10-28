@@ -51,11 +51,7 @@ void TestCudfAdapter()
       }
     });
 
-#if defined(XGBOOST_USE_CUDA)
     dh::safe_cuda(cudaDeviceSynchronize());
-#elif defined(XGBOOST_USE_HIP)
-    dh::safe_cuda(hipDeviceSynchronize());
-#endif
   });
 }
 

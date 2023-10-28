@@ -90,8 +90,8 @@ function(format_gencode_flags flags out)
   endif()
   # Set up architecture flags
   if(NOT flags)
-    if (CUDA_VERSION VERSION_GREATER_EQUAL "11.1")
-      set(flags "50;60;70;80")
+    if (CUDA_VERSION VERSION_GREATER_EQUAL "11.8")
+      set(flags "50;60;70;80;90")
     elseif (CUDA_VERSION VERSION_GREATER_EQUAL "11.0")
       set(flags "50;60;70;80")
     elseif(CUDA_VERSION VERSION_GREATER_EQUAL "10.0")
@@ -133,6 +133,11 @@ function(xgboost_set_cuda_flags target)
     $<$<COMPILE_LANGUAGE:CUDA>:-Xcompiler=${OpenMP_CXX_FLAGS}>
     $<$<COMPILE_LANGUAGE:CUDA>:-Xfatbin=-compress-all>)
 
+  if (USE_PER_THREAD_DEFAULT_STREAM)
+    target_compile_options(${target} PRIVATE
+            $<$<COMPILE_LANGUAGE:CUDA>:--default-stream per-thread>)
+  endif (USE_PER_THREAD_DEFAULT_STREAM)
+
   if (CMAKE_VERSION VERSION_GREATER_EQUAL "3.18")
     set_property(TARGET ${target} PROPERTY CUDA_ARCHITECTURES ${CMAKE_CUDA_ARCHITECTURES})
   endif (CMAKE_VERSION VERSION_GREATER_EQUAL "3.18")
@@ -172,7 +177,8 @@ function(xgboost_set_cuda_flags target)
   set_target_properties(${target} PROPERTIES
     CUDA_STANDARD 17
     CUDA_STANDARD_REQUIRED ON
-    CUDA_SEPARABLE_COMPILATION OFF)
+    CUDA_SEPARABLE_COMPILATION OFF
+    CUDA_RUNTIME_LIBRARY Static)
 endfunction(xgboost_set_cuda_flags)
 
 # Set HIP related flags to target.
@@ -203,6 +209,20 @@ macro(xgboost_link_nccl target)
     target_link_libraries(${target} PRIVATE ${NCCL_LIBRARY})
   endif (BUILD_STATIC_LIB)
 endmacro(xgboost_link_nccl)
+
+macro(xgboost_link_rccl target)
+  if(BUILD_STATIC_LIB)
+    target_include_directories(${target} PUBLIC ${RCCL_INCLUDE_DIR})
+    target_compile_definitions(${target} PUBLIC -DXGBOOST_USE_RCCL=1)
+    target_link_directories(${target} PUBLIC ${HIP_LIB_INSTALL_DIR})
+    target_link_libraries(${target} PUBLIC ${RCCL_LIBRARY})
+  else()
+    target_include_directories(${target} PRIVATE ${RCCL_INCLUDE_DIR})
+    target_compile_definitions(${target} PRIVATE -DXGBOOST_USE_RCCL=1)
+    target_link_directories(${target} PUBLIC ${HIP_LIB_INSTALL_DIR})
+    target_link_libraries(${target} PRIVATE ${RCCL_LIBRARY})
+  endif()
+endmacro()
 
 # compile options
 macro(xgboost_target_properties target)
@@ -295,6 +315,7 @@ macro(xgboost_target_link_libraries target)
 
   if (USE_CUDA)
     xgboost_set_cuda_flags(${target})
+    target_link_libraries(${target} PUBLIC CUDA::cudart_static)
   endif (USE_CUDA)
 
   if (USE_HIP)
@@ -308,6 +329,10 @@ macro(xgboost_target_link_libraries target)
   if (USE_NCCL)
     xgboost_link_nccl(${target})
   endif (USE_NCCL)
+
+  if(USE_RCCL)
+    xgboost_link_rccl(${target})
+  endif()
 
   if (USE_NVTX)
     target_link_libraries(${target} PRIVATE CUDA::nvToolsExt)

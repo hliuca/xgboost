@@ -11,16 +11,15 @@
 #include <vector>
 
 #include "../../../src/common/common.h"
-#include "../../../src/data/sparse_page_source.h"
 #if defined(XGBOOST_USE_CUDA)
-#include "../../../src/tree/constraints.cuh"
+#include "../../../src/data/ellpack_page.cuh"  // for EllpackPageImpl
+#include "../../../src/data/ellpack_page.h"    // for EllpackPage
 #include "../../../src/tree/param.h"  // for TrainParam
-#include "../../../src/tree/updater_gpu_common.cuh"
 #include "../../../src/tree/updater_gpu_hist.cu"
 #elif defined(XGBOOST_USE_HIP)
-#include "../../../src/tree/constraints.hip.h"
+#include "../../../src/data/ellpack_page.hip.h"  // for EllpackPageImpl
+#include "../../../src/data/ellpack_page.h"    // for EllpackPage
 #include "../../../src/tree/param.h"  // for TrainParam
-#include "../../../src/tree/updater_gpu_common.hip.h"
 #include "../../../src/tree/updater_gpu_hist.hip"
 #endif
 #include "../filesystem.h"  // dmlc::TemporaryDirectory
@@ -32,11 +31,7 @@
 namespace xgboost::tree {
 TEST(GpuHist, DeviceHistogram) {
   // Ensures that node allocates correctly after reaching `kStopGrowingSize`.
-#if defined(XGBOOST_USE_CUDA)
   dh::safe_cuda(cudaSetDevice(0));
-#elif defined(XGBOOST_USE_HIP)
-  dh::safe_cuda(hipSetDevice(0));
-#endif
   constexpr size_t kNBins = 128;
   constexpr int kNNodes = 4;
   constexpr size_t kStopGrowing = kNNodes * kNBins * 2u;
@@ -103,8 +98,9 @@ void TestBuildHist(bool use_shared_memory_histograms) {
   auto page = BuildEllpackPage(kNRows, kNCols);
   BatchParam batch_param{};
   Context ctx{MakeCUDACtx(0)};
-  GPUHistMakerDevice<GradientSumT> maker(&ctx, page.get(), {}, kNRows, param, kNCols, kNCols,
-                                         batch_param);
+  auto cs = std::make_shared<common::ColumnSampler>(0);
+  GPUHistMakerDevice maker(&ctx, /*is_external_memory=*/false, {}, kNRows, param, cs, kNCols,
+                           batch_param);
   xgboost::SimpleLCG gen;
   xgboost::SimpleRealUniformDistribution<bst_float> dist(0.0f, 1.0f);
   HostDeviceVector<GradientPair> gpair(kNRows);
@@ -116,10 +112,16 @@ void TestBuildHist(bool use_shared_memory_histograms) {
   gpair.SetDevice(0);
 
   thrust::host_vector<common::CompressedByteT> h_gidx_buffer (page->gidx_buffer.HostVector());
-  maker.row_partitioner.reset(new RowPartitioner(0, kNRows));
+  maker.row_partitioner = std::make_unique<RowPartitioner>(0, kNRows);
+
+  maker.hist.Init(0, page->Cuts().TotalBins());
   maker.hist.AllocateHistograms({0});
+
   maker.gpair = gpair.DeviceSpan();
-  maker.quantiser.reset(new GradientQuantiser(maker.gpair));
+  maker.quantiser = std::make_unique<GradientQuantiser>(maker.gpair);
+  maker.page = page.get();
+
+  maker.InitFeatureGroupsOnce();
 
   BuildGradientHistogram(ctx.CUDACtx(), page->GetDeviceAccessor(0),
                          maker.feature_groups->DeviceAccessor(0), gpair.DeviceSpan(),
@@ -132,19 +134,14 @@ void TestBuildHist(bool use_shared_memory_histograms) {
   // d_hist.data stored in float, not gradient pair
   thrust::host_vector<GradientPairInt64> h_result (node_histogram.size());
 
-#if defined(XGBOOST_USE_CUDA)
   dh::safe_cuda(cudaMemcpy(h_result.data(), node_histogram.data(), node_histogram.size_bytes(),
                            cudaMemcpyDeviceToHost));
-#elif defined(XGBOOST_USE_HIP)
-  dh::safe_cuda(hipMemcpy(h_result.data(), node_histogram.data(), node_histogram.size_bytes(),
-                           hipMemcpyDeviceToHost));
-#endif
 
   std::vector<GradientPairPrecise> solution = GetHostHistGpair();
   for (size_t i = 0; i < h_result.size(); ++i) {
     auto result = maker.quantiser->ToFloatingPoint(h_result[i]);
-    EXPECT_NEAR(result.GetGrad(), solution[i].GetGrad(), 0.01f);
-    EXPECT_NEAR(result.GetHess(), solution[i].GetHess(), 0.01f);
+    ASSERT_NEAR(result.GetGrad(), solution[i].GetGrad(), 0.01f);
+    ASSERT_NEAR(result.GetHess(), solution[i].GetHess(), 0.01f);
   }
 }
 
@@ -257,6 +254,7 @@ void UpdateTree(Context const* ctx, HostDeviceVector<GradientPair>* gpair, DMatr
 
   ObjInfo task{ObjInfo::kRegression};
   tree::GPUHistMaker hist_maker{ctx, &task};
+  hist_maker.Configure(Args{});
 
   std::vector<HostDeviceVector<bst_node_t>> position(1);
   hist_maker.Update(&param, gpair, dmat, common::Span<HostDeviceVector<bst_node_t>>{position},
@@ -408,14 +406,14 @@ TEST(GpuHist, ConfigIO) {
   std::unique_ptr<TreeUpdater> updater{TreeUpdater::Create("grow_gpu_hist", &ctx, &task)};
   updater->Configure(Args{});
 
-  Json j_updater { Object() };
+  Json j_updater{Object{}};
   updater->SaveConfig(&j_updater);
-  ASSERT_TRUE(IsA<Object>(j_updater["gpu_hist_train_param"]));
+  ASSERT_TRUE(IsA<Object>(j_updater["hist_train_param"]));
   updater->LoadConfig(j_updater);
 
-  Json j_updater_roundtrip { Object() };
+  Json j_updater_roundtrip{Object{}};
   updater->SaveConfig(&j_updater_roundtrip);
-  ASSERT_TRUE(IsA<Object>(j_updater_roundtrip["gpu_hist_train_param"]));
+  ASSERT_TRUE(IsA<Object>(j_updater_roundtrip["hist_train_param"]));
 
   ASSERT_EQ(j_updater, j_updater_roundtrip);
 }

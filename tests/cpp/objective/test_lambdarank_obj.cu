@@ -18,26 +18,22 @@
 
 namespace xgboost::obj {
 TEST(LambdaRank, GPUNDCGJsonIO) {
-  Context ctx;
-  ctx.gpu_id = 0;
+  auto ctx = MakeCUDACtx(0);
   TestNDCGJsonIO(&ctx);
 }
 
 TEST(LambdaRank, GPUMAPStat) {
-  Context ctx;
-  ctx.gpu_id = 0;
+  auto ctx = MakeCUDACtx(0);
   TestMAPStat(&ctx);
 }
 
 TEST(LambdaRank, GPUNDCGGPair) {
-  Context ctx;
-  ctx.gpu_id = 0;
+  auto ctx = MakeCUDACtx(0);
   TestNDCGGPair(&ctx);
 }
 
 void TestGPUMakePair() {
-  Context ctx;
-  ctx.gpu_id = 0;
+  auto ctx = MakeCUDACtx(0);
 
   MetaInfo info;
   HostDeviceVector<float> predt;
@@ -131,8 +127,7 @@ void TestGPUMakePair() {
 TEST(LambdaRank, GPUMakePair) { TestGPUMakePair(); }
 
 TEST(LambdaRank, GPUUnbiasedNDCG) {
-  Context ctx;
-  ctx.gpu_id = 0;
+  auto ctx = MakeCUDACtx(0);
   TestUnbiasedNDCG(&ctx);
 }
 
@@ -166,8 +161,7 @@ TEST(LambdaRank, RankItemCountOnRight) {
 }
 
 TEST(LambdaRank, GPUMAPGPair) {
-  Context ctx;
-  ctx.gpu_id = 0;
+  auto ctx = MakeCUDACtx(0);
   TestMAPGPair(&ctx);
 }
 }  // namespace xgboost::obj

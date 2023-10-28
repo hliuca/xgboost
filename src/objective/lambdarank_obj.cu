@@ -35,8 +35,6 @@
 
 #if defined(XGBOOST_USE_HIP)
 #include <hipcub/hipcub.hpp>
-
-namespace cub = hipcub;
 #endif
 
 namespace xgboost::obj {
@@ -297,11 +295,7 @@ void Launch(Context const* ctx, std::int32_t iter, HostDeviceVector<float> const
             HostDeviceVector<GradientPair>* out_gpair) {
   // boilerplate
   std::int32_t device_id = ctx->gpu_id;
-#if defined(XGBOOST_USE_CUDA)
   dh::safe_cuda(cudaSetDevice(device_id));
-#elif defined(XGBOOST_USE_HIP)
-  dh::safe_cuda(hipSetDevice(device_id));
-#endif
   auto n_groups = p_cache->Groups();
 
   info.labels.SetDevice(device_id);
@@ -384,11 +378,7 @@ void LambdaRankGetGradientNDCG(Context const* ctx, std::int32_t iter,
                                HostDeviceVector<GradientPair>* out_gpair) {
   // boilerplate
   std::int32_t device_id = ctx->gpu_id;
-#if defined(XGBOOST_USE_CUDA)
   dh::safe_cuda(cudaSetDevice(device_id));
-#elif defined(XGBOOST_USE_HIP)
-  dh::safe_cuda(hipSetDevice(device_id));
-#endif
   auto const d_inv_IDCG = p_cache->InvIDCG(ctx);
   auto const discount = p_cache->Discount(ctx);
 
@@ -456,11 +446,7 @@ void LambdaRankGetGradientMAP(Context const* ctx, std::int32_t iter,
                               linalg::VectorView<double> li, linalg::VectorView<double> lj,
                               HostDeviceVector<GradientPair>* out_gpair) {
   std::int32_t device_id = ctx->gpu_id;
-#if defined(XGBOOST_USE_CUDA)
   dh::safe_cuda(cudaSetDevice(device_id));
-#elif defined(XGBOOST_USE_HIP)
-  dh::safe_cuda(hipSetDevice(device_id));
-#endif
 
   info.labels.SetDevice(device_id);
   predt.SetDevice(device_id);
@@ -499,11 +485,7 @@ void LambdaRankGetGradientPairwise(Context const* ctx, std::int32_t iter,
                                    linalg::VectorView<double> li, linalg::VectorView<double> lj,
                                    HostDeviceVector<GradientPair>* out_gpair) {
   std::int32_t device_id = ctx->gpu_id;
-#if defined(XGBOOST_USE_CUDA)
   dh::safe_cuda(cudaSetDevice(device_id));
-#elif defined(XGBOOST_USE_HIP)
-  dh::safe_cuda(hipSetDevice(device_id));
-#endif
 
   info.labels.SetDevice(device_id);
   predt.SetDevice(device_id);
@@ -597,8 +579,8 @@ void LambdaRankUpdatePositionBias(Context const* ctx, linalg::VectorView<double 
                        if (lj(0) >= Eps64()) {
                          tj_minus(i) = std::pow(lj(i) / lj(0), regularizer);
                        }
-                       assert(!std::isinf(ti_plus(i)));
-                       assert(!std::isinf(tj_minus(i)));
+                       assert(!isinf(ti_plus(i)));
+                       assert(!isinf(tj_minus(i)));
                      });
 }
 }  // namespace cuda_impl
