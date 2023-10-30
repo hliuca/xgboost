@@ -1,7 +1,7 @@
 /**
  * Copyright 2023, XGBoost Contributors
  */
-#if defined(XGBOOST_USE_NCCL)
+#if defined(XGBOOST_USE_NCCL) || defined(XGBOOST_USE_RCCL)
 #include <algorithm>  // for sort
 #include <cstddef>    // for size_t
 #include <cstdint>    // for uint64_t, int8_t

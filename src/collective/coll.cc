@@ -87,7 +87,7 @@ namespace xgboost::collective {
   }
 }
 
-#if !defined(XGBOOST_USE_NCCL)
+#if !defined(XGBOOST_USE_NCCL) && !defined(XGBOOST_USE_RCCL)
 Coll* Coll::MakeCUDAVar() {
   LOG(FATAL) << "NCCL is required for device communication.";
   return nullptr;

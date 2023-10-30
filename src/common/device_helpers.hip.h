@@ -1092,7 +1092,13 @@ class CUDAStreamView {
   operator hipStream_t() const {  // NOLINT
     return stream_;
   }
-  void Sync() { dh::safe_cuda(hipStreamSynchronize(stream_)); }
+  hipError_t Sync(bool error = true) {
+    if (error) {
+      dh::safe_cuda(hipStreamSynchronize(stream_));
+      return hipSuccess;
+    }
+    return hipStreamSynchronize(stream_);
+  }
 };
 
 inline void CUDAEvent::Record(CUDAStreamView stream) {  // NOLINT

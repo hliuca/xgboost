@@ -3,7 +3,7 @@
  */
 #pragma once
 
-#ifdef XGBOOST_USE_NCCL
+#if defined(XGBOOST_USE_NCCL) || defined(XGBOOST_USE_RCCL)
 #include "nccl.h"
 #endif  // XGBOOST_USE_NCCL
 #include "../common/device_helpers.cuh"
