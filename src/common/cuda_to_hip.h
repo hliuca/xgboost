@@ -63,6 +63,7 @@ namespace thrust {
 
 namespace thrust {
     namespace cuda = thrust::hip;
+#define cuda_category hip_category
 }
 
 namespace hipcub {
