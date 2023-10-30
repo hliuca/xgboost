@@ -2,7 +2,7 @@
 // Created by bobwang on 2021/9/8.
 //
 
-#ifndef XGBOOST_USE_CUDA
+#if !defined(XGBOOST_USE_CUDA) && !defined(XGBOOST_USE_HIP)
 
 #include <jni.h>
 

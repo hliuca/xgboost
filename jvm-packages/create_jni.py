@@ -22,6 +22,8 @@ CONFIG = {
 
     "USE_CUDA": "OFF",
     "USE_NCCL": "OFF",
+    "USE_HIP": "OFF",
+    "USE_RCCL": "OFF",
     "JVM_BINDINGS": "ON",
     "LOG_CAPI_INVOCATION": "OFF"
 }
@@ -74,6 +76,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument('--log-capi-invocation', type=str, choices=['ON', 'OFF'], default='OFF')
     parser.add_argument('--use-cuda', type=str, choices=['ON', 'OFF'], default='OFF')
+    parser.add_argument('--use-hip', type=str, choices=['ON', 'OFF'], default='OFF')
     cli_args = parser.parse_args()
 
     if sys.platform == "darwin":
@@ -84,7 +87,7 @@ if __name__ == "__main__":
 
     print("building Java wrapper")
     with cd(".."):
-        build_dir = 'build-gpu' if cli_args.use_cuda == 'ON' else 'build'
+        build_dir = 'build-gpu' if cli_args.use_cuda == 'ON' or cli_args.use_hip == 'ON' else 'build'
         maybe_makedirs(build_dir)
         with cd(build_dir):
             if sys.platform == "win32":
@@ -103,6 +106,9 @@ if __name__ == "__main__":
             if cli_args.use_cuda == 'ON':
                 CONFIG['USE_CUDA'] = 'ON'
                 CONFIG['USE_NCCL'] = 'ON'
+            elif cli_args.use_hip== 'ON':
+                CONFIG['USE_HIP'] = 'ON'
+                CONFIG['USE_RCCL'] = 'ON'
 
             args = ["-D{0}:BOOL={1}".format(k, v) for k, v in CONFIG.items()]
 
@@ -125,8 +131,8 @@ if __name__ == "__main__":
             run(f'"{sys.executable}" mapfeat.py')
             run(f'"{sys.executable}" mknfold.py machine.txt 1')
 
-    xgboost4j = 'xgboost4j-gpu' if cli_args.use_cuda == 'ON' else 'xgboost4j'
-    xgboost4j_spark = 'xgboost4j-spark-gpu' if cli_args.use_cuda == 'ON' else 'xgboost4j-spark'
+    xgboost4j = 'xgboost4j-gpu' if cli_args.use_cuda == 'ON' or cli_args.use_hip== 'ON' else 'xgboost4j'
+    xgboost4j_spark = 'xgboost4j-spark-gpu' if cli_args.use_cuda == 'ON' or cli_args.use_hip == 'ON' else 'xgboost4j-spark'
 
     print("copying native library")
     library_name, os_folder = {
