@@ -20,7 +20,6 @@
 #include "../common/cuda_context.cuh"  // CUDAContext
 #include "../common/device_helpers.cuh"
 #include "../common/hist_util.h"
-#include "../common/io.h"
 #include "../common/timer.h"
 #include "../data/ellpack_page.cuh"
 #include "../data/ellpack_page.h"
@@ -40,7 +39,6 @@
 #include "xgboost/data.h"
 #include "xgboost/host_device_vector.h"
 #include "xgboost/json.h"
-#include "xgboost/parameter.h"
 #include "xgboost/span.h"
 #include "xgboost/task.h"  // for ObjInfo
 #include "xgboost/tree_model.h"
