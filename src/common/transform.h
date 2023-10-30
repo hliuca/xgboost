@@ -143,11 +143,7 @@ class Transform {
       size_t shard_size = range_size;
       Range shard_range {0, static_cast<Range::DifferenceType>(shard_size)};
 
-#if defined(XGBOOST_USE_HIP)
-      dh::safe_cuda(hipSetDevice(device_));
-#elif defined(XGBOOST_USE_CUDA)
       dh::safe_cuda(cudaSetDevice(device_));
-#endif
 
       const int kGrids =
           static_cast<int>(DivRoundUp(*(range_.end()), kBlockThreads));
