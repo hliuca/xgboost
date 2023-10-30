@@ -15,6 +15,10 @@ class BuildConfiguration:  # pylint: disable=R0902
     use_cuda: bool = False
     # Whether to enable NCCL
     use_nccl: bool = False
+    # Whether to enablea HIP 
+    use_hip: bool = False
+    # Whether to enable RCCL
+    use_rccl: bool = False
     # Whether to enable HDFS
     use_hdfs: bool = False
     # Whether to enable Azure Storage
