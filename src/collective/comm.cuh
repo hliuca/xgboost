@@ -3,8 +3,11 @@
  */
 #pragma once
 
-#if defined(XGBOOST_USE_NCCL) || defined(XGBOOST_USE_RCCL)
+#if defined(XGBOOST_USE_NCCL)
 #include "nccl.h"
+#elif defined(XGBOOST_USE_RCCL)
+#include "../common/cuda_to_hip.h"
+#include "rccl.h"
 #endif  // XGBOOST_USE_NCCL
 #include "../common/device_helpers.cuh"
 #include "coll.h"
@@ -17,7 +20,11 @@ inline Result GetCUDAResult(cudaError rc) {
   if (rc == cudaSuccess) {
     return Success();
   }
+#if defined(XGBOOST_USE_NCCL)
   std::string msg = thrust::system_error(rc, thrust::cuda_category()).what();
+#elif defined(XGBOOST_USE_RCCL)
+  std::string msg = thrust::system_error(rc, thrust::hip_category()).what();
+#endif
   return Fail(msg);
 }
 

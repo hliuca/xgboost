@@ -6,7 +6,9 @@
 #if defined(XGBOOST_USE_HIP)
 
 #define cudaSuccess                  hipSuccess
+#define cudaError                    hipError_t
 #define cudaGetLastError             hipGetLastError
+#define cudaPeekAtLastError          hipPeekAtLastError
 
 #define cudaStream_t                 hipStream_t
 #define cudaStreamCreate             hipStreamCreate
