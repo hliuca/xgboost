@@ -57,8 +57,8 @@
 
 /* hipMemoryTypeUnregistered not supported */
 #define cudaMemoryTypeUnregistered                          hipMemoryTypeUnified
-#define cudaMemoryTypeHost                                  hipMemoryTypeHost
 #define cudaMemoryTypeUnified                               hipMemoryTypeUnified
+#define cudaMemoryTypeHost                                  hipMemoryTypeHost
 
 #define cudaMemGetInfo                                      hipMemGetInfo
 #define cudaFuncSetAttribute                                hipFuncSetAttribute
