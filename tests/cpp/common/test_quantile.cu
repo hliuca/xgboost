@@ -3,17 +3,10 @@
  */
 #include <gtest/gtest.h>
 
-#if defined(XGBOOST_USE_CUDA)
 #include "../../../src/collective/communicator-inl.cuh"
 #include "../../../src/common/hist_util.cuh"
 #include "../../../src/common/quantile.cuh"
 #include "../../../src/data/device_adapter.cuh"  // CupyAdapter
-#elif defined(XGBOOST_USE_HIP)
-#include "../../../src/collective/communicator-inl.hip.h"
-#include "../../../src/common/hist_util.hip.h"
-#include "../../../src/common/quantile.hip.h"
-#include "../../../src/data/device_adapter.hip.h"  // CupyAdapter
-#endif
 #include "../helpers.h"
 #include "test_quantile.h"
 

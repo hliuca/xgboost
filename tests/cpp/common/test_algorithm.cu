@@ -9,13 +9,8 @@
 #include <algorithm>          // is_sorted
 #include <cstddef>            // size_t
 
-#if defined(XGBOOST_USE_CUDA)
 #include "../../../src/common/algorithm.cuh"
 #include "../../../src/common/device_helpers.cuh"
-#elif defined(XGBOOST_USE_HIP)
-#include "../../../src/common/algorithm.hip.h"
-#include "../../../src/common/device_helpers.hip.h"
-#endif
 #include "../helpers.h"  // CreateEmptyGenericParam
 
 namespace xgboost {

@@ -2,12 +2,7 @@
  * Copyright 2021-2023 by XGBoost Contributors
  */
 #include <gtest/gtest.h>
-
-#if defined(XGBOOST_USE_CUDA)
 #include "../../../src/common/linalg_op.cuh"
-#elif defined(XGBOOST_USE_HIP)
-#include "../../../src/common/linalg_op.hip.h"
-#endif
 #include "../helpers.h"
 #include "xgboost/context.h"
 #include "xgboost/linalg.h"

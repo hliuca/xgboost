@@ -1,9 +1,5 @@
 #include "../../../src/common/compressed_iterator.h"
-#if defined(XGBOOST_USE_CUDA)
 #include "../../../src/common/device_helpers.cuh"
-#elif defined(XGBOOST_USE_HIP)
-#include "../../../src/common/device_helpers.hip.h"
-#endif
 #include "gtest/gtest.h"
 #include <algorithm>
 #include <thrust/device_vector.h>

@@ -4,11 +4,7 @@
 #include <gtest/gtest.h>
 #include <thrust/host_vector.h>
 
-#if defined(XGBOOST_USE_CUDA)
 #include "../../../../src/tree/gpu_hist/evaluate_splits.cuh"
-#elif defined(XGBOOST_USE_HIP)
-#include "../../../../src/tree/gpu_hist/evaluate_splits.hip.h"
-#endif
 #include "../../helpers.h"
 #include "../../histogram_helpers.h"
 #include "../test_evaluate_splits.h"  // TestPartitionBasedSplit

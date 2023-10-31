@@ -7,11 +7,7 @@
 
 #include "../../../src/common/categorical.h"
 #include "../../../src/common/hist_util.h"
-#if defined(XGBOOST_USE_CUDA)
 #include "../../../src/data/ellpack_page.cuh"
-#elif defined(XGBOOST_USE_HIP)
-#include "../../../src/data/ellpack_page.hip.h"
-#endif
 #include "../../../src/data/ellpack_page.h"
 #include "../../../src/tree/param.h"  // TrainParam
 #include "../helpers.h"
