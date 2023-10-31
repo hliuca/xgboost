@@ -49,7 +49,7 @@ Result ConnectTrackerImpl(proto::PeerInfo info, std::chrono::seconds timeout, st
                             this->Rank(), this->World());
 }
 
-#if !defined(XGBOOST_USE_NCCL)
+#if !defined(XGBOOST_USE_NCCL) && !defined(XGBOOST_USE_RCCL)
 Comm* Comm::MakeCUDAVar(Context const*, std::shared_ptr<Coll>) const {
   common::AssertGPUSupport();
   common::AssertNCCLSupport();

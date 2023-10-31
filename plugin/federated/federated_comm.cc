@@ -120,7 +120,7 @@ FederatedComm::FederatedComm(Json const& config) {
              client_cert);
 }
 
-#if !defined(XGBOOST_USE_CUDA)
+#if !defined(XGBOOST_USE_CUDA) && !defined(XGBOOST_USE_HIP)
 Comm* FederatedComm::MakeCUDAVar(Context const*, std::shared_ptr<Coll>) const {
   common::AssertGPUSupport();
   return nullptr;
