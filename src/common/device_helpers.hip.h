@@ -1109,7 +1109,7 @@ inline CUDAStreamView DefaultStream() {
 #ifdef HIP_API_PER_THREAD_DEFAULT_STREAM
   return CUDAStreamView{hipStreamPerThread};
 #else
-  return CUDAStreamView{hipStreamDefault};
+  return CUDAStreamView{hipStreamLegacy};
 #endif
 }
 

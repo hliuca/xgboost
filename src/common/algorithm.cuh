@@ -32,6 +32,7 @@
 namespace xgboost {
 namespace common {
 namespace detail {
+
 // Wrapper around cub sort to define is_decending
 template <bool IS_DESCENDING, typename KeyT, typename BeginOffsetIteratorT,
           typename EndOffsetIteratorT>
@@ -56,13 +57,13 @@ static void DeviceSegmentedRadixSortKeys(CUDAContext const *ctx, void *d_temp_st
                                     end_bit, false, ctx->Stream(), debug_synchronous)));
 #elif defined(XGBOOST_USE_HIP)
   if (IS_DESCENDING) {
-      rocprim::segmented_radix_sort_pairs_desc<KeyT, hipcub::NullType, BeginOffsetIteratorT>(d_temp_storage,
+      rocprim::segmented_radix_sort_pairs_desc<KeyT, cub::NullType, BeginOffsetIteratorT>(d_temp_storage,
               temp_storage_bytes, d_keys_in, d_keys_out, nullptr, nullptr, num_items,
               num_segments, d_begin_offsets, d_end_offsets,
               begin_bit, end_bit, ctx->Stream(), debug_synchronous);
   }
   else {
-      rocprim::segmented_radix_sort_pairs<KeyT, hipcub::NullType, BeginOffsetIteratorT>(d_temp_storage,
+      rocprim::segmented_radix_sort_pairs<KeyT, cub::NullType, BeginOffsetIteratorT>(d_temp_storage,
               temp_storage_bytes, d_keys_in, d_keys_out, nullptr, nullptr, num_items,
               num_segments, d_begin_offsets, d_end_offsets,
               begin_bit, end_bit, ctx->Stream(), debug_synchronous);
