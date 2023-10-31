@@ -8,15 +8,9 @@
 #include <string>
 #include <bitset>
 #include <set>
-#if defined(XGBOOST_USE_CUDA)
 #include "../../../src/tree/constraints.cuh"
 #include "../../../src/tree/param.h"
 #include "../../../src/common/device_helpers.cuh"
-#elif defined(XGBOOST_USE_HIP)
-#include "../../../src/tree/constraints.hip.h"
-#include "../../../src/tree/param.h"
-#include "../../../src/common/device_helpers.hip.h"
-#endif
 
 namespace xgboost {
 namespace {

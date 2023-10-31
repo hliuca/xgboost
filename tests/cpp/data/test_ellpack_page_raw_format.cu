@@ -5,11 +5,7 @@
 #include <xgboost/data.h>
 
 #include "../../../src/common/io.h"  // for PrivateMmapConstStream, AlignedResourceReadStream...
-#if defined(XGBOOST_USE_CUDA)
 #include "../../../src/data/ellpack_page.cuh"
-#elif defined(XGBOOST_USE_HIP)
-#include "../../../src/data/ellpack_page.hip.h"
-#endif
 #include "../../../src/data/sparse_page_source.h"
 #include "../../../src/tree/param.h"  // TrainParam
 #include "../filesystem.h"            // dmlc::TemporaryDirectory

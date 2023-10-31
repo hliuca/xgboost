@@ -11,17 +11,10 @@
 #include <numeric>                                 // for iota
 #include <vector>                                  // for vector
 
-#if defined(XGBOOST_USE_CUDA)
 #include "../../../src/common/algorithm.cuh"       // for SegmentedSequence
 #include "../../../src/common/cuda_context.cuh"    // for CUDAContext
 #include "../../../src/common/device_helpers.cuh"  // for device_vector, ToSpan
 #include "../../../src/common/ranking_utils.cuh"   // for CalcQueriesInvIDCG
-#elif defined(XGBOOST_USE_HIP)
-#include "../../../src/common/algorithm.hip.h"       // for SegmentedSequence
-#include "../../../src/common/cuda_context.hip.h"    // for CUDAContext
-#include "../../../src/common/device_helpers.hip.h"  // for device_vector, ToSpan
-#include "../../../src/common/ranking_utils.hip.h"   // for CalcQueriesInvIDCG
-#endif
 #include "../../../src/common/ranking_utils.h"     // for LambdaRankParam, RankingCache
 #include "../helpers.h"                            // for EmptyDMatrix
 #include "test_ranking_utils.h"                    // for TestNDCGCache

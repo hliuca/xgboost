@@ -7,13 +7,8 @@
 #include <cstdint>                               // for uint32_t
 #include <vector>                                // for vector
 
-#if defined(XGBOOST_USE_CUDA)
 #include "../../../src/common/cuda_context.cuh"  // for CUDAContext
 #include "../../../src/objective/lambdarank_obj.cuh"
-#elif defined(XGBOOST_USE_HIP)
-#include "../../../src/common/cuda_context.hip.h"  // for CUDAContext
-#include "../../../src/objective/lambdarank_obj.hip.h"
-#endif
 #include "test_lambdarank_obj.h"
 
 namespace xgboost::obj {

@@ -6,13 +6,8 @@
 #include <vector>
 
 #include "../../../../src/common/categorical.h"
-#if defined(XGBOOST_USE_CUDA)
 #include "../../../../src/tree/gpu_hist/histogram.cuh"
 #include "../../../../src/tree/gpu_hist/row_partitioner.cuh"
-#elif defined(XGBOOST_USE_HIP)
-#include "../../../../src/tree/gpu_hist/histogram.hip.h"
-#include "../../../../src/tree/gpu_hist/row_partitioner.hip.h"
-#endif
 #include "../../../../src/tree/param.h"  // TrainParam
 #include "../../categorical_helpers.h"
 #include "../../helpers.h"

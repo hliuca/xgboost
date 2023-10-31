@@ -5,12 +5,7 @@
 #include <gtest/gtest.h>
 #include <thrust/equal.h>
 #include <thrust/iterator/counting_iterator.h>
-
-#if defined(XGBOOST_USE_CUDA)
 #include "../../../src/common/device_helpers.cuh"
-#elif defined(XGBOOST_USE_HIP)
-#include "../../../src/common/device_helpers.hip.h"
-#endif
 #include <xgboost/host_device_vector.h>
 
 namespace xgboost {

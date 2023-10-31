@@ -3,13 +3,8 @@
  */
 #include <gtest/gtest.h>
 
-#if defined(XGBOOST_USE_CUDA)
 #include "../../../src/data/device_adapter.cuh"
 #include "../../../src/data/ellpack_page.cuh"
-#elif defined(XGBOOST_USE_HIP)
-#include "../../../src/data/device_adapter.hip.h"
-#include "../../../src/data/ellpack_page.hip.h"
-#endif
 #include "../../../src/data/ellpack_page.h"
 #include "../../../src/data/iterative_dmatrix.h"
 #include "../../../src/tree/param.h"  // TrainParam

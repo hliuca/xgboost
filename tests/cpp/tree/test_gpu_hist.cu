@@ -11,17 +11,10 @@
 #include <vector>
 
 #include "../../../src/common/common.h"
-#if defined(XGBOOST_USE_CUDA)
 #include "../../../src/data/ellpack_page.cuh"  // for EllpackPageImpl
 #include "../../../src/data/ellpack_page.h"    // for EllpackPage
 #include "../../../src/tree/param.h"  // for TrainParam
 #include "../../../src/tree/updater_gpu_hist.cu"
-#elif defined(XGBOOST_USE_HIP)
-#include "../../../src/data/ellpack_page.hip.h"  // for EllpackPageImpl
-#include "../../../src/data/ellpack_page.h"    // for EllpackPage
-#include "../../../src/tree/param.h"  // for TrainParam
-#include "../../../src/tree/updater_gpu_hist.hip"
-#endif
 #include "../filesystem.h"  // dmlc::TemporaryDirectory
 #include "../helpers.h"
 #include "../histogram_helpers.h"
