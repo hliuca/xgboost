@@ -171,7 +171,7 @@ inline void AssertGPUSupport() {
 }
 
 inline void AssertNCCLSupport() {
-#if !defined(XGBOOST_USE_NCCL)
+#if !defined(XGBOOST_USE_NCCL) && !defined(XGBOOST_USE_RCCL)
     LOG(FATAL) << "XGBoost version not compiled with NCCL support.";
 #endif  // !defined(XGBOOST_USE_NCCL)
 }

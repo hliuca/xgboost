@@ -23,6 +23,7 @@ void XGBBuildInfoDevice(Json *p_info) {
 #if defined(XGBOOST_USE_CUDA)
   info["USE_CUDA"] = true;
 #elif defined(XGBOOST_USE_HIP)
+  info["USE_CUDA"] = true;
   info["USE_HIP"] = true;
 #endif
 
@@ -38,9 +39,11 @@ void XGBBuildInfoDevice(Json *p_info) {
   v = {Json{Integer{NCCL_MAJOR}}, Json{Integer{NCCL_MINOR}}, Json{Integer{NCCL_PATCH}}};
   info["NCCL_VERSION"] = v;
 #elif defined(XGBOOST_USE_RCCL)
+  info["USE_NCCL"] = Boolean{true};
   info["USE_RCCL"] = Boolean{true};
   v = {Json{Integer{NCCL_MAJOR}}, Json{Integer{NCCL_MINOR}}, Json{Integer{NCCL_PATCH}}};
   info["RCCL_VERSION"] = v;
+  info["NCCL_VERSION"] = v;
 #else
   info["USE_NCCL"] = Boolean{false};
   info["USE_RCCL"] = Boolean{false};
