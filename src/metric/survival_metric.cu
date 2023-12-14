@@ -218,7 +218,7 @@ struct EvalEWiseSurvivalBase : public MetricNoCache {
     return Policy::GetFinal(dat[0], dat[1]);
   }
 
-  const char* Name() const override {
+  [[nodiscard]] const char* Name() const override {
     return policy_.Name();
   }
 

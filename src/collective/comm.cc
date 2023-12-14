@@ -5,6 +5,7 @@
 
 #include <algorithm>  // for copy
 #include <chrono>     // for seconds
+#include <cstdlib>    // for exit
 #include <memory>     // for shared_ptr
 #include <string>     // for string
 #include <utility>    // for move, forward
@@ -29,33 +30,34 @@ Comm::Comm(std::string const& host, std::int32_t port, std::chrono::seconds time
 Result ConnectTrackerImpl(proto::PeerInfo info, std::chrono::seconds timeout, std::int32_t retry,
                           std::string const& task_id, TCPSocket* out, std::int32_t rank,
                           std::int32_t world) {
-  // get information from tracker
+  // Get information from the tracker
   CHECK(!info.host.empty());
-  auto rc = Connect(info.host, info.port, retry, timeout, out);
-  if (!rc.OK()) {
-    return Fail("Failed to connect to the tracker.", std::move(rc));
-  }
-
   TCPSocket& tracker = *out;
-  return std::move(rc)
-      << [&] { return tracker.NonBlocking(false); }
-      << [&] { return tracker.RecvTimeout(timeout); }
-      << [&] { return proto::Magic{}.Verify(&tracker); }
-      << [&] { return proto::Connect{}.WorkerSend(&tracker, world, rank, task_id); };
+  return Success() << [&] {
+    auto rc = Connect(info.host, info.port, retry, timeout, out);
+    if (rc.OK()) {
+      return rc;
+    } else {
+      return Fail("Failed to connect to the tracker.", std::move(rc));
+    }
+  } << [&] {
+    return tracker.NonBlocking(false);
+  } << [&] {
+    return tracker.RecvTimeout(timeout);
+  } << [&] {
+    return proto::Magic{}.Verify(&tracker);
+  } << [&] {
+    return proto::Connect{}.WorkerSend(&tracker, world, rank, task_id);
+  } << [&] {
+    LOG(INFO) << "Task " << task_id << " connected to the tracker";
+    return Success();
+  };
 }
 
 [[nodiscard]] Result Comm::ConnectTracker(TCPSocket* out) const {
   return ConnectTrackerImpl(this->TrackerInfo(), this->Timeout(), this->retry_, this->task_id_, out,
                             this->Rank(), this->World());
 }
-
-#if !defined(XGBOOST_USE_NCCL) && !defined(XGBOOST_USE_RCCL)
-Comm* Comm::MakeCUDAVar(Context const*, std::shared_ptr<Coll>) const {
-  common::AssertGPUSupport();
-  common::AssertNCCLSupport();
-  return nullptr;
-}
-#endif  //  !defined(XGBOOST_USE_NCCL)
 
 [[nodiscard]] Result ConnectWorkers(Comm const& comm, TCPSocket* listener, std::int32_t lport,
                                     proto::PeerInfo ninfo, std::chrono::seconds timeout,
@@ -181,11 +183,20 @@ Comm* Comm::MakeCUDAVar(Context const*, std::shared_ptr<Coll>) const {
 }
 
 RabitComm::RabitComm(std::string const& host, std::int32_t port, std::chrono::seconds timeout,
-                     std::int32_t retry, std::string task_id)
-    : Comm{std::move(host), port, timeout, retry, std::move(task_id)} {
+                     std::int32_t retry, std::string task_id, StringView nccl_path)
+    : HostComm{std::move(host), port, timeout, retry, std::move(task_id)},
+      nccl_path_{std::move(nccl_path)} {
   auto rc = this->Bootstrap(timeout_, retry_, task_id_);
   CHECK(rc.OK()) << rc.Report();
 }
+
+#if !defined(XGBOOST_USE_NCCL) && !defined(XGBOOST_USE_RCCL)
+Comm* RabitComm::MakeCUDAVar(Context const*, std::shared_ptr<Coll>) const {
+  common::AssertGPUSupport();
+  common::AssertNCCLSupport();
+  return nullptr;
+}
+#endif  //  !defined(XGBOOST_USE_NCCL)
 
 [[nodiscard]] Result RabitComm::Bootstrap(std::chrono::seconds timeout, std::int32_t retry,
                                           std::string task_id) {
@@ -209,24 +220,18 @@ RabitComm::RabitComm(std::string const& host, std::int32_t port, std::chrono::se
   std::shared_ptr<TCPSocket> error_sock{TCPSocket::CreatePtr(domain)};
   auto eport = error_sock->BindHost();
   error_sock->Listen();
-  error_worker_ = std::thread{[this, error_sock = std::move(error_sock)] {
+  error_worker_ = std::thread{[error_sock = std::move(error_sock)] {
     auto conn = error_sock->Accept();
-    // On Windows accept returns an invalid socket after network is shutdown.
+    // On Windows, accept returns a closed socket after finalize.
     if (conn.IsClosed()) {
       return;
     }
     LOG(WARNING) << "Another worker is running into error.";
-    std::string scmd;
-    conn.Recv(&scmd);
-    auto jcmd = Json::Load(scmd);
-    auto rc = this->Shutdown();
-    if (!rc.OK()) {
-      LOG(WARNING) << "Fail to shutdown worker:" << rc.Report();
-    }
 #if !defined(XGBOOST_STRICT_R_MODE) || XGBOOST_STRICT_R_MODE == 0
-    exit(-1);
+    // exit is nicer than abort as the former performs cleanups.
+    std::exit(-1);
 #else
-    LOG(FATAL) << rc.Report();
+    LOG(FATAL) << "abort";
 #endif
   }};
   error_worker_.detach();
@@ -259,8 +264,8 @@ RabitComm::RabitComm(std::string const& host, std::int32_t port, std::chrono::se
   CHECK(this->channels_.empty());
   for (auto& w : workers) {
     if (w) {
-      w->SetNoDelay();
-      rc = w->NonBlocking(true);
+      rc = std::move(rc) << [&] { return w->SetNoDelay(); } << [&] { return w->NonBlocking(true); }
+                         << [&] { return w->SetKeepAlive(); };
     }
     if (!rc.OK()) {
       return rc;

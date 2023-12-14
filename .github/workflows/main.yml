@@ -29,7 +29,7 @@ jobs:
       run: |
         mkdir build
         cd build
-        cmake .. -DGOOGLE_TEST=ON -DUSE_OPENMP=ON -DUSE_DMLC_GTEST=ON -DPLUGIN_DENSE_PARSER=ON -GNinja -DBUILD_DEPRECATED_CLI=ON
+        cmake .. -DGOOGLE_TEST=ON -DUSE_OPENMP=ON -DUSE_DMLC_GTEST=ON -GNinja -DBUILD_DEPRECATED_CLI=ON
         ninja -v
     - name: Run gtest binary
       run: |
@@ -62,6 +62,45 @@ jobs:
       run: |
         cd build
         ctest --extra-verbose
+
+  gtest-cpu-sycl:
+    name: Test Google C++ unittest (CPU SYCL)
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest]
+        python-version: ["3.8"]
+    steps:
+    - uses: actions/checkout@e2f20e631ae6d7dd3b768f56a5d2af784dd54791 # v2.5.0
+      with:
+        submodules: 'true'
+    - uses: mamba-org/provision-with-micromamba@f347426e5745fe3dfc13ec5baf20496990d0281f # v14
+      with:
+        cache-downloads: true
+        cache-env: true
+        environment-name: linux_sycl_test
+        environment-file: tests/ci_build/conda_env/linux_sycl_test.yml
+
+    - name: Display Conda env
+      run: |
+        conda info
+        conda list
+    - name: Build and install XGBoost
+      shell: bash -l {0}
+      run: |
+        mkdir build
+        cd build
+        cmake .. -DGOOGLE_TEST=ON -DUSE_DMLC_GTEST=ON -DPLUGIN_SYCL=ON -DCMAKE_INSTALL_PREFIX=$CONDA_PREFIX
+        make -j$(nproc)
+    - name: Run gtest binary for SYCL
+      run: |
+        cd build
+        ./testxgboost --gtest_filter=Sycl*
+    - name: Run gtest binary for non SYCL
+      run: |
+        cd build
+        ./testxgboost --gtest_filter=-Sycl*
 
   c-api-demo:
     name: Test installing XGBoost lib + building the C API demo
@@ -144,11 +183,5 @@ jobs:
         python -m pip install wheel setuptools cmakelint cpplint pylint
     - name: Run lint
       run: |
-        python3 tests/ci_build/lint_cpp.py xgboost cpp R-package/src
-
-        python3 tests/ci_build/lint_cpp.py xgboost cpp include src python-package \
-            --exclude_path python-package/xgboost/dmlc-core python-package/xgboost/include \
-                           python-package/xgboost/lib python-package/xgboost/rabit \
-                           python-package/xgboost/src
-
+        python3 tests/ci_build/lint_cpp.py
         sh ./tests/ci_build/lint_cmake.sh

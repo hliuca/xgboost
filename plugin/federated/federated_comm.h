@@ -10,12 +10,12 @@
 #include <memory>   // for unique_ptr
 #include <string>   // for string
 
-#include "../../src/collective/comm.h"    // for Comm
+#include "../../src/collective/comm.h"    // for HostComm
 #include "../../src/common/json_utils.h"  // for OptionalArg
 #include "xgboost/json.h"
 
 namespace xgboost::collective {
-class FederatedComm : public Comm {
+class FederatedComm : public HostComm {
   std::shared_ptr<federated::Federated::Stub> stub_;
 
   void Init(std::string const& host, std::int32_t port, std::int32_t world, std::int32_t rank,
@@ -26,6 +26,10 @@ class FederatedComm : public Comm {
   explicit FederatedComm(std::shared_ptr<FederatedComm const> that) : stub_{that->stub_} {
     this->rank_ = that->Rank();
     this->world_ = that->World();
+
+    this->retry_ = that->Retry();
+    this->timeout_ = that->Timeout();
+    this->task_id_ = that->TaskID();
 
     this->tracker_ = that->TrackerInfo();
   }
@@ -41,7 +45,8 @@ class FederatedComm : public Comm {
    * - federated_client_key_path
    * - federated_client_cert_path
    */
-  explicit FederatedComm(Json const& config);
+  explicit FederatedComm(std::int32_t retry, std::chrono::seconds timeout, std::string task_id,
+                         Json const& config);
   explicit FederatedComm(std::string const& host, std::int32_t port, std::int32_t world,
                          std::int32_t rank) {
     this->Init(host, port, world, rank, {}, {}, {});
@@ -59,6 +64,6 @@ class FederatedComm : public Comm {
   [[nodiscard]] bool IsFederated() const override { return true; }
   [[nodiscard]] federated::Federated::Stub* Handle() const { return stub_.get(); }
 
-  Comm* MakeCUDAVar(Context const* ctx, std::shared_ptr<Coll> pimpl) const override;
+  [[nodiscard]] Comm* MakeCUDAVar(Context const* ctx, std::shared_ptr<Coll> pimpl) const override;
 };
 }  // namespace xgboost::collective
