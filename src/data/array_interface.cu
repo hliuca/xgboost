@@ -20,7 +20,6 @@ void ArrayInterfaceHandler::SyncCudaStream(std::int64_t stream) {
        *   case where 0 might be given should either use None, 1, or 2 instead for
        *   clarity.
        */
-    /* ignored for HIP */
 #if !defined(XGBOOST_USE_HIP)
       LOG(FATAL) << "Invalid stream ID in array interface: " << stream;
 #endif
@@ -42,7 +41,7 @@ bool ArrayInterfaceHandler::IsCudaPtr(void const* ptr) {
     return false;
   }
 
-#if defined(XGBOOST_USE_CUDA) || defined(XGBOOST_USE_HIP)
+#if defined(XGBOOST_USE_CUDA)
   cudaPointerAttributes attr;
   auto err = cudaPointerGetAttributes(&attr, ptr);
   // reset error
@@ -62,6 +61,35 @@ bool ArrayInterfaceHandler::IsCudaPtr(void const* ptr) {
     return true;
   } else {
     // other errors, `cudaErrorNoDevice`, `cudaErrorInsufficientDriver` etc.
+    return false;
+  }
+#elif defined(XGBOOST_USE_HIP)
+  hipPointerAttribute_t attr;
+  auto err = hipPointerGetAttributes(&attr, ptr);
+  // reset error
+  CHECK_EQ(err, hipGetLastError());
+  if (err == hipErrorInvalidValue) {
+    return false;
+  } else if (err == hipSuccess) {
+#if HIP_VERSION_MAJOR < 6
+    switch (attr.memoryType) {
+      case hipMemoryTypeUnified:
+      case hipMemoryTypeHost:
+        return false;
+      default:
+        return true;
+    }
+#else
+    switch (attr.type) {
+      case hipMemoryTypeUnified:
+      case hipMemoryTypeHost:
+        return false;
+      default:
+        return true;
+    }
+#endif
+    return true;
+  } else {
     return false;
   }
 #endif
