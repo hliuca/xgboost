@@ -71,6 +71,7 @@ bool ArrayInterfaceHandler::IsCudaPtr(void const* ptr) {
   if (err == hipErrorInvalidValue) {
     return false;
   } else if (err == hipSuccess) {
+#if HIP_VERSION_MAJOR < 6
     switch (attr.memoryType) {
       case hipMemoryTypeUnified:
       case hipMemoryTypeHost:
@@ -78,6 +79,15 @@ bool ArrayInterfaceHandler::IsCudaPtr(void const* ptr) {
       default:
         return true;
     }
+#else
+    switch (attr.type) {
+      case hipMemoryTypeUnified:
+      case hipMemoryTypeHost:
+        return false;
+      default:
+        return true;
+    }
+#endif
     return true;
   } else {
     return false;
