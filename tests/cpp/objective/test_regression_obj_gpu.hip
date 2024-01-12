@@ -1,2 +1,2 @@
 
-#include "test_regression_obj.cc"
+#include "test_regression_obj_gpu.cu"

@@ -40,10 +40,6 @@
 #include "xgboost/logging.h"
 #include "xgboost/span.h"
 
-#ifdef XGBOOST_USE_RCCL
-#include "rccl.h"
-#endif  // XGBOOST_USE_RCCL
-
 #if defined(XGBOOST_USE_RMM) && XGBOOST_USE_RMM == 1
 #include "rmm/mr/device/per_device_resource.hpp"
 #include "rmm/mr/device/thrust_allocator_adaptor.hpp"
@@ -97,30 +93,6 @@ XGBOOST_DEV_INLINE T atomicAdd(T *addr, T v) {  // NOLINT
   return static_cast<T>(ret);
 }
 namespace dh {
-
-#ifdef XGBOOST_USE_RCCL
-#define safe_nccl(ans) ThrowOnNcclError((ans), __FILE__, __LINE__)
-
-inline ncclResult_t ThrowOnNcclError(ncclResult_t code, const char *file, int line) {
-  if (code != ncclSuccess) {
-    std::stringstream ss;
-    ss << "RCCL failure: " << ncclGetErrorString(code) << ".";
-    ss << " " << file << "(" << line << ")\n";
-    if (code == ncclUnhandledCudaError) {
-      // nccl usually preserves the last error so we can get more details.
-      auto err = hipPeekAtLastError();
-      ss << "  CUDA error: " << thrust::system_error(err, thrust::hip_category()).what() << "\n";
-    } else if (code == ncclSystemError) {
-      ss << "  This might be caused by a network configuration issue. Please consider specifying "
-            "the network interface for RCCL via environment variables listed in its reference: "
-            "`https://docs.nvidia.com/deeplearning/nccl/user-guide/docs/env.html`.\n";
-    }
-    LOG(FATAL) << ss.str();
-  }
-
-  return code;
-}
-#endif
 
 inline int32_t CudaGetPointerDevice(void const *ptr) {
   int32_t device = -1;
@@ -298,8 +270,8 @@ inline void LaunchN(size_t n, L lambda) {
 }
 
 template <typename Container>
-void Iota(Container array) {
-  LaunchN(array.size(), [=] __device__(size_t i) { array[i] = i; });
+void Iota(Container array, cudaStream_t stream) {
+  LaunchN(array.size(), stream, [=] __device__(size_t i) { array[i] = i; });
 }
 
 namespace detail {
@@ -465,7 +437,8 @@ struct XGBCachingDeviceAllocatorImpl : XGBBaseDeviceAllocator<T> {
   hipcub::CachingDeviceAllocator& GetGlobalCachingAllocator() {
     // Configure allocator with maximum cached bin size of ~1GB and no limit on
     // maximum cached bytes
-    static hipcub::CachingDeviceAllocator *allocator = new hipcub::CachingDeviceAllocator(2, 9, 29);
+    thread_local std::unique_ptr<hipcub::CachingDeviceAllocator> allocator{
+        std::make_unique<hipcub::CachingDeviceAllocator>(2, 9, 29)};
     return *allocator;
   }
   pointer allocate(size_t n) {  // NOLINT
@@ -580,6 +553,16 @@ class DoubleBuffer {
 
   T *Other() { return buff.Alternate(); }
 };
+
+template <typename T>
+xgboost::common::Span<T> LazyResize(xgboost::Context const *ctx,
+                                    xgboost::HostDeviceVector<T> *buffer, std::size_t n) {
+  buffer->SetDevice(ctx->Device());
+  if (buffer->Size() < n) {
+    buffer->Resize(n);
+  }
+  return buffer->DeviceSpan().subspan(0, n);
+}
 
 /**
  * \brief Copies device span to std::vector.
@@ -1017,49 +1000,6 @@ void InclusiveSum(InputIteratorT d_in, OutputIteratorT d_out, OffsetT num_items)
   InclusiveScan(d_in, d_out, hipcub::Sum(), num_items);
 }
 
-template <bool accending, typename IdxT, typename U>
-void ArgSort(xgboost::common::Span<U> keys, xgboost::common::Span<IdxT> sorted_idx) {
-  size_t bytes = 0;
-  Iota(sorted_idx);
-
-  using KeyT = typename decltype(keys)::value_type;
-  using ValueT = std::remove_const_t<IdxT>;
-
-  TemporaryArray<KeyT> out(keys.size());
-  TemporaryArray<IdxT> sorted_idx_out(sorted_idx.size());
-
-  // track https://github.com/NVIDIA/cub/pull/340 for 64bit length support
-  using OffsetT = std::conditional_t<!BuildWithCUDACub(), std::ptrdiff_t, int32_t>;
-  CHECK_LE(sorted_idx.size(), std::numeric_limits<OffsetT>::max());
-  if (accending) {
-    void *d_temp_storage = nullptr;
-
-    safe_cuda((rocprim::radix_sort_pairs(d_temp_storage,
-                    bytes, keys.data(), out.data().get(), sorted_idx.data(), sorted_idx_out.data().get(), sorted_idx.size(), 0,
-                    sizeof(KeyT) * 8)));
-
-    TemporaryArray<char> storage(bytes);
-    d_temp_storage = storage.data().get();
-    safe_cuda((rocprim::radix_sort_pairs(d_temp_storage,
-                    bytes, keys.data(), out.data().get(), sorted_idx.data(), sorted_idx_out.data().get(), sorted_idx.size(), 0,
-                    sizeof(KeyT) * 8)));
-  } else {
-    void *d_temp_storage = nullptr;
-
-    safe_cuda((rocprim::radix_sort_pairs_desc(d_temp_storage,
-                    bytes, keys.data(), out.data().get(), sorted_idx.data(), sorted_idx_out.data().get(), sorted_idx.size(), 0,
-                    sizeof(KeyT) * 8)));
-    TemporaryArray<char> storage(bytes);
-    d_temp_storage = storage.data().get();
-    safe_cuda((rocprim::radix_sort_pairs_desc(d_temp_storage,
-                    bytes, keys.data(), out.data().get(), sorted_idx.data(), sorted_idx_out.data().get(), sorted_idx.size(), 0,
-                    sizeof(KeyT) * 8)));
-  }
-
-  safe_cuda(hipMemcpyAsync(sorted_idx.data(), sorted_idx_out.data().get(),
-                            sorted_idx.size_bytes(), hipMemcpyDeviceToDevice));
-}
-
 class CUDAStreamView;
 
 class CUDAEvent {
@@ -1105,6 +1045,8 @@ inline void CUDAEvent::Record(CUDAStreamView stream) {  // NOLINT
   dh::safe_cuda(hipEventRecord(event_, hipStream_t{stream}));
 }
 
+// Changing this has effect on prediction return, where we need to pass the pointer to
+// third-party libraries like cuPy
 inline CUDAStreamView DefaultStream() {
 #ifdef HIP_API_PER_THREAD_DEFAULT_STREAM
   return CUDAStreamView{hipStreamPerThread};

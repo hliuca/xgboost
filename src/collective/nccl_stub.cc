@@ -1,15 +1,25 @@
 /**
  * Copyright 2023, XGBoost Contributors
  */
-#if defined(XGBOOST_USE_NCCL) || (defined(XGBOOST_USE_RCCL) && 0)
+#if defined(XGBOOST_USE_NCCL) || defined(XGBOOST_USE_RCCL)
 #include "nccl_stub.h"
 
+#if defined(XGBOOST_USE_NCCL)
 #include <cuda.h>              // for CUDA_VERSION
 #include <cuda_runtime_api.h>  // for cudaPeekAtLastError
 #include <dlfcn.h>             // for dlclose, dlsym, dlopen
 #include <nccl.h>
 #include <thrust/system/cuda/error.h>  // for cuda_category
 #include <thrust/system_error.h>       // for system_error
+#elif defined(XGBOOST_USE_RCCL)
+#include "../common/cuda_to_hip.h"
+#include "../common/device_helpers.hip.h"
+#include <hip/hip_runtime_api.h>  // for cudaPeekAtLastError
+#include <dlfcn.h>             // for dlclose, dlsym, dlopen
+#include <rccl.h>
+#include <thrust/system/hip/error.h>  // for cuda_category
+#include <thrust/system_error.h>       // for system_error
+#endif
 
 #include <cstdint>  // for int32_t
 #include <sstream>  // for stringstream

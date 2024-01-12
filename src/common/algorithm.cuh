@@ -226,6 +226,7 @@ void SegmentedArgMergeSort(Context const *ctx, SegIt seg_begin, SegIt seg_end, V
                              });
 }
 
+#if defined(XGBOOST_USE_CUDA)
 template <bool accending, typename IdxT, typename U>
 void ArgSort(xgboost::Context const *ctx, xgboost::common::Span<U> keys,
              xgboost::common::Span<IdxT> sorted_idx) {
@@ -295,5 +296,51 @@ void ArgSort(xgboost::Context const *ctx, xgboost::common::Span<U> keys,
                                 sorted_idx.size_bytes(), cudaMemcpyDeviceToDevice,
                                 cuctx->Stream()));
 }
+#elif defined(XGBOOST_USE_HIP)
+template <bool accending, typename IdxT, typename U>
+void ArgSort(xgboost::Context const *ctx, xgboost::common::Span<U> keys,
+             xgboost::common::Span<IdxT> sorted_idx) {
+  std::size_t bytes = 0;
+  auto cuctx = ctx->CUDACtx();
+  dh::Iota(sorted_idx, cuctx->Stream());
+
+  using KeyT = typename decltype(keys)::value_type;
+  using ValueT = std::remove_const_t<IdxT>;
+
+  dh::TemporaryArray<KeyT> out(keys.size());
+  dh::TemporaryArray<IdxT> sorted_idx_out(sorted_idx.size());
+
+  // track https://github.com/NVIDIA/cub/pull/340 for 64bit length support
+  using OffsetT = std::conditional_t<!dh::BuildWithCUDACub(), std::ptrdiff_t, int32_t>;
+  CHECK_LE(sorted_idx.size(), std::numeric_limits<OffsetT>::max());
+  if (accending) {
+    void *d_temp_storage = nullptr;
+
+    dh::safe_cuda((rocprim::radix_sort_pairs(d_temp_storage,
+                    bytes, keys.data(), out.data().get(), sorted_idx.data(), sorted_idx_out.data().get(), sorted_idx.size(), 0,
+                    sizeof(KeyT) * 8, cuctx->Stream(), false)));
+
+    dh::TemporaryArray<char> storage(bytes);
+    d_temp_storage = storage.data().get();
+    dh::safe_cuda((rocprim::radix_sort_pairs(d_temp_storage,
+                    bytes, keys.data(), out.data().get(), sorted_idx.data(), sorted_idx_out.data().get(), sorted_idx.size(), 0,
+                    sizeof(KeyT) * 8, cuctx->Stream(), false)));
+  } else {
+    void *d_temp_storage = nullptr;
+
+    dh::safe_cuda((rocprim::radix_sort_pairs_desc(d_temp_storage,
+                    bytes, keys.data(), out.data().get(), sorted_idx.data(), sorted_idx_out.data().get(), sorted_idx.size(), 0,
+                    sizeof(KeyT) * 8, cuctx->Stream(), false)));
+    dh::TemporaryArray<char> storage(bytes);
+    d_temp_storage = storage.data().get();
+    dh::safe_cuda((rocprim::radix_sort_pairs_desc(d_temp_storage,
+                    bytes, keys.data(), out.data().get(), sorted_idx.data(), sorted_idx_out.data().get(), sorted_idx.size(), 0,
+                    sizeof(KeyT) * 8, cuctx->Stream(), false)));
+  }
+
+  dh::safe_cuda(hipMemcpyAsync(sorted_idx.data(), sorted_idx_out.data().get(),
+                            sorted_idx.size_bytes(), hipMemcpyDeviceToDevice, cuctx->Stream()));
+}
+#endif
 }  // namespace xgboost::common
 #endif  // XGBOOST_COMMON_ALGORITHM_CUH_

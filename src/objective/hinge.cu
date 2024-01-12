@@ -9,7 +9,7 @@
 #include <cstdint>    // for int32_t
 
 #include "../common/common.h"  // for Range
-#if defined(XGBOOST_USE_CUDA)
+#if defined(XGBOOST_USE_CUDA) || defined(XGBOOST_USE_HIP)
 #include "../common/linalg_op.cuh"
 #endif
 #include "../common/linalg_op.h"

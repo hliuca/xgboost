@@ -2,10 +2,17 @@
  * Copyright 2023, XGBoost Contributors
  */
 #pragma once
-#if defined(XGBOOST_USE_NCCL) || (defined(XGBOOST_USE_RCCL) && 0)
+#if defined(XGBOOST_USE_NCCL) || defined(XGBOOST_USE_RCCL)
 
+#if defined(XGBOOST_USE_NCCL)
 #include <cuda_runtime_api.h>
 #include <nccl.h>
+#elif defined(XGBOOST_USE_RCCL)
+#include "../common/cuda_to_hip.h"
+#include "../common/device_helpers.cuh"
+#include <hip/hip_runtime_api.h>
+#include <rccl.h>
+#endif
 
 #include <string>  // for string
 
