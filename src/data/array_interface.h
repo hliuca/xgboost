@@ -377,11 +377,6 @@ struct ToDType<int64_t> {
   static constexpr ArrayInterfaceHandler::Type kType = ArrayInterfaceHandler::kI8;
 };
 
-#if !defined(XGBOOST_USE_CUDA) && !defined(XGBOOST_USE_HIP)
-inline void ArrayInterfaceHandler::SyncCudaStream(int64_t) { common::AssertGPUSupport(); }
-inline bool ArrayInterfaceHandler::IsCudaPtr(void const *) { return false; }
-#endif  // !defined(XGBOOST_USE_CUDA)
-
 /**
  * \brief A type erased view over __array_interface__ protocol defined by numpy
  *
