@@ -180,7 +180,7 @@ class ColumnSampler {
     if (ctx->IsCPU()) {
       std::iota(feature_set_tree_->HostVector().begin(), feature_set_tree_->HostVector().end(), 0);
     } else {
-#if defined(XGBOOST_USE_CUDA)
+#if defined(XGBOOST_USE_CUDA) || defined(XGBOOST_USE_HIP)
       cuda_impl::InitFeatureSet(ctx, feature_set_tree_);
 #else
       AssertGPUSupport();

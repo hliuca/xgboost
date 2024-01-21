@@ -9,7 +9,15 @@
 #include <nccl.h>
 #elif defined(XGBOOST_USE_RCCL)
 #include "../common/cuda_to_hip.h"
-#include "../common/device_helpers.cuh"
+
+#ifndef __HIP_PLATFORM_AMD__
+#define __HIP_PLATFORM_AMD__
+#endif
+
+#ifndef THRUST_DEVICE_SYSTEM
+#define THRUST_DEVICE_SYSTEM THRUST_DEVICE_SYSTEM_HIP
+#endif
+
 #include <hip/hip_runtime_api.h>
 #include <rccl.h>
 #endif

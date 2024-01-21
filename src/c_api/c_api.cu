@@ -55,8 +55,10 @@ void XGBBuildInfoDevice(Json *p_info) {
   info["RCCL_VERSION"] = v;
   info["NCCL_VERSION"] = v;
 #if defined(XGBOOST_USE_DLOPEN_RCCL)
+  info["USE_DLOPEN_NCCL"] = Boolean{true};
   info["USE_DLOPEN_RCCL"] = Boolean{true};
 #else
+  info["USE_DLOPEN_NCCL"] = Boolean{false};
   info["USE_DLOPEN_RCCL"] = Boolean{false};
 #endif  // defined(XGBOOST_USE_DLOPEN_RCCL)
 #else
