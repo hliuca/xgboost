@@ -28,7 +28,7 @@
 
 #if defined(XGBOOST_USE_CUDA)
 #include "cuda_fp16.h"
-#elif defined(__HIP_PLATFORM_AMD__)
+#elif defined(XGBOOST_USE_HIP)
 #include <hip/hip_fp16.h>
 #endif
 
@@ -323,7 +323,7 @@ class ArrayInterfaceHandler {
 template <typename T, typename E = void>
 struct ToDType;
 // float
-#if defined(XGBOOST_USE_CUDA) || defined(__HIP_PLATFORM_AMD__)
+#if defined(XGBOOST_USE_CUDA) || defined(XGBOOST_USE_HIP)
 template <>
 struct ToDType<__half> {
   static constexpr ArrayInterfaceHandler::Type kType = ArrayInterfaceHandler::kF2;
@@ -478,7 +478,7 @@ class ArrayInterface {
       CHECK(sizeof(long double) == 16) << error::NoF128();
       type = T::kF16;
     } else if (typestr[1] == 'f' && typestr[2] == '2') {
-#if defined(XGBOOST_USE_CUDA) || defined(__HIP_PLATFORM_AMD__)
+#if defined(XGBOOST_USE_CUDA) || defined(XGBOOST_USE_HIP)
       type = T::kF2;
 #else
       LOG(FATAL) << "Half type is not supported.";
@@ -517,7 +517,7 @@ class ArrayInterface {
     using T = ArrayInterfaceHandler::Type;
     switch (type) {
       case T::kF2: {
-#if defined(XGBOOST_USE_CUDA) || defined(__HIP_PLATFORM_AMD__)
+#if defined(XGBOOST_USE_CUDA) || defined(XGBOOST_USE_HIP)
         return func(reinterpret_cast<__half const *>(data));
 #endif  // defined(XGBOOST_USE_CUDA)
       }
@@ -525,7 +525,7 @@ class ArrayInterface {
         return func(reinterpret_cast<float const *>(data));
       case T::kF8:
         return func(reinterpret_cast<double const *>(data));
-#if defined(__CUDA_ARCH__ ) || defined(__HIP_PLATFORM_AMD__)
+#if defined(__CUDA_ARCH__ ) || defined(XGBOOST_USE_HIP)
       case T::kF16: {
         // CUDA device code doesn't support long double.
         SPAN_CHECK(false);
@@ -572,7 +572,7 @@ class ArrayInterface {
     static_assert(sizeof...(index) <= D, "Invalid index.");
     return this->DispatchCall([=](auto const *p_values) -> T {
       std::size_t offset = linalg::detail::Offset<0ul>(strides, 0ul, index...);
-#if defined(XGBOOST_USE_CUDA) || defined(__HIP_PLATFORM_AMD__)
+#if defined(XGBOOST_USE_CUDA) || defined(XGBOOST_USE_HIP)
       // No operator defined for half -> size_t
       using Type = std::conditional_t<
           std::is_same<__half,
@@ -606,7 +606,7 @@ template <typename Fn>
 auto DispatchDType(ArrayInterfaceHandler::Type dtype, Fn dispatch) {
   switch (dtype) {
     case ArrayInterfaceHandler::kF2: {
-#if defined(XGBOOST_USE_CUDA) || defined(__HIP_PLATFORM_AMD__)
+#if defined(XGBOOST_USE_CUDA) || defined(XGBOOST_USE_HIP)
       return dispatch(__half{});
 #else
       LOG(FATAL) << "half type is only supported for CUDA input.";
