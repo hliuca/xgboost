@@ -58,11 +58,11 @@
 
 namespace xgboost {
 
-#if defined(__CUDACC__) || defined(__HIP_PLATFORM_AMD__)
+#if defined(__CUDACC__) || defined(__HIPCC__)
 // Sets a function to call instead of cudaSetDevice();
 // only added for testing
 void SetCudaSetDeviceHandler(void (*handler)(int));
-#endif  // __CUDACC__ || __HIP_PLATFORM_AMD__
+#endif  // __CUDACC__ || __HIPCC__
 
 template <typename T> struct HostDeviceVectorImpl;
 

@@ -26,7 +26,7 @@
 
 #define WITH_CUDA() true
 
-#elif defined(__HIP_PLATFORM_AMD__)
+#elif defined(__HIPCC__)
 #include <thrust/system/hip/error.h>
 #include <thrust/system_error.h>
 
@@ -55,7 +55,7 @@ inline cudaError_t ThrowOnCudaError(cudaError_t code, const char *file, int line
   return code;
 }
 
-#elif defined(__HIP_PLATFORM_AMD__)
+#elif defined(__HIPCC__)
 /*
  * Error handling  functions
  */

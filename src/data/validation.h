@@ -13,7 +13,7 @@ namespace xgboost {
 namespace data {
 struct LabelsCheck {
   XGBOOST_DEVICE bool operator()(float y) {
-#if defined(__CUDA_ARCH__) || defined(__HIP_PLATFORM_AMD__)
+#if defined(__CUDA_ARCH__) || defined(__HIPCC__)
     return ::isnan(y) || ::isinf(y);
 #else
     return std::isnan(y) || std::isinf(y);

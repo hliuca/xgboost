@@ -286,7 +286,7 @@ void CopyDataToEllpack(const AdapterBatchT& batch, common::Span<FeatureType cons
                          cub::NullType(), batch.Size(), nullptr, false);
 #endif
 
-#elif defined (__HIP_PLATFORM_AMD__)
+#elif defined (__HIPCC__)
 
   rocprim::inclusive_scan(nullptr, temp_storage_bytes, key_value_index_iter, out, batch.Size(), TupleScanOp<Tuple>());
 

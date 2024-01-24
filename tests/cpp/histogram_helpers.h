@@ -1,4 +1,4 @@
-#if defined(__CUDACC__) || defined(__HIP_PLATFORM_AMD__)
+#if defined(__CUDACC__) || defined(__HIPCC__)
 #include "../../src/data/ellpack_page.cuh"
 #endif
 
@@ -7,7 +7,7 @@
 #include "./helpers.h"  // for RandomDataGenerator
 
 namespace xgboost {
-#if defined(__CUDACC__) || defined(__HIP_PLATFORM_AMD__)
+#if defined(__CUDACC__) || defined(__HIPCC__)
 namespace {
 class HistogramCutsWrapper : public common::HistogramCuts {
  public:

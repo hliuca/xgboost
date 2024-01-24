@@ -28,19 +28,19 @@
 #include "filesystem.h"  // dmlc::TemporaryDirectory
 #include "xgboost/linalg.h"
 
-#if defined(__CUDACC__) || defined(__HIP_PLATFORM_AMD__)
+#if defined(__CUDACC__) || defined(__HIPCC__)
 #define DeclareUnifiedTest(name) GPU ## name
 #else
 #define DeclareUnifiedTest(name) name
 #endif
 
-#if defined(__CUDACC__) || defined(__HIP_PLATFORM_AMD__)
+#if defined(__CUDACC__) || defined(__HIPCC__)
 #define GPUIDX (common::AllVisibleGPUs() == 1 ? 0 : collective::GetRank())
 #else
 #define GPUIDX (-1)
 #endif
 
-#if defined(__CUDACC__) || defined(__HIP_PLATFORM_AMD__)
+#if defined(__CUDACC__) || defined(__HIPCC__)
 #define DeclareUnifiedDistributedTest(name) MGPU ## name
 #else
 #define DeclareUnifiedDistributedTest(name) name

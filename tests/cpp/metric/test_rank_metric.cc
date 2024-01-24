@@ -20,7 +20,7 @@
 namespace xgboost {
 namespace metric {
 
-#if !defined(__CUDACC__) && !defined(__HIP_PLATFORM_AMD__)
+#if !defined(__CUDACC__) && !defined(__HIPCC__)
 TEST(Metric, AMS) {
   auto ctx = MakeCUDACtx(GPUIDX);
   EXPECT_ANY_THROW(Metric::Create("ams", &ctx));
