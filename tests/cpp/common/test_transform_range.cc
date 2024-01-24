@@ -14,7 +14,7 @@
 namespace xgboost::common {
 namespace {
 constexpr DeviceOrd TransformDevice() {
-#if defined(__CUDACC__) || defined(__HIP_PLATFORM_AMD__)
+#if defined(__CUDACC__) || defined(__HIPCC__)
   return DeviceOrd::CUDA(0);
 #else
   return DeviceOrd::CPU();
@@ -51,7 +51,7 @@ TEST(Transform, DeclareUnifiedTest(Basic)) {
   ASSERT_TRUE(std::equal(h_sol.begin(), h_sol.end(), res.begin()));
 }
 
-#if !defined(__CUDACC__) && !defined(__HIP_PLATFORM_AMD__)
+#if !defined(__CUDACC__) && !defined(__HIPCC__)
 TEST(TransformDeathTest, Exception) {
   size_t const kSize{16};
   std::vector<float> h_in(kSize);

@@ -41,7 +41,7 @@
 
 #if defined(__CUDACC__)
 #include <cuda_runtime.h>
-#elif defined(__HIP_PLATFORM_AMD__)
+#elif defined(__HIPCC__)
 #include <hip/hip_runtime.h>
 #endif
 
@@ -106,7 +106,7 @@ namespace common {
 
 #define SPAN_CHECK KERNEL_CHECK
 
-#elif defined(__HIP_PLATFORM_AMD__)
+#elif defined(__HIPCC__)
 // Usual logging facility is not available inside device code.
 
 #if defined(_MSC_VER)
@@ -157,7 +157,7 @@ namespace common {
 
 #endif  // defined(XGBOOST_STRICT_R_MODE)
 
-#endif  // __CUDA_ARCH__ || __HIP_PLATFORM_AMD__
+#endif  // __CUDA_ARCH__ || __HIPCC__
 
 #define SPAN_LT(lhs, rhs) SPAN_CHECK((lhs) < (rhs))
 

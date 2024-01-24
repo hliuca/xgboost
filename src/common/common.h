@@ -25,7 +25,7 @@
 
 #define WITH_CUDA() true
 
-#elif defined(__HIP_PLATFORM_AMD__)
+#elif defined(__HIPCC__)
 #include "cuda_to_hip.h"
 #include <thrust/system/hip/error.h>
 #include <thrust/system_error.h>
@@ -39,7 +39,7 @@
 #endif  // defined(__CUDACC__)
 
 namespace dh {
-#if defined(__CUDACC__) || defined(__HIP_PLATFORM_AMD__)
+#if defined(__CUDACC__) || defined(__HIPCC__)
 /*
  * Error handling  functions
  */
