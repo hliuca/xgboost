@@ -1,21 +1,22 @@
 /**
- * Copyright 2014-2023 by XGBoost Contributors
+ * Copyright 2014-2024, XGBoost Contributors
  * \file updater_colmaker.cc
  * \brief use columnwise update to construct a tree
  * \author Tianqi Chen
  */
-#include <vector>
-#include <cmath>
 #include <algorithm>
+#include <cmath>
+#include <vector>
 
+#include "../common/error_msg.h"  // for NoCategorical
+#include "../common/random.h"
+#include "constraints.h"
+#include "param.h"
+#include "split_evaluator.h"
+#include "xgboost/json.h"
+#include "xgboost/logging.h"
 #include "xgboost/parameter.h"
 #include "xgboost/tree_updater.h"
-#include "xgboost/logging.h"
-#include "xgboost/json.h"
-#include "param.h"
-#include "constraints.h"
-#include "../common/random.h"
-#include "split_evaluator.h"
 
 namespace xgboost::tree {
 
@@ -101,6 +102,9 @@ class ColMaker: public TreeUpdater {
     if (!dmat->SingleColBlock()) {
       LOG(FATAL) << "Updater `grow_colmaker` or `exact` tree method doesn't "
                     "support external memory training.";
+    }
+    if (dmat->Info().HasCategorical()) {
+      LOG(FATAL) << error::NoCategorical("Updater `grow_colmaker` or `exact` tree method");
     }
     this->LazyGetColumnDensity(dmat);
     // rescale learning rate according to size of trees
@@ -225,9 +229,12 @@ class ColMaker: public TreeUpdater {
         }
       }
       {
-        column_sampler_.Init(ctx_, fmat.Info().num_col_,
-                             fmat.Info().feature_weights.ConstHostVector(), param_.colsample_bynode,
-                             param_.colsample_bylevel, param_.colsample_bytree);
+        if (!column_sampler_) {
+          column_sampler_ = common::MakeColumnSampler(ctx_);
+        }
+        column_sampler_->Init(
+            ctx_, fmat.Info().num_col_, fmat.Info().feature_weights.ConstHostVector(),
+            param_.colsample_bynode, param_.colsample_bylevel, param_.colsample_bytree);
       }
       {
         // setup temp space for each thread
@@ -467,7 +474,7 @@ class ColMaker: public TreeUpdater {
                           RegTree *p_tree) {
       auto evaluator = tree_evaluator_.GetEvaluator();
 
-      auto feat_set = column_sampler_.GetFeatureSet(depth);
+      auto feat_set = column_sampler_->GetFeatureSet(depth);
       for (const auto &batch : p_fmat->GetBatches<SortedCSCPage>(ctx_)) {
         this->UpdateSolution(batch, feat_set->HostVector(), gpair, p_fmat);
       }
@@ -586,7 +593,7 @@ class ColMaker: public TreeUpdater {
     const ColMakerTrainParam& colmaker_train_param_;
     // number of omp thread used during training
     Context const* ctx_;
-    common::ColumnSampler column_sampler_;
+    std::shared_ptr<common::ColumnSampler> column_sampler_;
     // Instance Data: current node position in the tree of each instance
     std::vector<int> position_;
     // PerThread x PerTreeNode: statistics for per thread construction

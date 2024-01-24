@@ -6,7 +6,7 @@ echo "--- Build CPU code"
 
 source tests/buildkite/conftest.sh
 
-command_wrapper="tests/ci_build/ci_build.sh cpu docker"
+command_wrapper="tests/ci_build/ci_build.sh cpu"
 
 $command_wrapper rm -fv dmlc-core/include/dmlc/build_config_default.h
   # This step is not necessary, but here we include it, to ensure that
@@ -15,7 +15,7 @@ $command_wrapper rm -fv dmlc-core/include/dmlc/build_config_default.h
   # include/dmlc/build_config_default.h.
 echo "--- Build libxgboost from the source"
 $command_wrapper tests/ci_build/build_via_cmake.sh -DCMAKE_PREFIX_PATH=/opt/grpc \
-  -DPLUGIN_DENSE_PARSER=ON -DPLUGIN_FEDERATED=ON
+		 -DPLUGIN_FEDERATED=ON
 echo "--- Run Google Test"
 $command_wrapper bash -c "cd build && ctest --extra-verbose"
 echo "--- Stash XGBoost CLI executable"

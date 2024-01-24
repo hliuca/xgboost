@@ -377,11 +377,6 @@ struct ToDType<int64_t> {
   static constexpr ArrayInterfaceHandler::Type kType = ArrayInterfaceHandler::kI8;
 };
 
-#if !defined(XGBOOST_USE_CUDA) && !defined(XGBOOST_USE_HIP)
-inline void ArrayInterfaceHandler::SyncCudaStream(int64_t) { common::AssertGPUSupport(); }
-inline bool ArrayInterfaceHandler::IsCudaPtr(void const *) { return false; }
-#endif  // !defined(XGBOOST_USE_CUDA)
-
 /**
  * \brief A type erased view over __array_interface__ protocol defined by numpy
  *
@@ -525,7 +520,7 @@ class ArrayInterface {
         return func(reinterpret_cast<float const *>(data));
       case T::kF8:
         return func(reinterpret_cast<double const *>(data));
-#if defined(__CUDA_ARCH__ ) || defined(XGBOOST_USE_HIP)
+#if defined(__CUDA_ARCH__ ) || defined(__HIPCC__)
       case T::kF16: {
         // CUDA device code doesn't support long double.
         SPAN_CHECK(false);

@@ -35,6 +35,8 @@
 #include "xgboost/span.h"
 #include "xgboost/tree_model.h"  // RegTree
 
+#include "regression_param.h"
+
 #if defined(XGBOOST_USE_CUDA) || defined(XGBOOST_USE_HIP)
 #include "../common/cuda_context.cuh"  // for CUDAContext
 #include "../common/device_helpers.cuh"
@@ -53,14 +55,7 @@ void CheckRegInputs(MetaInfo const& info, HostDeviceVector<bst_float> const& pre
 DMLC_REGISTRY_FILE_TAG(regression_obj_gpu);
 #endif  // defined(XGBOOST_USE_CUDA) || defined(XGBOOST_USE_HIP)
 
-struct RegLossParam : public XGBoostParameter<RegLossParam> {
-  float scale_pos_weight;
-  // declare parameters
-  DMLC_DECLARE_PARAMETER(RegLossParam) {
-    DMLC_DECLARE_FIELD(scale_pos_weight).set_default(1.0f).set_lower_bound(0.0f)
-      .describe("Scale the weight of positive examples by this factor");
-  }
-};
+
 
 template<typename Loss>
 class RegLossObj : public FitIntercept {
@@ -221,6 +216,10 @@ XGBOOST_REGISTER_OBJECTIVE(LogisticRaw, LogisticRaw::Name())
           "before logistic transformation.")
 .set_body([]() { return new RegLossObj<LogisticRaw>(); });
 
+XGBOOST_REGISTER_OBJECTIVE(GammaRegression, GammaDeviance::Name())
+    .describe("Gamma regression using the gamma deviance loss with log link.")
+    .set_body([]() { return new RegLossObj<GammaDeviance>(); });
+
 // Deprecated functions
 XGBOOST_REGISTER_OBJECTIVE(LinearRegression, "reg:linear")
 .describe("Regression with squared error.")
@@ -251,24 +250,24 @@ class PseudoHuberRegression : public FitIntercept {
     auto gpair = out_gpair->View(ctx_->Device());
 
     preds.SetDevice(ctx_->Device());
-    auto predt = linalg::MakeVec(&preds);
+    auto predt = linalg::MakeTensorView(ctx_, &preds, info.num_row_, this->Targets(info));
 
     info.weights_.SetDevice(ctx_->Device());
     common::OptionalWeights weight{ctx_->IsCUDA() ? info.weights_.ConstDeviceSpan()
                                                   : info.weights_.ConstHostSpan()};
 
-    linalg::ElementWiseKernel(ctx_, labels, [=] XGBOOST_DEVICE(size_t i, float const y) mutable {
-      auto sample_id = std::get<0>(linalg::UnravelIndex(i, labels.Shape()));
-      const float z = predt(i) - y;
-      const float scale_sqrt = std::sqrt(1 + common::Sqr(z) / common::Sqr(slope));
-      float grad = z / scale_sqrt;
+    linalg::ElementWiseKernel(
+        ctx_, labels, [=] XGBOOST_DEVICE(std::size_t i, std::size_t j) mutable {
+          float z = predt(i, j) - labels(i, j);
+          float scale_sqrt = std::sqrt(1 + common::Sqr(z) / common::Sqr(slope));
+          float grad = z / scale_sqrt;
 
-      auto scale = common::Sqr(slope) + common::Sqr(z);
-      float hess = common::Sqr(slope) / (scale * scale_sqrt);
+          auto scale = common::Sqr(slope) + common::Sqr(z);
+          float hess = common::Sqr(slope) / (scale * scale_sqrt);
 
-      auto w = weight[sample_id];
-      gpair(i) = {grad * w, hess * w};
-    });
+          auto w = weight[i];
+          gpair(i) = {grad * w, hess * w};
+        });
   }
 
   [[nodiscard]] const char* DefaultEvalMetric() const override { return "mphe"; }
@@ -501,87 +500,6 @@ XGBOOST_REGISTER_OBJECTIVE(CoxRegression, "survival:cox")
 .describe("Cox regression for censored survival data (negative labels are considered censored).")
 .set_body([]() { return new CoxRegression(); });
 
-// gamma regression
-class GammaRegression : public FitIntercept {
- public:
-  void Configure(Args const&) override {}
-  [[nodiscard]] ObjInfo Task() const override { return ObjInfo::kRegression; }
-
-  void GetGradient(const HostDeviceVector<bst_float>& preds, const MetaInfo& info, std::int32_t,
-                   linalg::Matrix<GradientPair>* out_gpair) override {
-    CHECK_NE(info.labels.Size(), 0U) << "label set cannot be empty";
-    CHECK_EQ(preds.Size(), info.labels.Size()) << "labels are not correctly provided";
-    const size_t ndata = preds.Size();
-    auto device = ctx_->Device();
-    out_gpair->SetDevice(ctx_->Device());
-    out_gpair->Reshape(info.num_row_, this->Targets(info));
-    label_correct_.Resize(1);
-    label_correct_.Fill(1);
-
-    const bool is_null_weight = info.weights_.Size() == 0;
-    if (!is_null_weight) {
-      CHECK_EQ(info.weights_.Size(), ndata)
-          << "Number of weights should be equal to number of data points.";
-    }
-    common::Transform<>::Init(
-        [=] XGBOOST_DEVICE(size_t _idx,
-                           common::Span<int> _label_correct,
-                           common::Span<GradientPair> _out_gpair,
-                           common::Span<const bst_float> _preds,
-                           common::Span<const bst_float> _labels,
-                           common::Span<const bst_float> _weights) {
-          bst_float p = _preds[_idx];
-          bst_float w = is_null_weight ? 1.0f : _weights[_idx];
-          bst_float y = _labels[_idx];
-          if (y <= 0.0f) {
-            _label_correct[0] = 0;
-          }
-          _out_gpair[_idx] = GradientPair((1 - y / expf(p)) * w, y / expf(p) * w);
-        },
-        common::Range{0, static_cast<int64_t>(ndata)}, this->ctx_->Threads(), device).Eval(
-            &label_correct_, out_gpair->Data(), &preds, info.labels.Data(), &info.weights_);
-
-    // copy "label correct" flags back to host
-    std::vector<int>& label_correct_h = label_correct_.HostVector();
-    for (auto const flag : label_correct_h) {
-      if (flag == 0) {
-        LOG(FATAL) << "GammaRegression: label must be positive.";
-      }
-    }
-  }
-  void PredTransform(HostDeviceVector<bst_float> *io_preds) const override {
-    common::Transform<>::Init(
-        [] XGBOOST_DEVICE(size_t _idx, common::Span<bst_float> _preds) {
-          _preds[_idx] = expf(_preds[_idx]);
-        },
-        common::Range{0, static_cast<int64_t>(io_preds->Size())}, this->ctx_->Threads(),
-        io_preds->Device())
-        .Eval(io_preds);
-  }
-  void EvalTransform(HostDeviceVector<bst_float> *io_preds) override {
-    PredTransform(io_preds);
-  }
-  [[nodiscard]] float ProbToMargin(bst_float base_score) const override {
-    return std::log(base_score);
-  }
-  [[nodiscard]] const char* DefaultEvalMetric() const override {
-    return "gamma-nloglik";
-  }
-  void SaveConfig(Json* p_out) const override {
-    auto& out = *p_out;
-    out["name"] = String("reg:gamma");
-  }
-  void LoadConfig(Json const&) override {}
-
- private:
-  HostDeviceVector<int> label_correct_;
-};
-
-// register the objective functions
-XGBOOST_REGISTER_OBJECTIVE(GammaRegression, "reg:gamma")
-.describe("Gamma regression for severity data.")
-.set_body([]() { return new GammaRegression(); });
-
 
 // declare parameter
 struct TweedieRegressionParam : public XGBoostParameter<TweedieRegressionParam> {
@@ -712,20 +630,21 @@ class MeanAbsoluteError : public ObjFunction {
     auto gpair = out_gpair->View(ctx_->Device());
 
     preds.SetDevice(ctx_->Device());
-    auto predt = linalg::MakeVec(&preds);
+    auto predt = linalg::MakeTensorView(ctx_, &preds, info.num_row_, this->Targets(info));
     info.weights_.SetDevice(ctx_->Device());
     common::OptionalWeights weight{ctx_->IsCUDA() ? info.weights_.ConstDeviceSpan()
                                                   : info.weights_.ConstHostSpan()};
 
-    linalg::ElementWiseKernel(ctx_, labels, [=] XGBOOST_DEVICE(std::size_t i, float y) mutable {
-      auto sign = [](auto x) {
-        return (x > static_cast<decltype(x)>(0)) - (x < static_cast<decltype(x)>(0));
-      };
-      auto [sample_id, target_id] = linalg::UnravelIndex(i, labels.Shape());
-      auto grad = sign(predt(i) - y) * weight[sample_id];
-      auto hess = weight[sample_id];
-      gpair(sample_id, target_id) = GradientPair{grad, hess};
-    });
+    linalg::ElementWiseKernel(
+        ctx_, labels, [=] XGBOOST_DEVICE(std::size_t i, std::size_t j) mutable {
+          auto sign = [](auto x) {
+            return (x > static_cast<decltype(x)>(0)) - (x < static_cast<decltype(x)>(0));
+          };
+          auto y = labels(i, j);
+          auto hess = weight[i];
+          auto grad = sign(predt(i, j) - y) * hess;
+          gpair(i, j) = GradientPair{grad, hess};
+        });
   }
 
   void InitEstimation(MetaInfo const& info, linalg::Tensor<float, 1>* base_margin) const override {

@@ -8,7 +8,9 @@
 #define XGBOOST_R_H_ // NOLINT(*)
 
 
+#include <R.h>
 #include <Rinternals.h>
+#include <R_ext/Altrep.h>
 #include <R_ext/Random.h>
 #include <Rmath.h>
 
@@ -20,6 +22,22 @@
  * \return whether it is null ptr
  */
 XGB_DLL SEXP XGCheckNullPtr_R(SEXP handle);
+
+/*!
+ * \brief set the dimensions of an array in-place
+ * \param arr
+ * \param dims dimensions to set to the array
+ * \return NULL value
+ */
+XGB_DLL SEXP XGSetArrayDimInplace_R(SEXP arr, SEXP dims);
+
+/*!
+ * \brief set the names of the dimensions of an array in-place
+ * \param arr
+ * \param dim_names names for the dimensions to set
+ * \return NULL value
+ */
+XGB_DLL SEXP XGSetArrayDimNamesInplace_R(SEXP arr, SEXP dim_names);
 
 /*!
  * \brief Set global configuration
@@ -53,6 +71,16 @@ XGB_DLL SEXP XGDMatrixCreateFromFile_R(SEXP fname, SEXP silent);
 XGB_DLL SEXP XGDMatrixCreateFromMat_R(SEXP mat,
                                       SEXP missing,
                                       SEXP n_threads);
+
+/**
+ * @brief Create matrix content from a data frame.
+ * @param data R data.frame object
+ * @param missing which value to represent missing value
+ * @param n_threads Number of threads used to construct DMatrix from dense matrix.
+ * @return created dmatrix
+ */
+XGB_DLL SEXP XGDMatrixCreateFromDF_R(SEXP df, SEXP missing, SEXP n_threads);
+
 /*!
  * \brief create a matrix content from CSC format
  * \param indptr pointer to column headers
@@ -106,12 +134,20 @@ XGB_DLL SEXP XGDMatrixSaveBinary_R(SEXP handle, SEXP fname, SEXP silent);
 XGB_DLL SEXP XGDMatrixSetInfo_R(SEXP handle, SEXP field, SEXP array);
 
 /*!
- * \brief get info vector from matrix
+ * \brief get info vector (float type) from matrix
  * \param handle a instance of data matrix
  * \param field field name
  * \return info vector
  */
-XGB_DLL SEXP XGDMatrixGetInfo_R(SEXP handle, SEXP field);
+XGB_DLL SEXP XGDMatrixGetFloatInfo_R(SEXP handle, SEXP field);
+
+/*!
+ * \brief get info vector (uint type) from matrix
+ * \param handle a instance of data matrix
+ * \param field field name
+ * \return info vector
+ */
+XGB_DLL SEXP XGDMatrixGetUIntInfo_R(SEXP handle, SEXP field);
 
 /*!
  * \brief return number of rows
@@ -126,18 +162,86 @@ XGB_DLL SEXP XGDMatrixNumRow_R(SEXP handle);
 XGB_DLL SEXP XGDMatrixNumCol_R(SEXP handle);
 
 /*!
+ * \brief Call R C-level function 'duplicate'
+ * \param obj Object to duplicate
+ */
+XGB_DLL SEXP XGDuplicate_R(SEXP obj);
+
+/*!
+ * \brief Equality comparison for two pointers
+ * \param obj1 R 'externalptr'
+ * \param obj2 R 'externalptr'
+ */
+XGB_DLL SEXP XGPointerEqComparison_R(SEXP obj1, SEXP obj2);
+
+/*!
+ * \brief Register the Altrep class used for the booster
+ * \param dll DLL info as provided by R_init
+ */
+XGB_DLL void XGBInitializeAltrepClass_R(DllInfo *dll);
+
+/*!
+ * \brief return the quantile cuts used for the histogram method
+ * \param handle an instance of data matrix
+ * \return A list with entries 'indptr' and 'data'
+ */
+XGB_DLL SEXP XGDMatrixGetQuantileCut_R(SEXP handle);
+
+/*!
+ * \brief get the number of non-missing entries in a dmatrix
+ * \param handle an instance of data matrix
+ * \return the number of non-missing entries
+ */
+XGB_DLL SEXP XGDMatrixNumNonMissing_R(SEXP handle);
+
+/*!
+ * \brief get the data in a dmatrix in CSR format
+ * \param handle an instance of data matrix
+ * \return R list with the following entries in this order:
+ * - 'indptr
+ * - 'indices
+ * - 'data'
+ * - 'ncol'
+ */
+XGB_DLL SEXP XGDMatrixGetDataAsCSR_R(SEXP handle);
+
+/*!
  * \brief create xgboost learner
  * \param dmats a list of dmatrix handles that will be cached
  */
 XGB_DLL SEXP XGBoosterCreate_R(SEXP dmats);
 
+/*!
+ * \brief copy information about features from a DMatrix into a Booster
+ * \param booster R 'externalptr' pointing to a booster object
+ * \param dmat R 'externalptr' pointing to a DMatrix object
+ */
+XGB_DLL SEXP XGBoosterCopyInfoFromDMatrix_R(SEXP booster, SEXP dmat);
 
 /*!
- * \brief create xgboost learner, saving the pointer into an existing R object
- * \param dmats a list of dmatrix handles that will be cached
- * \param R_handle a clean R external pointer (not holding any object)
+ * \brief handle R 'externalptr' holding the booster object
+ * \param field field name
+ * \param features features to set for the field
  */
-XGB_DLL SEXP XGBoosterCreateInEmptyObj_R(SEXP dmats, SEXP R_handle);
+XGB_DLL SEXP XGBoosterSetStrFeatureInfo_R(SEXP handle, SEXP field, SEXP features);
+
+/*!
+ * \brief handle R 'externalptr' holding the booster object
+ * \param field field name
+ */
+XGB_DLL SEXP XGBoosterGetStrFeatureInfo_R(SEXP handle, SEXP field);
+
+/*!
+ * \brief Get the number of boosted rounds from a model
+ * \param handle R 'externalptr' holding the booster object
+ */
+XGB_DLL SEXP XGBoosterBoostedRounds_R(SEXP handle);
+
+/*!
+ * \brief Get the number of features to which the model was fitted
+ * \param handle R 'externalptr' holding the booster object
+ */
+XGB_DLL SEXP XGBoosterGetNumFeature_R(SEXP handle);
 
 /*!
  * \brief set parameters
@@ -297,5 +401,15 @@ XGB_DLL SEXP XGBoosterGetAttrNames_R(SEXP handle);
  *         feature scores and thrid element as feature scores.
  */
 XGB_DLL SEXP XGBoosterFeatureScore_R(SEXP handle, SEXP json_config);
+
+/*!
+ * \brief Slice a fitted booster model (by rounds)
+ * \param handle handle to the fitted booster
+ * \param begin_layer start of the slice
+ * \param end_later end of the slice; end_layer=0 is equivalent to end_layer=num_boost_round
+ * \param step step size of the slice
+ * \return The sliced booster with the requested rounds only
+ */
+XGB_DLL SEXP XGBoosterSlice_R(SEXP handle, SEXP begin_layer, SEXP end_layer, SEXP step);
 
 #endif  // XGBOOST_WRAPPER_R_H_ // NOLINT(*)

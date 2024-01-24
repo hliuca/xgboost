@@ -1,5 +1,5 @@
 /**
- * Copyright 2017-2023 by XGBoost Contributors
+ * Copyright 2017-2023, XGBoost Contributors
  * \file updater_quantile_hist.cc
  * \brief use quantized feature values to construct a tree
  * \author Philip Cho, Tianqi Checn, Egor Smirnov
@@ -149,6 +149,9 @@ class MultiTargetHistBuilder {
   }
 
   void InitData(DMatrix *p_fmat, RegTree const *p_tree) {
+    if (collective::IsDistributed()) {
+      LOG(FATAL) << "Distributed training for vector-leaf is not yet supported.";
+    }
     monitor_->Start(__func__);
 
     p_last_fmat_ = p_fmat;
@@ -228,8 +231,8 @@ class MultiTargetHistBuilder {
                       std::vector<MultiExpandEntry> const &valid_candidates,
                       linalg::MatrixView<GradientPair const> gpair) {
     monitor_->Start(__func__);
-    histogram_builder_->BuildHistLeftRight(p_fmat, p_tree, partitioner_, valid_candidates, gpair,
-                                           HistBatch(param_));
+    histogram_builder_->BuildHistLeftRight(ctx_, p_fmat, p_tree, partitioner_, valid_candidates,
+                                           gpair, HistBatch(param_));
     monitor_->Stop(__func__);
   }
 
@@ -436,8 +439,8 @@ class HistUpdater {
                       std::vector<CPUExpandEntry> const &valid_candidates,
                       linalg::MatrixView<GradientPair const> gpair) {
     monitor_->Start(__func__);
-    this->histogram_builder_->BuildHistLeftRight(p_fmat, p_tree, partitioner_, valid_candidates,
-                                                 gpair, HistBatch(param_));
+    this->histogram_builder_->BuildHistLeftRight(ctx_, p_fmat, p_tree, partitioner_,
+                                                 valid_candidates, gpair, HistBatch(param_));
     monitor_->Stop(__func__);
   }
 
@@ -470,8 +473,7 @@ class HistUpdater {
 class QuantileHistMaker : public TreeUpdater {
   std::unique_ptr<HistUpdater> p_impl_{nullptr};
   std::unique_ptr<MultiTargetHistBuilder> p_mtimpl_{nullptr};
-  std::shared_ptr<common::ColumnSampler> column_sampler_ =
-      std::make_shared<common::ColumnSampler>();
+  std::shared_ptr<common::ColumnSampler> column_sampler_;
   common::Monitor monitor_;
   ObjInfo const *task_{nullptr};
   HistMakerTrainParam hist_param_;
@@ -495,6 +497,10 @@ class QuantileHistMaker : public TreeUpdater {
   void Update(TrainParam const *param, linalg::Matrix<GradientPair> *gpair, DMatrix *p_fmat,
               common::Span<HostDeviceVector<bst_node_t>> out_position,
               const std::vector<RegTree *> &trees) override {
+    if (!column_sampler_) {
+      column_sampler_ = common::MakeColumnSampler(ctx_);
+    }
+
     if (trees.front()->IsMultiTarget()) {
       CHECK(hist_param_.GetInitialised());
       CHECK(param->monotone_constraints.empty()) << "monotone constraint" << MTNotImplemented();
@@ -537,17 +543,17 @@ class QuantileHistMaker : public TreeUpdater {
                                    h_out_position, *tree_it);
       }
 
-      hist_param_.CheckTreesSynchronized(*tree_it);
+      hist_param_.CheckTreesSynchronized(ctx_, *tree_it);
     }
   }
 
   bool UpdatePredictionCache(const DMatrix *data, linalg::MatrixView<float> out_preds) override {
-    if (p_impl_) {
-      return p_impl_->UpdatePredictionCache(data, out_preds);
-    } else if (p_mtimpl_) {
+    if (out_preds.Shape(1) > 1) {
+      CHECK(p_mtimpl_);
       return p_mtimpl_->UpdatePredictionCache(data, out_preds);
     } else {
-      return false;
+      CHECK(p_impl_);
+      return p_impl_->UpdatePredictionCache(data, out_preds);
     }
   }
 

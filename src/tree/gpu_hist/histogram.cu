@@ -16,8 +16,7 @@
 #include "row_partitioner.cuh"
 #include "xgboost/base.h"
 
-namespace xgboost {
-namespace tree {
+namespace xgboost::tree {
 namespace {
 struct Pair {
   GradientPair first;
@@ -53,7 +52,8 @@ struct Clip : public thrust::unary_function<GradientPair, Pair> {
  *
  * to avoid outliers, as the full reduction is reproducible on GPU with reduction tree.
  */
-GradientQuantiser::GradientQuantiser(common::Span<GradientPair const> gpair, MetaInfo const& info) {
+GradientQuantiser::GradientQuantiser(Context const*, common::Span<GradientPair const> gpair,
+                                     MetaInfo const& info) {
   using GradientSumT = GradientPairPrecise;
   using T = typename GradientSumT::ValueT;
   dh::XGBCachingDeviceAllocator<char> alloc;
@@ -99,7 +99,6 @@ GradientQuantiser::GradientQuantiser(common::Span<GradientPair const> gpair, Met
   to_fixed_point_ = GradientSumT(static_cast<T>(1) / to_floating_point_.GetGrad(),
                                  static_cast<T>(1) / to_floating_point_.GetHess());
 }
-
 
 XGBOOST_DEV_INLINE void
 AtomicAddGpairShared(xgboost::GradientPairInt64 *dest,
@@ -319,7 +318,6 @@ void BuildGradientHistogram(CUDAContext const* ctx, EllpackDeviceAccessor const&
     grid_size = std::min(common::DivRoundUp(grid_size, num_groups), static_cast<std::uint32_t>(
                                         common::DivRoundUp(items_per_group, kMinItemsPerBlock)));
 #endif
-
     dh::LaunchKernel {dim3(grid_size, num_groups), static_cast<uint32_t>(kBlockThreads), smem_size,
                      ctx->Stream()} (kernel, matrix, feature_groups, d_ridx, histogram.data(),
                                      gpair.data(), rounding);
@@ -333,6 +331,4 @@ void BuildGradientHistogram(CUDAContext const* ctx, EllpackDeviceAccessor const&
 
   dh::safe_cuda(cudaGetLastError());
 }
-
-}  // namespace tree
-}  // namespace xgboost
+}  // namespace xgboost::tree

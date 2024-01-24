@@ -1,5 +1,5 @@
 /**
- * Copyright 2014~2023 by XGBoost Contributors
+ * Copyright 2014~2023, XGBoost Contributors
  * \file simple_dmatrix.cc
  * \brief the input data structure for gradient boosting
  * \author Tianqi Chen
@@ -283,7 +283,7 @@ SimpleDMatrix::SimpleDMatrix(AdapterT* adapter, float missing, int nthread,
   // Synchronise worker columns
   info_.data_split_mode = data_split_mode;
   ReindexFeatures(&ctx);
-  info_.SynchronizeNumberOfColumns();
+  info_.SynchronizeNumberOfColumns(&ctx);
 
   if (adapter->NumRows() == kAdapterUnknownSize) {
     using IteratorAdapterT =
@@ -355,6 +355,8 @@ template SimpleDMatrix::SimpleDMatrix(CSCAdapter* adapter, float missing, int nt
 template SimpleDMatrix::SimpleDMatrix(DataTableAdapter* adapter, float missing, int nthread,
                                       DataSplitMode data_split_mode);
 template SimpleDMatrix::SimpleDMatrix(FileAdapter* adapter, float missing, int nthread,
+                                      DataSplitMode data_split_mode);
+template SimpleDMatrix::SimpleDMatrix(ColumnarAdapter* adapter, float missing, int nthread,
                                       DataSplitMode data_split_mode);
 template SimpleDMatrix::SimpleDMatrix(
     IteratorAdapter<DataIterHandle, XGBCallbackDataIterNext, XGBoostBatchCSR>* adapter,

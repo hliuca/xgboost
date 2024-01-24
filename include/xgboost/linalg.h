@@ -582,20 +582,20 @@ auto MakeTensorView(Context const *ctx, Container &data, S &&...shape) {  // NOL
   return TensorView<T, sizeof...(S)>{data, in_shape, ctx->Device()};
 }
 
-template <typename T, typename... S>
-LINALG_HD auto MakeTensorView(DeviceOrd device, common::Span<T> data, S &&...shape) {
+template <typename T, decltype(common::dynamic_extent) ext, typename... S>
+LINALG_HD auto MakeTensorView(DeviceOrd device, common::Span<T, ext> data, S &&...shape) {
   std::size_t in_shape[sizeof...(S)];
   detail::IndexToArr(in_shape, std::forward<S>(shape)...);
   return TensorView<T, sizeof...(S)>{data, in_shape, device};
 }
 
-template <typename T, typename... S>
-auto MakeTensorView(Context const *ctx, common::Span<T> data, S &&...shape) {
+template <typename T, decltype(common::dynamic_extent) ext, typename... S>
+auto MakeTensorView(Context const *ctx, common::Span<T, ext> data, S &&...shape) {
   return MakeTensorView(ctx->Device(), data, std::forward<S>(shape)...);
 }
 
-template <typename T, typename... S>
-auto MakeTensorView(Context const *ctx, Order order, common::Span<T> data, S &&...shape) {
+template <typename T, decltype(common::dynamic_extent) ext, typename... S>
+auto MakeTensorView(Context const *ctx, Order order, common::Span<T, ext> data, S &&...shape) {
   std::size_t in_shape[sizeof...(S)];
   detail::IndexToArr(in_shape, std::forward<S>(shape)...);
   return TensorView<T, sizeof...(S)>{data, in_shape, ctx->Device(), order};
@@ -683,7 +683,7 @@ using MatrixView = TensorView<T, 2>;
  *
  * `stream` is optionally included when data is on CUDA device.
  */
-template <typename T, int32_t D>
+template <typename T, std::int32_t D>
 Json ArrayInterface(TensorView<T const, D> const &t) {
   Json array_interface{Object{}};
   array_interface["data"] = std::vector<Json>(2);
@@ -691,7 +691,7 @@ Json ArrayInterface(TensorView<T const, D> const &t) {
   array_interface["data"][1] = Boolean{true};
   if (t.Device().IsCUDA()) {
     // Change this once we have different CUDA stream.
-    array_interface["stream"] = Null{};
+    array_interface["stream"] = Integer{2};
   }
   std::vector<Json> shape(t.Shape().size());
   std::vector<Json> stride(t.Stride().size());

@@ -16,31 +16,28 @@ n_threads <- 1
 test_that("train and predict binary classification", {
   nrounds <- 2
   expect_output(
-    bst <- xgboost(
-      data = train$data, label = train$label, max_depth = 2,
+    bst <- xgb.train(
+      data = xgb.DMatrix(train$data, label = train$label), max_depth = 2,
       eta = 1, nthread = n_threads, nrounds = nrounds,
-      objective = "binary:logistic", eval_metric = "error"
+      objective = "binary:logistic", eval_metric = "error",
+      watchlist = list(train = xgb.DMatrix(train$data, label = train$label))
     ),
     "train-error"
   )
   expect_equal(class(bst), "xgb.Booster")
-  expect_equal(bst$niter, nrounds)
-  expect_false(is.null(bst$evaluation_log))
-  expect_equal(nrow(bst$evaluation_log), nrounds)
-  expect_lt(bst$evaluation_log[, min(train_error)], 0.03)
+  expect_equal(xgb.get.num.boosted.rounds(bst), nrounds)
+  expect_false(is.null(attributes(bst)$evaluation_log))
+  expect_equal(nrow(attributes(bst)$evaluation_log), nrounds)
+  expect_lt(attributes(bst)$evaluation_log[, min(train_error)], 0.03)
 
   pred <- predict(bst, test$data)
   expect_length(pred, 1611)
 
-  pred1 <- predict(bst, train$data, ntreelimit = 1)
+  pred1 <- predict(bst, train$data, iterationrange = c(1, 1))
   expect_length(pred1, 6513)
   err_pred1 <- sum((pred1 > 0.5) != train$label) / length(train$label)
-  err_log <- bst$evaluation_log[1, train_error]
+  err_log <- attributes(bst)$evaluation_log[1, train_error]
   expect_lt(abs(err_pred1 - err_log), 10e-6)
-
-  pred2 <- predict(bst, train$data, iterationrange = c(1, 2))
-  expect_length(pred1, 6513)
-  expect_equal(pred1, pred2)
 })
 
 test_that("parameter validation works", {
@@ -56,7 +53,7 @@ test_that("parameter validation works", {
   y <- d[, "x1"] + d[, "x2"]^2 +
     ifelse(d[, "x3"] > .5, d[, "x3"]^2, 2^d[, "x3"]) +
     rnorm(10)
-  dtrain <- xgb.DMatrix(data = d, info = list(label = y), nthread = n_threads)
+  dtrain <- xgb.DMatrix(data = d, label = y, nthread = n_threads)
 
   correct <- function() {
     params <- list(
@@ -82,7 +79,8 @@ test_that("parameter validation works", {
       bar = "foo"
     )
     output <- capture.output(
-      xgb.train(params = params, data = dtrain, nrounds = nrounds)
+      xgb.train(params = params, data = dtrain, nrounds = nrounds),
+      type = "message"
     )
     print(output)
   }
@@ -104,9 +102,8 @@ test_that("dart prediction works", {
     rnorm(100)
 
   set.seed(1994)
-  booster_by_xgboost <- xgboost(
-    data = d,
-    label = y,
+  booster_by_xgboost <- xgb.train(
+    data = xgb.DMatrix(d, label = y),
     max_depth = 2,
     booster = "dart",
     rate_drop = 0.5,
@@ -116,15 +113,15 @@ test_that("dart prediction works", {
     nrounds = nrounds,
     objective = "reg:squarederror"
   )
-  pred_by_xgboost_0 <- predict(booster_by_xgboost, newdata = d, ntreelimit = 0)
-  pred_by_xgboost_1 <- predict(booster_by_xgboost, newdata = d, ntreelimit = nrounds)
+  pred_by_xgboost_0 <- predict(booster_by_xgboost, newdata = d, iterationrange = NULL)
+  pred_by_xgboost_1 <- predict(booster_by_xgboost, newdata = d, iterationrange = c(1, nrounds))
   expect_true(all(matrix(pred_by_xgboost_0, byrow = TRUE) == matrix(pred_by_xgboost_1, byrow = TRUE)))
 
   pred_by_xgboost_2 <- predict(booster_by_xgboost, newdata = d, training = TRUE)
   expect_false(all(matrix(pred_by_xgboost_0, byrow = TRUE) == matrix(pred_by_xgboost_2, byrow = TRUE)))
 
   set.seed(1994)
-  dtrain <- xgb.DMatrix(data = d, info = list(label = y), nthread = n_threads)
+  dtrain <- xgb.DMatrix(data = d, label = y, nthread = n_threads)
   booster_by_train <- xgb.train(
     params = list(
       booster = "dart",
@@ -138,8 +135,8 @@ test_that("dart prediction works", {
     data = dtrain,
     nrounds = nrounds
   )
-  pred_by_train_0 <- predict(booster_by_train, newdata = dtrain, ntreelimit = 0)
-  pred_by_train_1 <- predict(booster_by_train, newdata = dtrain, ntreelimit = nrounds)
+  pred_by_train_0 <- predict(booster_by_train, newdata = dtrain, iterationrange = NULL)
+  pred_by_train_1 <- predict(booster_by_train, newdata = dtrain, iterationrange = c(1, nrounds))
   pred_by_train_2 <- predict(booster_by_train, newdata = dtrain, training = TRUE)
 
   expect_true(all(matrix(pred_by_train_0, byrow = TRUE) == matrix(pred_by_xgboost_0, byrow = TRUE)))
@@ -151,16 +148,17 @@ test_that("train and predict softprob", {
   lb <- as.numeric(iris$Species) - 1
   set.seed(11)
   expect_output(
-    bst <- xgboost(
-      data = as.matrix(iris[, -5]), label = lb,
+    bst <- xgb.train(
+      data = xgb.DMatrix(as.matrix(iris[, -5]), label = lb),
       max_depth = 3, eta = 0.5, nthread = n_threads, nrounds = 5,
-      objective = "multi:softprob", num_class = 3, eval_metric = "merror"
+      objective = "multi:softprob", num_class = 3, eval_metric = "merror",
+      watchlist = list(train = xgb.DMatrix(as.matrix(iris[, -5]), label = lb))
     ),
     "train-merror"
   )
-  expect_false(is.null(bst$evaluation_log))
-  expect_lt(bst$evaluation_log[, min(train_merror)], 0.025)
-  expect_equal(bst$niter * 3, xgb.ntree(bst))
+  expect_false(is.null(attributes(bst)$evaluation_log))
+  expect_lt(attributes(bst)$evaluation_log[, min(train_merror)], 0.025)
+  expect_equal(xgb.get.num.boosted.rounds(bst), 5)
   pred <- predict(bst, as.matrix(iris[, -5]))
   expect_length(pred, nrow(iris) * 3)
   # row sums add up to total probability of 1:
@@ -170,14 +168,14 @@ test_that("train and predict softprob", {
   expect_equal(as.numeric(t(mpred)), pred)
   pred_labels <- max.col(mpred) - 1
   err <- sum(pred_labels != lb) / length(lb)
-  expect_equal(bst$evaluation_log[5, train_merror], err, tolerance = 5e-6)
+  expect_equal(attributes(bst)$evaluation_log[5, train_merror], err, tolerance = 5e-6)
   # manually calculate error at the 1st iteration:
-  mpred <- predict(bst, as.matrix(iris[, -5]), reshape = TRUE, ntreelimit = 1)
+  mpred <- predict(bst, as.matrix(iris[, -5]), reshape = TRUE, iterationrange = c(1, 1))
   pred_labels <- max.col(mpred) - 1
   err <- sum(pred_labels != lb) / length(lb)
-  expect_equal(bst$evaluation_log[1, train_merror], err, tolerance = 5e-6)
+  expect_equal(attributes(bst)$evaluation_log[1, train_merror], err, tolerance = 5e-6)
 
-  mpred1 <- predict(bst, as.matrix(iris[, -5]), reshape = TRUE, iterationrange = c(1, 2))
+  mpred1 <- predict(bst, as.matrix(iris[, -5]), reshape = TRUE, iterationrange = c(1, 1))
   expect_equal(mpred, mpred1)
 
   d <- cbind(
@@ -186,7 +184,7 @@ test_that("train and predict softprob", {
     x3 = rnorm(100)
   )
   y <- sample.int(10, 100, replace = TRUE) - 1
-  dtrain <- xgb.DMatrix(data = d, info = list(label = y), nthread = n_threads)
+  dtrain <- xgb.DMatrix(data = d, label = y, nthread = n_threads)
   booster <- xgb.train(
     params = list(tree_method = "hist", nthread = n_threads),
     data = dtrain, nrounds = 4, num_class = 10,
@@ -201,97 +199,97 @@ test_that("train and predict softmax", {
   lb <- as.numeric(iris$Species) - 1
   set.seed(11)
   expect_output(
-    bst <- xgboost(
-      data = as.matrix(iris[, -5]), label = lb,
+    bst <- xgb.train(
+      data = xgb.DMatrix(as.matrix(iris[, -5]), label = lb),
       max_depth = 3, eta = 0.5, nthread = n_threads, nrounds = 5,
-      objective = "multi:softmax", num_class = 3, eval_metric = "merror"
+      objective = "multi:softmax", num_class = 3, eval_metric = "merror",
+      watchlist = list(train = xgb.DMatrix(as.matrix(iris[, -5]), label = lb))
     ),
     "train-merror"
   )
-  expect_false(is.null(bst$evaluation_log))
-  expect_lt(bst$evaluation_log[, min(train_merror)], 0.025)
-  expect_equal(bst$niter * 3, xgb.ntree(bst))
+  expect_false(is.null(attributes(bst)$evaluation_log))
+  expect_lt(attributes(bst)$evaluation_log[, min(train_merror)], 0.025)
+  expect_equal(xgb.get.num.boosted.rounds(bst), 5)
 
   pred <- predict(bst, as.matrix(iris[, -5]))
   expect_length(pred, nrow(iris))
   err <- sum(pred != lb) / length(lb)
-  expect_equal(bst$evaluation_log[5, train_merror], err, tolerance = 5e-6)
+  expect_equal(attributes(bst)$evaluation_log[5, train_merror], err, tolerance = 5e-6)
 })
 
 test_that("train and predict RF", {
   set.seed(11)
   lb <- train$label
   # single iteration
-  bst <- xgboost(
-    data = train$data, label = lb, max_depth = 5,
+  bst <- xgb.train(
+    data = xgb.DMatrix(train$data, label = lb), max_depth = 5,
     nthread = n_threads,
     nrounds = 1, objective = "binary:logistic", eval_metric = "error",
-    num_parallel_tree = 20, subsample = 0.6, colsample_bytree = 0.1
+    num_parallel_tree = 20, subsample = 0.6, colsample_bytree = 0.1,
+    watchlist = list(train = xgb.DMatrix(train$data, label = lb))
   )
-  expect_equal(bst$niter, 1)
-  expect_equal(xgb.ntree(bst), 20)
+  expect_equal(xgb.get.num.boosted.rounds(bst), 1)
 
   pred <- predict(bst, train$data)
   pred_err <- sum((pred > 0.5) != lb) / length(lb)
-  expect_lt(abs(bst$evaluation_log[1, train_error] - pred_err), 10e-6)
+  expect_lt(abs(attributes(bst)$evaluation_log[1, train_error] - pred_err), 10e-6)
   # expect_lt(pred_err, 0.03)
 
-  pred <- predict(bst, train$data, ntreelimit = 20)
+  pred <- predict(bst, train$data, iterationrange = c(1, 1))
   pred_err_20 <- sum((pred > 0.5) != lb) / length(lb)
   expect_equal(pred_err_20, pred_err)
-
-  pred1 <- predict(bst, train$data, iterationrange = c(1, 2))
-  expect_equal(pred, pred1)
 })
 
 test_that("train and predict RF with softprob", {
   lb <- as.numeric(iris$Species) - 1
   nrounds <- 15
   set.seed(11)
-  bst <- xgboost(
-    data = as.matrix(iris[, -5]), label = lb,
+  bst <- xgb.train(
+    data = xgb.DMatrix(as.matrix(iris[, -5]), label = lb),
     max_depth = 3, eta = 0.9, nthread = n_threads, nrounds = nrounds,
     objective = "multi:softprob", eval_metric = "merror",
     num_class = 3, verbose = 0,
-    num_parallel_tree = 4, subsample = 0.5, colsample_bytree = 0.5
+    num_parallel_tree = 4, subsample = 0.5, colsample_bytree = 0.5,
+    watchlist = list(train = xgb.DMatrix(as.matrix(iris[, -5]), label = lb))
   )
-  expect_equal(bst$niter, 15)
-  expect_equal(xgb.ntree(bst), 15 * 3 * 4)
+  expect_equal(xgb.get.num.boosted.rounds(bst), 15)
   # predict for all iterations:
   pred <- predict(bst, as.matrix(iris[, -5]), reshape = TRUE)
   expect_equal(dim(pred), c(nrow(iris), 3))
   pred_labels <- max.col(pred) - 1
   err <- sum(pred_labels != lb) / length(lb)
-  expect_equal(bst$evaluation_log[nrounds, train_merror], err, tolerance = 5e-6)
+  expect_equal(attributes(bst)$evaluation_log[nrounds, train_merror], err, tolerance = 5e-6)
   # predict for 7 iterations and adjust for 4 parallel trees per iteration
-  pred <- predict(bst, as.matrix(iris[, -5]), reshape = TRUE, ntreelimit = 7 * 4)
+  pred <- predict(bst, as.matrix(iris[, -5]), reshape = TRUE, iterationrange = c(1, 7))
   err <- sum((max.col(pred) - 1) != lb) / length(lb)
-  expect_equal(bst$evaluation_log[7, train_merror], err, tolerance = 5e-6)
+  expect_equal(attributes(bst)$evaluation_log[7, train_merror], err, tolerance = 5e-6)
 })
 
 test_that("use of multiple eval metrics works", {
   expect_output(
-    bst <- xgboost(
-      data = train$data, label = train$label, max_depth = 2,
+    bst <- xgb.train(
+      data = xgb.DMatrix(train$data, label = train$label), max_depth = 2,
       eta = 1, nthread = n_threads, nrounds = 2, objective = "binary:logistic",
-      eval_metric = "error", eval_metric = "auc", eval_metric = "logloss"
+      eval_metric = "error", eval_metric = "auc", eval_metric = "logloss",
+      watchlist = list(train = xgb.DMatrix(train$data, label = train$label))
     ),
     "train-error.*train-auc.*train-logloss"
   )
-  expect_false(is.null(bst$evaluation_log))
-  expect_equal(dim(bst$evaluation_log), c(2, 4))
-  expect_equal(colnames(bst$evaluation_log), c("iter", "train_error", "train_auc", "train_logloss"))
+  expect_false(is.null(attributes(bst)$evaluation_log))
+  expect_equal(dim(attributes(bst)$evaluation_log), c(2, 4))
+  expect_equal(colnames(attributes(bst)$evaluation_log), c("iter", "train_error", "train_auc", "train_logloss"))
   expect_output(
-    bst2 <- xgboost(
-      data = train$data, label = train$label, max_depth = 2,
+    bst2 <- xgb.train(
+      data = xgb.DMatrix(train$data, label = train$label), max_depth = 2,
       eta = 1, nthread = n_threads, nrounds = 2, objective = "binary:logistic",
-      eval_metric = list("error", "auc", "logloss")
+      eval_metric = list("error", "auc", "logloss"),
+      watchlist = list(train = xgb.DMatrix(train$data, label = train$label))
     ),
     "train-error.*train-auc.*train-logloss"
   )
-  expect_false(is.null(bst2$evaluation_log))
-  expect_equal(dim(bst2$evaluation_log), c(2, 4))
-  expect_equal(colnames(bst2$evaluation_log), c("iter", "train_error", "train_auc", "train_logloss"))
+  expect_false(is.null(attributes(bst2)$evaluation_log))
+  expect_equal(dim(attributes(bst2)$evaluation_log), c(2, 4))
+  expect_equal(colnames(attributes(bst2)$evaluation_log), c("iter", "train_error", "train_auc", "train_logloss"))
 })
 
 
@@ -311,41 +309,25 @@ test_that("training continuation works", {
   # continue for two more:
   bst2 <- xgb.train(param, dtrain, nrounds = 2, watchlist, verbose = 0, xgb_model = bst1)
   if (!windows_flag && !solaris_flag) {
-    expect_equal(bst$raw, bst2$raw)
+    expect_equal(xgb.save.raw(bst), xgb.save.raw(bst2))
   }
-  expect_false(is.null(bst2$evaluation_log))
-  expect_equal(dim(bst2$evaluation_log), c(4, 2))
-  expect_equal(bst2$evaluation_log, bst$evaluation_log)
+  expect_false(is.null(attributes(bst2)$evaluation_log))
+  expect_equal(dim(attributes(bst2)$evaluation_log), c(4, 2))
+  expect_equal(attributes(bst2)$evaluation_log, attributes(bst)$evaluation_log)
   # test continuing from raw model data
-  bst2 <- xgb.train(param, dtrain, nrounds = 2, watchlist, verbose = 0, xgb_model = bst1$raw)
+  bst2 <- xgb.train(param, dtrain, nrounds = 2, watchlist, verbose = 0, xgb_model = xgb.save.raw(bst1))
   if (!windows_flag && !solaris_flag) {
-    expect_equal(bst$raw, bst2$raw)
+    expect_equal(xgb.save.raw(bst), xgb.save.raw(bst2))
   }
-  expect_equal(dim(bst2$evaluation_log), c(2, 2))
+  expect_equal(dim(attributes(bst2)$evaluation_log), c(2, 2))
   # test continuing from a model in file
-  xgb.save(bst1, "xgboost.json")
-  bst2 <- xgb.train(param, dtrain, nrounds = 2, watchlist, verbose = 0, xgb_model = "xgboost.json")
+  fname <- file.path(tempdir(), "xgboost.json")
+  xgb.save(bst1, fname)
+  bst2 <- xgb.train(param, dtrain, nrounds = 2, watchlist, verbose = 0, xgb_model = fname)
   if (!windows_flag && !solaris_flag) {
-    expect_equal(bst$raw, bst2$raw)
+    expect_equal(xgb.save.raw(bst), xgb.save.raw(bst2))
   }
-  expect_equal(dim(bst2$evaluation_log), c(2, 2))
-  file.remove("xgboost.json")
-})
-
-test_that("model serialization works", {
-  out_path <- "model_serialization"
-  dtrain <- xgb.DMatrix(train$data, label = train$label, nthread = n_threads)
-  watchlist <- list(train = dtrain)
-  param <- list(objective = "binary:logistic", nthread = n_threads)
-  booster <- xgb.train(param, dtrain, nrounds = 4, watchlist)
-  raw <- xgb.serialize(booster)
-  saveRDS(raw, out_path)
-  raw <- readRDS(out_path)
-
-  loaded <- xgb.unserialize(raw)
-  raw_from_loaded <- xgb.serialize(loaded)
-  expect_equal(raw, raw_from_loaded)
-  file.remove(out_path)
+  expect_equal(dim(attributes(bst2)$evaluation_log), c(2, 2))
 })
 
 test_that("xgb.cv works", {
@@ -361,7 +343,7 @@ test_that("xgb.cv works", {
   expect_is(cv, "xgb.cv.synchronous")
   expect_false(is.null(cv$evaluation_log))
   expect_lt(cv$evaluation_log[, min(test_error_mean)], 0.03)
-  expect_lt(cv$evaluation_log[, min(test_error_std)], 0.008)
+  expect_lt(cv$evaluation_log[, min(test_error_std)], 0.0085)
   expect_equal(cv$niter, 2)
   expect_false(is.null(cv$folds) && is.list(cv$folds))
   expect_length(cv$folds, 5)
@@ -391,8 +373,8 @@ test_that("xgb.cv works with stratified folds", {
 test_that("train and predict with non-strict classes", {
   # standard dense matrix input
   train_dense <- as.matrix(train$data)
-  bst <- xgboost(
-    data = train_dense, label = train$label, max_depth = 2,
+  bst <- xgb.train(
+    data = xgb.DMatrix(train_dense, label = train$label), max_depth = 2,
     eta = 1, nthread = n_threads, nrounds = 2, objective = "binary:logistic",
     verbose = 0
   )
@@ -402,8 +384,8 @@ test_that("train and predict with non-strict classes", {
   class(train_dense) <- "shmatrix"
   expect_true(is.matrix(train_dense))
   expect_error(
-    bst <- xgboost(
-      data = train_dense, label = train$label, max_depth = 2,
+    bst <- xgb.train(
+      data = xgb.DMatrix(train_dense, label = train$label), max_depth = 2,
       eta = 1, nthread = n_threads, nrounds = 2, objective = "binary:logistic",
       verbose = 0
     ),
@@ -416,8 +398,8 @@ test_that("train and predict with non-strict classes", {
   class(train_dense) <- c("pphmatrix", "shmatrix")
   expect_true(is.matrix(train_dense))
   expect_error(
-    bst <- xgboost(
-      data = train_dense, label = train$label, max_depth = 2,
+    bst <- xgb.train(
+      data = xgb.DMatrix(train_dense, label = train$label), max_depth = 2,
       eta = 1, nthread = n_threads, nrounds = 2, objective = "binary:logistic",
       verbose = 0
     ),
@@ -448,8 +430,8 @@ test_that("max_delta_step works", {
   # model with restricted max_delta_step
   bst2 <- xgb.train(param, dtrain, nrounds, watchlist, verbose = 1, max_delta_step = 1)
   # the no-restriction model is expected to have consistently lower loss during the initial iterations
-  expect_true(all(bst1$evaluation_log$train_logloss < bst2$evaluation_log$train_logloss))
-  expect_lt(mean(bst1$evaluation_log$train_logloss) / mean(bst2$evaluation_log$train_logloss), 0.8)
+  expect_true(all(attributes(bst1)$evaluation_log$train_logloss < attributes(bst2)$evaluation_log$train_logloss))
+  expect_lt(mean(attributes(bst1)$evaluation_log$train_logloss) / mean(attributes(bst2)$evaluation_log$train_logloss), 0.8)
 })
 
 test_that("colsample_bytree works", {
@@ -480,8 +462,8 @@ test_that("colsample_bytree works", {
 })
 
 test_that("Configuration works", {
-  bst <- xgboost(
-    data = train$data, label = train$label, max_depth = 2,
+  bst <- xgb.train(
+    data = xgb.DMatrix(train$data, label = train$label), max_depth = 2,
     eta = 1, nthread = n_threads, nrounds = 2, objective = "binary:logistic",
     eval_metric = "error", eval_metric = "auc", eval_metric = "logloss"
   )
@@ -521,8 +503,8 @@ test_that("strict_shape works", {
     y <- as.numeric(iris$Species) - 1
     X <- as.matrix(iris[, -5])
 
-    bst <- xgboost(
-      data = X, label = y,
+    bst <- xgb.train(
+      data = xgb.DMatrix(X, label = y),
       max_depth = 2, nrounds = n_rounds, nthread = n_threads,
       objective = "multi:softprob", num_class = 3, eval_metric = "merror"
     )
@@ -536,8 +518,8 @@ test_that("strict_shape works", {
     X <- agaricus.train$data
     y <- agaricus.train$label
 
-    bst <- xgboost(
-      data = X, label = y, max_depth = 2, nthread = n_threads,
+    bst <- xgb.train(
+      data = xgb.DMatrix(X, label = y), max_depth = 2, nthread = n_threads,
       nrounds = n_rounds, objective = "binary:logistic",
       eval_metric = "error", eval_metric = "auc", eval_metric = "logloss"
     )
@@ -555,8 +537,8 @@ test_that("'predict' accepts CSR data", {
   x_csc <- as(X[1L, , drop = FALSE], "CsparseMatrix")
   x_csr <- as(x_csc, "RsparseMatrix")
   x_spv <- as(x_csc, "sparseVector")
-  bst <- xgboost(
-    data = X, label = y, objective = "binary:logistic",
+  bst <- xgb.train(
+    data = xgb.DMatrix(X, label = y), objective = "binary:logistic",
     nrounds = 5L, verbose = FALSE, nthread = n_threads,
   )
   p_csc <- predict(bst, x_csc)
@@ -564,4 +546,235 @@ test_that("'predict' accepts CSR data", {
   p_spv <- predict(bst, x_spv)
   expect_equal(p_csc, p_csr)
   expect_equal(p_csc, p_spv)
+})
+
+test_that("Quantile regression accepts multiple quantiles", {
+  data(mtcars)
+  y <- mtcars[, 1]
+  x <- as.matrix(mtcars[, -1])
+  dm <- xgb.DMatrix(data = x, label = y)
+  model <- xgb.train(
+    data = dm,
+    params = list(
+      objective = "reg:quantileerror",
+      tree_method = "exact",
+      quantile_alpha = c(0.05, 0.5, 0.95),
+      nthread = n_threads
+    ),
+    nrounds = 15
+  )
+  pred <- predict(model, x, reshape = TRUE)
+
+  expect_equal(dim(pred)[1], nrow(x))
+  expect_equal(dim(pred)[2], 3)
+  expect_true(all(pred[, 1] <= pred[, 3]))
+
+  cors <- cor(y, pred)
+  expect_true(cors[2] > cors[1])
+  expect_true(cors[2] > cors[3])
+  expect_true(cors[2] > 0.85)
+})
+
+test_that("Can use multi-output labels with built-in objectives", {
+  data("mtcars")
+  y <- mtcars$mpg
+  x <- as.matrix(mtcars[, -1])
+  y_mirrored <- cbind(y, -y)
+  dm <- xgb.DMatrix(x, label = y_mirrored, nthread = n_threads)
+  model <- xgb.train(
+    params = list(
+      tree_method = "hist",
+      multi_strategy = "multi_output_tree",
+      objective = "reg:squarederror",
+      nthread = n_threads
+    ),
+    data = dm,
+    nrounds = 5
+  )
+  pred <- predict(model, x, reshape = TRUE)
+  expect_equal(pred[, 1], -pred[, 2])
+  expect_true(cor(y, pred[, 1]) > 0.9)
+  expect_true(cor(y, pred[, 2]) < -0.9)
+})
+
+test_that("Can use multi-output labels with custom objectives", {
+  data("mtcars")
+  y <- mtcars$mpg
+  x <- as.matrix(mtcars[, -1])
+  y_mirrored <- cbind(y, -y)
+  dm <- xgb.DMatrix(x, label = y_mirrored, nthread = n_threads)
+  model <- xgb.train(
+    params = list(
+      tree_method = "hist",
+      multi_strategy = "multi_output_tree",
+      base_score = 0,
+      objective = function(pred, dtrain) {
+        y <- getinfo(dtrain, "label")
+        grad <- pred - y
+        hess <- rep(1, nrow(grad) * ncol(grad))
+        hess <- matrix(hess, nrow = nrow(grad))
+        return(list(grad = grad, hess = hess))
+      },
+      nthread = n_threads
+    ),
+    data = dm,
+    nrounds = 5
+  )
+  pred <- predict(model, x, reshape = TRUE)
+  expect_equal(pred[, 1], -pred[, 2])
+  expect_true(cor(y, pred[, 1]) > 0.9)
+  expect_true(cor(y, pred[, 2]) < -0.9)
+})
+
+test_that("Can use ranking objectives with either 'qid' or 'group'", {
+  set.seed(123)
+  x <- matrix(rnorm(100 * 10), nrow = 100)
+  y <- sample(2, size = 100, replace = TRUE) - 1
+  qid <- c(rep(1, 20), rep(2, 20), rep(3, 60))
+  gr <- c(20, 20, 60)
+
+  dmat_qid <- xgb.DMatrix(x, label = y, qid = qid)
+  dmat_gr <- xgb.DMatrix(x, label = y, group = gr)
+
+  params <- list(tree_method = "hist",
+                 lambdarank_num_pair_per_sample = 8,
+                 objective = "rank:ndcg",
+                 lambdarank_pair_method = "topk",
+                 nthread = n_threads)
+  set.seed(123)
+  model_qid <- xgb.train(params, dmat_qid, nrounds = 5)
+  set.seed(123)
+  model_gr <- xgb.train(params, dmat_gr, nrounds = 5)
+
+  pred_qid <- predict(model_qid, x)
+  pred_gr <- predict(model_gr, x)
+  expect_equal(pred_qid, pred_gr)
+})
+
+test_that("Coefficients from gblinear have the expected shape and names", {
+  # Single-column coefficients
+  data(mtcars)
+  y <- mtcars$mpg
+  x <- as.matrix(mtcars[, -1])
+  mm <- model.matrix(~., data = mtcars[, -1])
+  dm <- xgb.DMatrix(x, label = y, nthread = 1)
+  model <- xgb.train(
+    data = dm,
+    params = list(
+      booster = "gblinear",
+      nthread = 1
+    ),
+    nrounds = 3
+  )
+  coefs <- coef(model)
+  expect_equal(length(coefs), ncol(x) + 1)
+  expect_equal(names(coefs), c("(Intercept)", colnames(x)))
+  pred_auto <- predict(model, x)
+  pred_manual <- as.numeric(mm %*% coefs)
+  expect_equal(pred_manual, pred_auto, tolerance = 1e-5)
+
+  # Multi-column coefficients
+  data(iris)
+  y <- as.numeric(iris$Species) - 1
+  x <- as.matrix(iris[, -5])
+  dm <- xgb.DMatrix(x, label = y, nthread = 1)
+  mm <- model.matrix(~., data = iris[, -5])
+  model <- xgb.train(
+    data = dm,
+    params = list(
+      booster = "gblinear",
+      objective = "multi:softprob",
+      num_class = 3,
+      nthread = 1
+    ),
+    nrounds = 3
+  )
+  coefs <- coef(model)
+  expect_equal(nrow(coefs), ncol(x) + 1)
+  expect_equal(ncol(coefs), 3)
+  expect_equal(row.names(coefs), c("(Intercept)", colnames(x)))
+  pred_auto <- predict(model, x, outputmargin = TRUE, reshape = TRUE)
+  pred_manual <- unname(mm %*% coefs)
+  expect_equal(pred_manual, pred_auto, tolerance = 1e-7)
+})
+
+test_that("Deep copies work as expected", {
+  data(mtcars)
+  y <- mtcars$mpg
+  x <- mtcars[, -1]
+  dm <- xgb.DMatrix(x, label = y, nthread = 1)
+  model <- xgb.train(
+   data = dm,
+   params = list(nthread = 1),
+   nrounds = 3
+  )
+
+  xgb.attr(model, "my_attr") <- 100
+  model_shallow_copy <- model
+  xgb.attr(model_shallow_copy, "my_attr") <- 333
+  attr_orig <- xgb.attr(model, "my_attr")
+  attr_shallow <- xgb.attr(model_shallow_copy, "my_attr")
+  expect_equal(attr_orig, attr_shallow)
+
+  model_deep_copy <- xgb.copy.Booster(model)
+  xgb.attr(model_deep_copy, "my_attr") <- 444
+  attr_orig <- xgb.attr(model, "my_attr")
+  attr_deep <- xgb.attr(model_deep_copy, "my_attr")
+  expect_false(attr_orig == attr_deep)
+})
+
+test_that("Pointer comparison works as expected", {
+  library(xgboost)
+  y <- mtcars$mpg
+  x <- as.matrix(mtcars[, -1])
+  model <- xgb.train(
+    params = list(nthread = 1),
+    data = xgb.DMatrix(x, label = y, nthread = 1),
+    nrounds = 3
+  )
+
+  model_shallow_copy <- model
+  expect_true(xgb.is.same.Booster(model, model_shallow_copy))
+
+  model_deep_copy <- xgb.copy.Booster(model)
+  expect_false(xgb.is.same.Booster(model, model_deep_copy))
+
+  xgb.attr(model_shallow_copy, "my_attr") <- 111
+  expect_equal(xgb.attr(model, "my_attr"), "111")
+  expect_null(xgb.attr(model_deep_copy, "my_attr"))
+})
+
+test_that("DMatrix field are set to booster when training", {
+  set.seed(123)
+  y <- rnorm(100)
+  x <- matrix(rnorm(100 * 3), nrow = 100)
+  x[, 2] <- abs(as.integer(x[, 2]))
+
+  dm_unnamed <- xgb.DMatrix(x, label = y, nthread = 1)
+  dm_feature_names <- xgb.DMatrix(x, label = y, feature_names = c("a", "b", "c"), nthread = 1)
+  dm_feature_types <- xgb.DMatrix(x, label = y)
+  setinfo(dm_feature_types, "feature_type", c("q", "c", "q"))
+  dm_both <- xgb.DMatrix(x, label = y, feature_names = c("a", "b", "c"), nthread = 1)
+  setinfo(dm_both, "feature_type", c("q", "c", "q"))
+
+  params <- list(nthread = 1)
+  model_unnamed <- xgb.train(data = dm_unnamed, params = params, nrounds = 3)
+  model_feature_names <- xgb.train(data = dm_feature_names, params = params, nrounds = 3)
+  model_feature_types <- xgb.train(data = dm_feature_types, params = params, nrounds = 3)
+  model_both <- xgb.train(data = dm_both, params = params, nrounds = 3)
+
+  expect_null(getinfo(model_unnamed, "feature_name"))
+  expect_equal(getinfo(model_feature_names, "feature_name"), c("a", "b", "c"))
+  expect_null(getinfo(model_feature_types, "feature_name"))
+  expect_equal(getinfo(model_both, "feature_name"), c("a", "b", "c"))
+
+  expect_null(variable.names(model_unnamed))
+  expect_equal(variable.names(model_feature_names), c("a", "b", "c"))
+  expect_null(variable.names(model_feature_types))
+  expect_equal(variable.names(model_both), c("a", "b", "c"))
+
+  expect_null(getinfo(model_unnamed, "feature_type"))
+  expect_null(getinfo(model_feature_names, "feature_type"))
+  expect_equal(getinfo(model_feature_types, "feature_type"), c("q", "c", "q"))
+  expect_equal(getinfo(model_both, "feature_type"), c("q", "c", "q"))
 })

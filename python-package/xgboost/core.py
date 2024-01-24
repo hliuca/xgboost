@@ -3,7 +3,6 @@
 """Core XGBoost Library."""
 import copy
 import ctypes
-import importlib.util
 import json
 import os
 import re
@@ -45,7 +44,6 @@ from ._typing import (
     CStrPptr,
     CStrPtr,
     CTypeT,
-    CupyT,
     DataType,
     FeatureInfo,
     FeatureNames,
@@ -55,7 +53,7 @@ from ._typing import (
     TransformedData,
     c_bst_ulong,
 )
-from .compat import PANDAS_INSTALLED, DataFrame, py_str
+from .compat import PANDAS_INSTALLED, DataFrame, import_cupy, py_str
 from .libpath import find_lib_path
 
 
@@ -184,6 +182,13 @@ def _py_version() -> str:
         return f.read().strip()
 
 
+def _register_log_callback(lib: ctypes.CDLL) -> None:
+    lib.XGBGetLastError.restype = ctypes.c_char_p
+    lib.callback = _get_log_callback_func()  # type: ignore
+    if lib.XGBRegisterLogCallback(lib.callback) != 0:
+        raise XGBoostError(lib.XGBGetLastError())
+
+
 def _load_lib() -> ctypes.CDLL:
     """Load xgboost Library."""
     lib_paths = find_lib_path()
@@ -206,6 +211,7 @@ def _load_lib() -> ctypes.CDLL:
             lib = ctypes.cdll.LoadLibrary(lib_path)
             setattr(lib, "path", os.path.normpath(lib_path))
             lib_success = True
+            break
         except OSError as e:
             os_error_list.append(str(e))
             continue
@@ -228,10 +234,7 @@ Likely causes:
 Error message(s): {os_error_list}
 """
         )
-    lib.XGBGetLastError.restype = ctypes.c_char_p
-    lib.callback = _get_log_callback_func()  # type: ignore
-    if lib.XGBRegisterLogCallback(lib.callback) != 0:
-        raise XGBoostError(lib.XGBGetLastError())
+    _register_log_callback(lib)
 
     def parse(ver: str) -> Tuple[int, int, int]:
         """Avoid dependency on packaging (PEP 440)."""
@@ -354,10 +357,13 @@ def _numpy2ctypes_type(dtype: Type[np.number]) -> Type[CNumeric]:
     return _NUMPY_TO_CTYPES_MAPPING[dtype]
 
 
+def _array_hasobject(data: DataType) -> bool:
+    return hasattr(data.dtype, "hasobject") and data.dtype.hasobject
+
+
 def _cuda_array_interface(data: DataType) -> bytes:
-    assert (
-        data.dtype.hasobject is False
-    ), "Input data contains `object` dtype.  Expecting numeric data."
+    if _array_hasobject(data):
+        raise ValueError("Input data contains `object` dtype.  Expecting numeric data.")
     interface = data.__cuda_array_interface__
     if "mask" in interface:
         interface["mask"] = interface["mask"].__cuda_array_interface__
@@ -374,34 +380,6 @@ def ctypes2numpy(cptr: CNumericPtr, length: int, dtype: Type[np.number]) -> np.n
     if not ctypes.memmove(res.ctypes.data, cptr, length * res.strides[0]):
         raise RuntimeError("memmove failed")
     return res
-
-
-def ctypes2cupy(cptr: CNumericPtr, length: int, dtype: Type[np.number]) -> CupyT:
-    """Convert a ctypes pointer array to a cupy array."""
-    # pylint: disable=import-error
-    import cupy
-    from cupy.cuda.memory import MemoryPointer, UnownedMemory
-
-    CUPY_TO_CTYPES_MAPPING: Dict[Type[np.number], Type[CNumeric]] = {
-        cupy.float32: ctypes.c_float,
-        cupy.uint32: ctypes.c_uint,
-    }
-    if dtype not in CUPY_TO_CTYPES_MAPPING:
-        raise RuntimeError(f"Supported types: {CUPY_TO_CTYPES_MAPPING.keys()}")
-    addr = ctypes.cast(cptr, ctypes.c_void_p).value
-    # pylint: disable=c-extension-no-member,no-member
-    device = cupy.cuda.runtime.pointerGetAttributes(addr).device
-    # The owner field is just used to keep the memory alive with ref count.  As
-    # unowned's life time is scoped within this function we don't need that.
-    unownd = UnownedMemory(
-        addr, length * ctypes.sizeof(CUPY_TO_CTYPES_MAPPING[dtype]), owner=None
-    )
-    memptr = MemoryPointer(unownd, 0)
-    # pylint: disable=unexpected-keyword-arg
-    mem = cupy.ndarray((length,), dtype=dtype, memptr=memptr)
-    assert mem.device.id == device
-    arr = cupy.array(mem, copy=True)
-    return arr
 
 
 def ctypes2buffer(cptr: CStrPtr, length: int) -> bytearray:
@@ -462,14 +440,8 @@ def from_array_interface(interface: dict) -> NumpyOrCupy:
 
     if "stream" in interface:
         # CUDA stream is presented, this is a __cuda_array_interface__.
-        spec = importlib.util.find_spec("cupy")
-        if spec is None:
-            raise ImportError("`cupy` is required for handling CUDA buffer.")
-
-        import cupy as cp  # pylint: disable=import-error
-
         arr.__cuda_array_interface__ = interface
-        out = cp.array(arr, copy=True)
+        out = import_cupy().array(arr, copy=True)
     else:
         arr.__array_interface__ = interface
         out = np.array(arr, copy=True)
@@ -477,17 +449,42 @@ def from_array_interface(interface: dict) -> NumpyOrCupy:
     return out
 
 
+def make_array_interface(
+    ptr: CNumericPtr, shape: Tuple[int, ...], dtype: Type[np.number], is_cuda: bool
+) -> Dict[str, Union[int, tuple, None]]:
+    """Make an __(cuda)_array_interface__ from a pointer."""
+    # Use an empty array to handle typestr and descr
+    if is_cuda:
+        empty = import_cupy().empty(shape=(0,), dtype=dtype)
+        array = empty.__cuda_array_interface__  # pylint: disable=no-member
+    else:
+        empty = np.empty(shape=(0,), dtype=dtype)
+        array = empty.__array_interface__  # pylint: disable=no-member
+
+    addr = ctypes.cast(ptr, ctypes.c_void_p).value
+    length = int(np.prod(shape))
+    # Handle empty dataset.
+    assert addr is not None or length == 0
+
+    if addr is None:
+        return array
+
+    array["data"] = (addr, True)
+    if is_cuda:
+        array["stream"] = 2
+    array["shape"] = shape
+    array["strides"] = None
+    return array
+
+
 def _prediction_output(
     shape: CNumericPtr, dims: c_bst_ulong, predts: CFloatPtr, is_cuda: bool
 ) -> NumpyOrCupy:
-    arr_shape = ctypes2numpy(shape, dims.value, np.uint64)
-    length = int(np.prod(arr_shape))
-    if is_cuda:
-        arr_predict = ctypes2cupy(predts, length, np.float32)
-    else:
-        arr_predict = ctypes2numpy(predts, length, np.float32)
-    arr_predict = arr_predict.reshape(arr_shape)
-    return arr_predict
+    arr_shape = tuple(ctypes2numpy(shape, dims.value, np.uint64).flatten())
+    array = from_array_interface(
+        make_array_interface(predts, arr_shape, np.float32, is_cuda)
+    )
+    return array
 
 
 class DataIter(ABC):  # pylint: disable=too-many-instance-attributes
@@ -791,7 +788,7 @@ class DMatrix:  # pylint: disable=too-many-instance-attributes,too-many-public-m
                  so it doesn't make sense to assign weights to individual data points.
 
         base_margin :
-            Base margin used for boosting from existing model.
+            Global bias for each instance. See :doc:`/tutorials/intercept` for details.
         missing :
             Value in the input data which needs to be present as a missing value. If
             None, defaults to np.nan.
@@ -828,9 +825,19 @@ class DMatrix:  # pylint: disable=too-many-instance-attributes,too-many-public-m
 
             .. note:: This parameter is experimental
 
-            Experimental support of specializing for categorical features.  Do not set
-            to True unless you are interested in development. Also, JSON/UBJSON
-            serialization format is required.
+            Experimental support of specializing for categorical features.
+
+            If passing 'True' and 'data' is a data frame (from supported libraries such
+            as Pandas, Modin or cuDF), columns of categorical types will automatically
+            be set to be of categorical type (feature_type='c') in the resulting
+            DMatrix.
+
+            If passing 'False' and 'data' is a data frame with categorical columns,
+            it will result in an error being thrown.
+
+            If 'data' is not a data frame, this argument is ignored.
+
+            JSON/UBJSON serialization format is required for this.
 
         """
         if group is not None and qid is not None:
@@ -1435,6 +1442,12 @@ class _ProxyDMatrix(DMatrix):
 
         _check_call(
             _LIB.XGProxyDMatrixSetDataDense(self.handle, _array_interface(data))
+        )
+
+    def _set_data_from_pandas(self, data: DataType) -> None:
+        """Set data from a pandas DataFrame. The input is a PandasTransformed instance."""
+        _check_call(
+            _LIB.XGProxyDMatrixSetDataColumnar(self.handle, data.array_interface())
         )
 
     def _set_data_from_csr(self, csr: scipy.sparse.csr_matrix) -> None:
@@ -2092,7 +2105,7 @@ class Booster:
             _array_interface,
             _cuda_array_interface,
             _ensure_np_dtype,
-            _is_cupy_array,
+            _is_cupy_alike,
         )
 
         self._assign_dmatrix_features(dtrain)
@@ -2106,7 +2119,7 @@ class Booster:
                 "Expecting `np.ndarray` or `cupy.ndarray` for gradient and hessian."
                 f" Got: {type(array)}"
             )
-            if not isinstance(array, np.ndarray) and not _is_cupy_array(array):
+            if not isinstance(array, np.ndarray) and not _is_cupy_alike(array):
                 raise TypeError(msg)
 
             n_samples = dtrain.num_row()
@@ -2121,7 +2134,7 @@ class Booster:
             if isinstance(array, np.ndarray):
                 array, _ = _ensure_np_dtype(array, array.dtype)
                 interface = _array_interface(array)
-            elif _is_cupy_array(array):
+            elif _is_cupy_alike(array):
                 interface = _cuda_array_interface(array)
             else:
                 raise TypeError(msg)
@@ -2446,11 +2459,12 @@ class Booster:
         assert proxy is None or isinstance(proxy, _ProxyDMatrix)
 
         from .data import (
+            PandasTransformed,
             _array_interface,
             _arrow_transform,
             _is_arrow,
             _is_cudf_df,
-            _is_cupy_array,
+            _is_cupy_alike,
             _is_list,
             _is_np_array_like,
             _is_pandas_df,
@@ -2500,6 +2514,19 @@ class Booster:
                 )
             )
             return _prediction_output(shape, dims, preds, False)
+        if isinstance(data, PandasTransformed):
+            _check_call(
+                _LIB.XGBoosterPredictFromColumnar(
+                    self.handle,
+                    data.array_interface(),
+                    args,
+                    p_handle,
+                    ctypes.byref(shape),
+                    ctypes.byref(dims),
+                    ctypes.byref(preds),
+                )
+            )
+            return _prediction_output(shape, dims, preds, False)
         if isinstance(data, scipy.sparse.csr_matrix):
             from .data import transform_scipy_sparse
 
@@ -2519,7 +2546,7 @@ class Booster:
                 )
             )
             return _prediction_output(shape, dims, preds, False)
-        if _is_cupy_array(data):
+        if _is_cupy_alike(data):
             from .data import _transform_cupy_array
 
             data = _transform_cupy_array(data)
@@ -2567,9 +2594,8 @@ class Booster:
 
         The model is saved in an XGBoost internal format which is universal among the
         various XGBoost interfaces. Auxiliary attributes of the Python Booster object
-        (such as feature_names) will not be saved when using binary format.  To save
-        those attributes, use JSON/UBJ instead. See :doc:`Model IO
-        </tutorials/saving_model>` for more info.
+        (such as feature_names) are only saved when using JSON or UBJSON (default)
+        format. See :doc:`Model IO </tutorials/saving_model>` for more info.
 
         .. code-block:: python
 
@@ -2589,15 +2615,18 @@ class Booster:
         else:
             raise TypeError("fname must be a string or os PathLike")
 
-    def save_raw(self, raw_format: str = "deprecated") -> bytearray:
+    def save_raw(self, raw_format: str = "ubj") -> bytearray:
         """Save the model to a in memory buffer representation instead of file.
+
+        The model is saved in an XGBoost internal format which is universal among the
+        various XGBoost interfaces. Auxiliary attributes of the Python Booster object
+        (such as feature_names) are only saved when using JSON or UBJSON (default)
+        format. See :doc:`Model IO </tutorials/saving_model>` for more info.
 
         Parameters
         ----------
         raw_format :
-            Format of output buffer. Can be `json`, `ubj` or `deprecated`.  Right now
-            the default is `deprecated` but it will be changed to `ubj` (univeral binary
-            json) in the future.
+            Format of output buffer. Can be `json`, `ubj` or `deprecated`.
 
         Returns
         -------
@@ -2616,11 +2645,10 @@ class Booster:
     def load_model(self, fname: ModelIn) -> None:
         """Load the model from a file or a bytearray.
 
-        The model is loaded from XGBoost format which is universal among the various
-        XGBoost interfaces. Auxiliary attributes of the Python Booster object (such as
-        feature_names) will not be loaded when using binary format.  To save those
-        attributes, use JSON/UBJ instead.  See :doc:`Model IO </tutorials/saving_model>`
-        for more info.
+        The model is saved in an XGBoost internal format which is universal among the
+        various XGBoost interfaces. Auxiliary attributes of the Python Booster object
+        (such as feature_names) are only saved when using JSON or UBJSON (default)
+        format. See :doc:`Model IO </tutorials/saving_model>` for more info.
 
         .. code-block:: python
 
@@ -2745,9 +2773,9 @@ class Booster:
         with_stats: bool = False,
         dump_format: str = "text",
     ) -> List[str]:
-        """Returns the model dump as a list of strings.  Unlike :py:meth:`save_model`, the output
-        format is primarily used for visualization or interpretation, hence it's more
-        human readable but cannot be loaded back to XGBoost.
+        """Returns the model dump as a list of strings.  Unlike :py:meth:`save_model`,
+        the output format is primarily used for visualization or interpretation, hence
+        it's more human readable but cannot be loaded back to XGBoost.
 
         Parameters
         ----------

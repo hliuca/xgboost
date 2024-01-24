@@ -18,6 +18,8 @@
 
 #if defined(XGBOOST_USE_CUDA)
 #include "cuda_fp16.h"  // for __half
+#elif defined(XGBOOST_USE_HIP)
+#include <hip/hip_fp16.h>  // for __half
 #endif
 
 namespace xgboost::collective {

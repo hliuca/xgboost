@@ -21,6 +21,10 @@ if (USE_HIP)
   target_sources(objxgboost PRIVATE ${HIP_SOURCES})
 endif (USE_HIP)
 
+if(PLUGIN_SYCL)
+  target_compile_definitions(objxgboost PRIVATE -DXGBOOST_USE_SYCL=1)
+endif()
+
 target_include_directories(objxgboost
   PRIVATE
   ${xgboost_SOURCE_DIR}/include

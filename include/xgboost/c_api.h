@@ -159,6 +159,16 @@ XGB_DLL int XGDMatrixCreateFromURI(char const *config, DMatrixHandle *out);
 XGB_DLL int XGDMatrixCreateFromCSREx(const size_t *indptr, const unsigned *indices,
                                      const float *data, size_t nindptr, size_t nelem,
                                      size_t num_col, DMatrixHandle *out);
+/**
+ * @brief Create a DMatrix from columnar data. (table)
+ *
+ * @param data   See @ref XGBoosterPredictFromColumnar for details.
+ * @param config See @ref XGDMatrixCreateFromDense for details.
+ * @param out    The created dmatrix.
+ *
+ * @return 0 when success, -1 when failure happens
+ */
+XGB_DLL int XGDMatrixCreateFromColumnar(char const *data, char const *config, DMatrixHandle *out);
 
 /**
  * @example c-api-demo.c
@@ -513,6 +523,16 @@ XGB_DLL int XGDeviceQuantileDMatrixCreateFromCallback(DataIterHandle iter, DMatr
 XGB_DLL int
 XGProxyDMatrixSetDataCudaArrayInterface(DMatrixHandle handle,
                                         const char *c_interface_str);
+
+/**
+ * @brief Set columnar (table) data on a DMatrix proxy.
+ *
+ * @param handle          A DMatrix proxy created by @ref XGProxyDMatrixCreate
+ * @param c_interface_str See @ref XGBoosterPredictFromColumnar for details.
+ *
+ * @return 0 when success, -1 when failure happens
+ */
+XGB_DLL int XGProxyDMatrixSetDataColumnar(DMatrixHandle handle, char const *c_interface_str);
 
 /*!
  * \brief Set data on a DMatrix proxy.
@@ -1114,6 +1134,31 @@ XGB_DLL int XGBoosterPredictFromDense(BoosterHandle handle, char const *values, 
  */
 
 /**
+ * @brief Inplace prediction from CPU columnar data. (Table)
+ *
+ * @note If the booster is configured to run on a CUDA device, XGBoost falls back to run
+ *       prediction with DMatrix with a performance warning.
+ *
+ * @param handle        Booster handle.
+ * @param values        An JSON array of __array_interface__ for each column.
+ * @param config        See @ref XGBoosterPredictFromDMatrix for more info.
+ *   Additional fields for inplace prediction are:
+ *     - "missing": float
+ * @param m             An optional (NULL if not available) proxy DMatrix instance
+ *                      storing meta info.
+ *
+ * @param out_shape     See @ref XGBoosterPredictFromDMatrix for more info.
+ * @param out_dim       See @ref XGBoosterPredictFromDMatrix for more info.
+ * @param out_result    See @ref XGBoosterPredictFromDMatrix for more info.
+ *
+ * @return 0 when success, -1 when failure happens
+ */
+XGB_DLL int XGBoosterPredictFromColumnar(BoosterHandle handle, char const *array_interface,
+                                         char const *c_json_config, DMatrixHandle m,
+                                         bst_ulong const **out_shape, bst_ulong *out_dim,
+                                         const float **out_result);
+
+/**
  * \brief Inplace prediction from CPU CSR matrix.
  *
  * \note If the booster is configured to run on a CUDA device, XGBoost falls back to run
@@ -1508,6 +1553,83 @@ XGB_DLL int XGBoosterFeatureScore(BoosterHandle handle, const char *config,
  * @{
  */
 
+/**
+ * @brief Handle to tracker.
+ *
+ *   There are currently two types of tracker in XGBoost, first one is `rabit`, while the
+ *   other one is `federated`.
+ *
+ *   This is still under development.
+ */
+typedef void *TrackerHandle; /* NOLINT */
+
+/**
+ * @brief Create a new tracker.
+ *
+ * @param config JSON encoded parameters.
+ *
+ *   - dmlc_communicator: String, the type of tracker to create. Available options are `rabit`
+ *                        and `federated`.
+ *   - n_workers: Integer, the number of workers.
+ *   - port: (Optional) Integer, the port this tracker should listen to.
+ *   - timeout: (Optional) Integer, timeout in seconds for various networking operations.
+ *
+ *   Some configurations are `rabit` specific:
+ *   - host: (Optional) String, Used by the the `rabit` tracker to specify the address of the host.
+ *
+ *   Some `federated` specific configurations:
+ *   - federated_secure: Boolean, whether this is a secure server.
+ *   - server_key_path: Path to the server key. Used only if this is a secure server.
+ *   - server_cert_path: Path to the server certificate. Used only if this is a secure server.
+ *   - client_cert_path: Path to the client certificate. Used only if this is a secure server.
+ *
+ * @param handle The handle to the created tracker.
+ *
+ * @return 0 for success, -1 for failure.
+ */
+XGB_DLL int XGTrackerCreate(char const *config, TrackerHandle *handle);
+
+/**
+ * @brief Get the arguments needed for running workers. This should be called after
+ *        XGTrackerRun() and XGTrackerWait()
+ *
+ * @param handle The handle to the tracker.
+ * @param args The arguments returned as a JSON document.
+ *
+ * @return 0 for success, -1 for failure.
+ */
+XGB_DLL int XGTrackerWorkerArgs(TrackerHandle handle, char const **args);
+
+/**
+ * @brief Run the tracker.
+ *
+ * @param handle The handle to the tracker.
+ *
+ * @return 0 for success, -1 for failure.
+ */
+XGB_DLL int XGTrackerRun(TrackerHandle handle);
+
+/**
+ * @brief Wait for the tracker to finish, should be called after XGTrackerRun().
+ *
+ * @param handle The handle to the tracker.
+ * @param config JSON encoded configuration. No argument is required yet, preserved for
+ *        the future.
+ *
+ * @return 0 for success, -1 for failure.
+ */
+XGB_DLL int XGTrackerWait(TrackerHandle handle, char const *config);
+
+/**
+ * @brief Free a tracker instance. XGTrackerWait() is called internally. If the tracker
+ *        cannot close properly, manual interruption is required.
+ *
+ * @param handle The handle to the tracker.
+ *
+ * @return 0 for success, -1 for failure.
+ */
+XGB_DLL int XGTrackerFree(TrackerHandle handle);
+
 /*!
  * \brief Initialize the collective communicator.
  *
@@ -1536,6 +1658,8 @@ XGB_DLL int XGBoosterFeatureScore(BoosterHandle handle, const char *config,
  *   - DMLC_TRACKER_PORT: Port number of the tracker.
  *   - DMLC_TASK_ID: ID of the current task, can be used to obtain deterministic rank assignment.
  *   - DMLC_WORKER_CONNECT_RETRY: Number of retries to connect to the tracker.
+ *   - dmlc_nccl_path: The path to NCCL shared object. Only used if XGBoost is compiled with
+ *                     `USE_DLOPEN_NCCL`.
  * Only applicable to the Federated communicator (use upper case for environment variables, use
  * lower case for runtime configuration):
  *   - federated_server_address: Address of the federated server.

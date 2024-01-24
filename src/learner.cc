@@ -209,7 +209,7 @@ struct LearnerModelParamLegacy : public dmlc::Parameter<LearnerModelParamLegacy>
     return dmlc::Parameter<LearnerModelParamLegacy>::UpdateAllowUnknown(kwargs);
   }
   // sanity check
-  void Validate() {
+  void Validate(Context const*) {
     if (!collective::IsDistributed()) {
       return;
     }
@@ -434,7 +434,7 @@ class LearnerConfiguration : public Learner {
       }
       // Update the shared model parameter
       this->ConfigureModelParamWithoutBaseScore();
-      mparam_.Validate();
+      mparam_.Validate(&ctx_);
     }
     CHECK(!std::isnan(mparam_.base_score));
     CHECK(!std::isinf(mparam_.base_score));
@@ -535,8 +535,7 @@ class LearnerConfiguration : public Learner {
 
     tparam_.booster = get<String>(gradient_booster["name"]);
     if (!gbm_) {
-      gbm_.reset(GradientBooster::Create(tparam_.booster,
-                                         &ctx_, &learner_model_param_));
+      gbm_.reset(GradientBooster::Create(tparam_.booster, &ctx_, &learner_model_param_));
     }
     gbm_->LoadConfig(gradient_booster);
 
@@ -1094,6 +1093,11 @@ class LearnerIO : public LearnerConfiguration {
     LearnerModelParamLegacy mparam = mparam_;  // make a copy to potentially modify
     std::vector<std::pair<std::string, std::string> > extra_attr;
     mparam.contain_extra_attrs = 1;
+
+    if (!this->feature_names_.empty() || !this->feature_types_.empty()) {
+      LOG(WARNING) << "feature names and feature types are being disregarded, use JSON/UBJSON "
+                      "format instead.";
+    }
 
     {
       // Similar to JSON model IO, we save the objective.
