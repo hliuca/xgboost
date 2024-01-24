@@ -318,7 +318,6 @@ void BuildGradientHistogram(CUDAContext const* ctx, EllpackDeviceAccessor const&
     grid_size = std::min(common::DivRoundUp(grid_size, num_groups), static_cast<std::uint32_t>(
                                         common::DivRoundUp(items_per_group, kMinItemsPerBlock)));
 #endif
-
     dh::LaunchKernel {dim3(grid_size, num_groups), static_cast<uint32_t>(kBlockThreads), smem_size,
                      ctx->Stream()} (kernel, matrix, feature_groups, d_ridx, histogram.data(),
                                      gpair.data(), rounding);
