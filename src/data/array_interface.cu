@@ -20,7 +20,7 @@ void ArrayInterfaceHandler::SyncCudaStream(std::int64_t stream) {
        *   case where 0 might be given should either use None, 1, or 2 instead for
        *   clarity.
        */
-#if !defined(XGBOOST_USE_HIP)
+#ifndef XGBOOST_USE_HIP
       LOG(FATAL) << "Invalid stream ID in array interface: " << stream;
 #endif
     case 1:
@@ -73,7 +73,6 @@ bool ArrayInterfaceHandler::IsCudaPtr(void const* ptr) {
   } else if (err == hipSuccess) {
 #if HIP_VERSION_MAJOR < 6
     switch (attr.memoryType) {
-      case hipMemoryTypeUnified:
       case hipMemoryTypeHost:
         return false;
       default:
@@ -81,7 +80,7 @@ bool ArrayInterfaceHandler::IsCudaPtr(void const* ptr) {
     }
 #else
     switch (attr.type) {
-      case hipMemoryTypeUnified:
+      case hipMemoryTypeUnregistered:
       case hipMemoryTypeHost:
         return false;
       default:
