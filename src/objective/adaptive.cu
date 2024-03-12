@@ -1,5 +1,5 @@
 /**
- * Copyright 2022-2023 by XGBoost Contributors
+ * Copyright 2022-2024, XGBoost Contributors
  */
 #include <thrust/sort.h>
 
@@ -157,7 +157,7 @@ void UpdateTreeLeafDevice(Context const* ctx, common::Span<bst_node_t const> pos
 
   if (nptr.Empty()) {
     std::vector<float> quantiles;
-    UpdateLeafValues(&quantiles, nidx.ConstHostVector(), info, learning_rate, p_tree);
+    UpdateLeafValues(ctx, &quantiles, nidx.ConstHostVector(), info, learning_rate, p_tree);
   }
 
   predt.SetDevice(ctx->Device());
@@ -167,7 +167,7 @@ void UpdateTreeLeafDevice(Context const* ctx, common::Span<bst_node_t const> pos
   auto t_predt = d_predt.Slice(linalg::All(), group_idx);
 
   HostDeviceVector<float> quantiles;
-  collective::ApplyWithLabels(info, &quantiles, [&] {
+  collective::ApplyWithLabels(ctx, info, &quantiles, [&] {
     auto d_labels = info.labels.View(ctx->Device()).Slice(linalg::All(), IdxY(info, group_idx));
     auto d_row_index = dh::ToSpan(ridx);
     auto seg_beg = nptr.DevicePointer();
@@ -193,6 +193,7 @@ void UpdateTreeLeafDevice(Context const* ctx, common::Span<bst_node_t const> pos
                                         w_it + d_weights.size(), &quantiles);
     }
   });
-  UpdateLeafValues(&quantiles.HostVector(), nidx.ConstHostVector(), info, learning_rate, p_tree);
+  UpdateLeafValues(ctx, &quantiles.HostVector(), nidx.ConstHostVector(), info, learning_rate,
+                   p_tree);
 }
 }  // namespace xgboost::obj::detail
