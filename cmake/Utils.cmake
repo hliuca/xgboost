@@ -1,6 +1,5 @@
 # Automatically set source group based on folder
 function(auto_source_group SOURCES)
-
   foreach(FILE ${SOURCES})
       get_filename_component(PARENT_DIR "${FILE}" PATH)
 
