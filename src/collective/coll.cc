@@ -42,6 +42,10 @@ bool constexpr IsFloatingPointV() {
   auto redop_fn = [](auto lhs, auto out, auto elem_op) {
     auto p_lhs = lhs.data();
     auto p_out = out.data();
+#if defined(__GNUC__) || defined(__clang__)
+    // For the sum op, one can verify the simd by: addps  %xmm15, %xmm14
+#pragma omp simd
+#endif
     for (std::size_t i = 0; i < lhs.size(); ++i) {
       p_out[i] = elem_op(p_lhs[i], p_out[i]);
     }
@@ -108,9 +112,8 @@ bool constexpr IsFloatingPointV() {
   return cpu_impl::Broadcast(comm, data, root);
 }
 
-[[nodiscard]] Result Coll::Allgather(Comm const& comm, common::Span<std::int8_t> data,
-                                     std::int64_t size) {
-  return RingAllgather(comm, data, size);
+[[nodiscard]] Result Coll::Allgather(Comm const& comm, common::Span<std::int8_t> data) {
+  return RingAllgather(comm, data);
 }
 
 [[nodiscard]] Result Coll::AllgatherV(Comm const& comm, common::Span<std::int8_t const> data,
