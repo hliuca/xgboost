@@ -1,11 +1,12 @@
 /**
- * Copyright 2023, XGBoost Contributors
+ * Copyright 2023-2024, XGBoost Contributors
  */
 #include <gtest/gtest.h>
 
+#include <numeric>  // for iota
+
 #include "../../../src/collective/allreduce.h"
 #include "../../../src/collective/coll.h"  // for Coll
-#include "../../../src/collective/tracker.h"
 #include "../../../src/common/type.h"  // for EraseType
 #include "test_worker.h"               // for WorkerForTest, TestDistributed
 
@@ -58,7 +59,7 @@ class AllreduceWorker : public WorkerForTest {
     auto pcoll = std::shared_ptr<Coll>{new Coll{}};
     auto rc = pcoll->Allreduce(comm_, common::EraseType(common::Span{data.data(), data.size()}),
                                ArrayInterfaceHandler::kU4, Op::kBitwiseOR);
-    ASSERT_TRUE(rc.OK()) << rc.Report();
+    SafeColl(rc);
     for (auto v : data) {
       ASSERT_EQ(v, ~std::uint32_t{0});
     }

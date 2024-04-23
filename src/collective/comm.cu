@@ -27,7 +27,7 @@ Result GetUniqueId(Comm const& comm, std::shared_ptr<NcclStub> stub, std::shared
   ncclUniqueId id;
   if (comm.Rank() == kRootRank) {
     auto rc = stub->GetUniqueId(&id);
-    CHECK(rc.OK()) << rc.Report();
+    SafeColl(rc);
   }
   auto rc = coll->Broadcast(
       comm, common::Span{reinterpret_cast<std::int8_t*>(&id), sizeof(ncclUniqueId)}, kRootRank);
@@ -90,9 +90,8 @@ NCCLComm::NCCLComm(Context const* ctx, Comm const& root, std::shared_ptr<Coll> p
   auto s_this_uuid = s_uuid.subspan(root.Rank() * kUuidLength, kUuidLength);
   GetCudaUUID(s_this_uuid, ctx->Device());
 
-  auto rc = pimpl->Allgather(root, common::EraseType(s_uuid), s_this_uuid.size_bytes());
-
-  CHECK(rc.OK()) << rc.Report();
+  auto rc = pimpl->Allgather(root, common::EraseType(s_uuid));
+  SafeColl(rc);
 
   std::vector<xgboost::common::Span<std::uint64_t, kUuidLength>> converted(root.World());
   std::size_t j = 0;
@@ -113,7 +112,7 @@ NCCLComm::NCCLComm(Context const* ctx, Comm const& root, std::shared_ptr<Coll> p
        [&] {
          return this->stub_->CommInitRank(&nccl_comm_, root.World(), nccl_unique_id_, root.Rank());
        };
-  CHECK(rc.OK()) << rc.Report();
+  SafeColl(rc);
 
   for (std::int32_t r = 0; r < root.World(); ++r) {
     this->channels_.emplace_back(
@@ -124,7 +123,7 @@ NCCLComm::NCCLComm(Context const* ctx, Comm const& root, std::shared_ptr<Coll> p
 NCCLComm::~NCCLComm() {
   if (nccl_comm_) {
     auto rc = stub_->CommDestroy(nccl_comm_);
-    CHECK(rc.OK()) << rc.Report();
+    SafeColl(rc);
   }
 }
 }  // namespace xgboost::collective
