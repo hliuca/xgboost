@@ -108,6 +108,7 @@ template <typename T, typename U>
 void CopyTo(Span<T> out, Span<U> src) {
   CHECK_EQ(out.size(), src.size());
   static_assert(std::is_same<std::remove_cv_t<T>, std::remove_cv_t<T>>::value);
+
   dh::safe_cuda(cudaMemcpyAsync(out.data(), src.data(),
                                 out.size_bytes(),
                                 cudaMemcpyDefault));
@@ -161,6 +162,7 @@ common::Span<thrust::tuple<uint64_t, uint64_t>> MergePath(
   // Compute output ptr
   auto transform_it =
       thrust::make_zip_iterator(thrust::make_tuple(x_ptr.data(), y_ptr.data()));
+
   thrust::transform(
       thrust::cuda::par(alloc), transform_it, transform_it + x_ptr.size(),
       out_ptr.data(),
@@ -377,6 +379,7 @@ size_t SketchContainer::ScanInput(Span<SketchEntry> entries, Span<OffsetT> d_col
       });
   // Reverse scan to accumulate weights into first duplicated element on left.
   auto val_it = thrust::make_reverse_iterator(dh::tend(entries));
+
   thrust::inclusive_scan_by_key(
       thrust::cuda::par(alloc), key_it, key_it + entries.size(),
       val_it, val_it,

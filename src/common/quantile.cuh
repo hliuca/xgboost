@@ -184,11 +184,13 @@ class SketchContainer {
     dh::XGBCachingDeviceAllocator<char> alloc;
 
     d_column_scan = this->columns_ptr_.DeviceSpan();
+
     size_t n_uniques = dh::SegmentedUnique(
         thrust::cuda::par(alloc), d_column_scan.data(),
         d_column_scan.data() + d_column_scan.size(), entries.data(),
         entries.data() + entries.size(), scan_out.DevicePointer(),
         entries.data(), detail::SketchUnique{}, key_comp);
+
     this->columns_ptr_.Copy(scan_out);
     CHECK(!this->columns_ptr_.HostCanRead());
 

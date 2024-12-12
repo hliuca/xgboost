@@ -61,7 +61,9 @@ TEST(HistUtil, SketchBatchNumElements) {
 #endif  // defined(XGBOOST_USE_RMM) && XGBOOST_USE_RMM == 1
   size_t constexpr kCols = 10000;
   int device;
+
   dh::safe_cuda(cudaGetDevice(&device));
+
   auto avail = static_cast<size_t>(dh::AvailableMemory(device) * 0.8);
   auto per_elem = detail::BytesPerElement(false);
   auto avail_elem = avail / per_elem;

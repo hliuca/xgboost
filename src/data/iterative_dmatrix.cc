@@ -358,7 +358,7 @@ BatchSet<ExtSparsePage> IterativeDMatrix::GetExtBatches(Context const* ctx,
   return BatchSet<ExtSparsePage>(begin_iter);
 }
 
-#if !defined(XGBOOST_USE_CUDA)
+#if !defined(XGBOOST_USE_CUDA) && !defined(XGBOOST_USE_HIP)
 inline void IterativeDMatrix::InitFromCUDA(Context const*, BatchParam const&, DataIterHandle, float,
                                            std::shared_ptr<DMatrix>) {
   // silent the warning about unused variables.
@@ -378,5 +378,5 @@ inline BatchSet<EllpackPage> IterativeDMatrix::GetEllpackBatches(Context const*,
 inline void GetCutsFromEllpack(EllpackPage const&, common::HistogramCuts*) {
   common::AssertGPUSupport();
 }
-#endif  // !defined(XGBOOST_USE_CUDA)
+#endif  // !defined(XGBOOST_USE_CUDA) && !defined(XGBOOST_USE_HIP)
 }  // namespace xgboost::data

@@ -131,6 +131,7 @@ void TestBuildHist(bool use_shared_memory_histograms) {
   auto node_histogram = d_hist.GetNodeHistogram(0);
   // d_hist.data stored in float, not gradient pair
   thrust::host_vector<GradientPairInt64> h_result (node_histogram.size());
+
   dh::safe_cuda(cudaMemcpy(h_result.data(), node_histogram.data(), node_histogram.size_bytes(),
                            cudaMemcpyDeviceToHost));
 

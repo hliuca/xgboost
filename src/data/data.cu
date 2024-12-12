@@ -44,6 +44,7 @@ void CopyTensorInfoImpl(CUDAContext const* ctx, Json arr_interface, linalg::Tens
       std::copy(array.shape, array.shape + D, shape.data());
       // set data
       data->Resize(array.n);
+
       dh::safe_cuda(cudaMemcpyAsync(data->DevicePointer(), array.data, array.n * sizeof(T),
                                     cudaMemcpyDefault, ctx->Stream()));
     });
@@ -95,8 +96,10 @@ void CopyQidImpl(ArrayInterface<1> array_interface, std::vector<bst_group_t>* p_
     }
   });
   bool non_dec = true;
+
   dh::safe_cuda(cudaMemcpy(&non_dec, flag.data().get(), sizeof(bool),
                            cudaMemcpyDeviceToHost));
+
   CHECK(non_dec) << "`qid` must be sorted in increasing order along with data.";
   size_t bytes = 0;
   dh::caching_device_vector<uint32_t> out(array_interface.Shape(0));
@@ -114,8 +117,10 @@ void CopyQidImpl(ArrayInterface<1> array_interface, std::vector<bst_group_t>* p_
   group_ptr_.clear();
   group_ptr_.resize(h_num_runs_out + 1, 0);
   dh::XGBCachingDeviceAllocator<char> alloc;
+
   thrust::inclusive_scan(thrust::cuda::par(alloc), cnt.begin(),
                          cnt.begin() + h_num_runs_out, cnt.begin());
+
   thrust::copy(cnt.begin(), cnt.begin() + h_num_runs_out,
                group_ptr_.begin() + 1);
 }

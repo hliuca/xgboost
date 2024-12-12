@@ -354,7 +354,7 @@ TEST_F(SerializationTest, CPUCoordDescent) {
                            fmap_, p_dmat_);
 }
 
-#if defined(XGBOOST_USE_CUDA)
+#if defined(XGBOOST_USE_CUDA) || defined(XGBOOST_USE_HIP)
 TEST_F(SerializationTest, GpuHist) {
   TestLearnerSerialization({{"booster", "gbtree"},
                             {"seed", "0"},
@@ -432,7 +432,7 @@ TEST_F(SerializationTest, GPUCoordDescent) {
                             {"updater", "gpu_coord_descent"}},
                            fmap_, p_dmat_);
 }
-#endif  // defined(XGBOOST_USE_CUDA)
+#endif  // defined(XGBOOST_USE_CUDA) || defined(XGBOOST_USE_HIP)
 
 class L1SerializationTest : public SerializationTest {};
 
@@ -463,7 +463,7 @@ TEST_F(L1SerializationTest, Hist) {
                            fmap_, p_dmat_);
 }
 
-#if defined(XGBOOST_USE_CUDA)
+#if defined(XGBOOST_USE_CUDA) || defined(XGBOOST_USE_HIP)
 TEST_F(L1SerializationTest, GpuHist) {
   TestLearnerSerialization({{"booster", "gbtree"},
                             {"objective", "reg:absoluteerror"},
@@ -472,7 +472,7 @@ TEST_F(L1SerializationTest, GpuHist) {
                             {"tree_method", "gpu_hist"}},
                            fmap_, p_dmat_);
 }
-#endif  //  defined(XGBOOST_USE_CUDA)
+#endif  //  defined(XGBOOST_USE_CUDA) || defined(XGBOOST_USE_HIP)
 
 class LogitSerializationTest : public SerializationTest {
  protected:
@@ -558,7 +558,7 @@ TEST_F(LogitSerializationTest, CPUCoordDescent) {
                            fmap_, p_dmat_);
 }
 
-#if defined(XGBOOST_USE_CUDA)
+#if defined(XGBOOST_USE_CUDA) || defined(XGBOOST_USE_HIP)
 TEST_F(LogitSerializationTest, GpuHist) {
   TestLearnerSerialization({{"booster", "gbtree"},
                             {"objective", "binary:logistic"},
@@ -594,7 +594,7 @@ TEST_F(LogitSerializationTest, GPUCoordDescent) {
                             {"updater", "gpu_coord_descent"}},
                            fmap_, p_dmat_);
 }
-#endif  // defined(XGBOOST_USE_CUDA)
+#endif  // defined(XGBOOST_USE_CUDA) || defined(XGBOOST_USE_HIP)
 
 class MultiClassesSerializationTest : public SerializationTest {
  protected:
@@ -700,7 +700,7 @@ TEST_F(MultiClassesSerializationTest, CPUCoordDescent) {
                            fmap_, p_dmat_);
 }
 
-#if defined(XGBOOST_USE_CUDA)
+#if defined(XGBOOST_USE_CUDA) || defined(XGBOOST_USE_HIP)
 TEST_F(MultiClassesSerializationTest, GpuHist) {
   TestLearnerSerialization({{"booster", "gbtree"},
                             {"num_class", std::to_string(kClasses)},
@@ -743,5 +743,5 @@ TEST_F(MultiClassesSerializationTest, GPUCoordDescent) {
                             {"updater", "gpu_coord_descent"}},
                            fmap_, p_dmat_);
 }
-#endif  // defined(XGBOOST_USE_CUDA)
+#endif  // defined(XGBOOST_USE_CUDA) || defined(XGBOOST_USE_HIP)
 }       // namespace xgboost

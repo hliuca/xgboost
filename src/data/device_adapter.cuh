@@ -244,6 +244,7 @@ bst_idx_t GetRowCounts(const AdapterBatchT batch, common::Span<bst_idx_t> offset
                   &offset[ridx]),
               static_cast<unsigned long long>(cnt));  // NOLINT
   });
+
   dh::XGBCachingDeviceAllocator<char> alloc;
   bst_idx_t row_stride =
       dh::Reduce(thrust::cuda::par(alloc), thrust::device_pointer_cast(offset.data()),

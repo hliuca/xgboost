@@ -43,7 +43,9 @@ void FitStump(Context const* ctx, MetaInfo const& info,
   CHECK(d_sum.CContiguous());
 
   dh::XGBCachingDeviceAllocator<char> alloc;
+
   auto policy = thrust::cuda::par(alloc);
+
   thrust::reduce_by_key(policy, key_it, key_it + gpair.Size(), grad_it,
                         thrust::make_discard_iterator(), dh::tbegin(d_sum.Values()));
 
