@@ -813,7 +813,7 @@ class ColumnSplitTrainingTest
 auto MakeParamsForTest() {
   std::vector<std::tuple<std::string, bool, bool>> configs;
   for (auto tm : {"hist", "approx"}) {
-#if defined(XGBOOST_USE_CUDA)
+#if defined(XGBOOST_USE_CUDA) || defined(XGBOOST_USE_HIP)
     std::array<bool, 2> use_gpu{true, false};
 #else
     std::array<bool, 1> use_gpu{false};
