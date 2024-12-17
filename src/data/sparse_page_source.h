@@ -16,7 +16,7 @@
 #include <utility>    // for pair, move
 #include <vector>     // for vector
 
-#if !defined(XGBOOST_USE_CUDA)
+#if !defined(XGBOOST_USE_CUDA) && !defined(XGBOOST_USE_HIP)
 #include "../common/common.h"  // for AssertGPUSupport
 #endif                         // !defined(XGBOOST_USE_CUDA)
 

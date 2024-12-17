@@ -11,7 +11,7 @@
 #include <string>     // for string
 #include <thread>     // for thread
 #include <utility>    // for move, forward
-#if !defined(XGBOOST_USE_NCCL)
+#if !defined(XGBOOST_USE_NCCL) && !defined(XGBOOST_USE_RCCL)
 #include "../common/common.h"           // for AssertNCCLSupport
 #endif                                  // !defined(XGBOOST_USE_NCCL)
 #include "allgather.h"                  // for RingAllgather
