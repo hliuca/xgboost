@@ -18,11 +18,8 @@
 #define cudaStreamDestroy                                   hipStreamDestroy
 #define cudaStreamWaitEvent                                 hipStreamWaitEvent
 #define cudaStreamSynchronize                               hipStreamSynchronize
+#define cudaStreamLegacy                                    hipStreamLegacy
 #define cudaStreamPerThread                                 hipStreamPerThread
-
-/* not compatible */
-#define cudaStreamLegacy                                    hipStreamDefault
-#define hipStreamLegacy                                     hipStreamDefault
 
 #define cudaEvent_t                                         hipEvent_t
 #define cudaEventCreate                                     hipEventCreate
