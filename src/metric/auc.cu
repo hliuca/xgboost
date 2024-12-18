@@ -5,7 +5,13 @@
 #include <thrust/scan.h>
 
 #include <cassert>
+
+#if defined(XGBOOST_USE_CUDA)
 #include <cub/cub.cuh>  // NOLINT
+#elif defined(XGBOOST_USE_HIP)
+#include <hipcub/hipcub.hpp>  // NOLINT
+#endif
+
 #include <limits>
 #include <memory>
 #include <tuple>
@@ -121,10 +127,12 @@ std::tuple<double, double, double> GPUBinaryAUC(Context const *ctx,
   auto uni_key = dh::MakeTransformIterator<float>(
       thrust::make_counting_iterator(0),
       [=] XGBOOST_DEVICE(size_t i) { return predts[d_sorted_idx[i]]; });
+
   auto end_unique = thrust::unique_by_key_copy(
       thrust::cuda::par(alloc), uni_key, uni_key + d_sorted_idx.size(),
       dh::tbegin(d_unique_idx), thrust::make_discard_iterator(),
       dh::tbegin(d_unique_idx));
+
   d_unique_idx = d_unique_idx.subspan(0, end_unique.second - dh::tbegin(d_unique_idx));
 
   dh::InclusiveScan(dh::tbegin(d_fptp), dh::tbegin(d_fptp),
@@ -164,7 +172,9 @@ std::tuple<double, double, double> GPUBinaryAUC(Context const *ctx,
       });
 
   Pair last = cache->fptp.back();
+
   double auc = thrust::reduce(thrust::cuda::par(alloc), in, in + d_unique_idx.size());
+
   return std::make_tuple(last.first, last.second, auc);
 }
 
@@ -222,6 +232,7 @@ double ScaleClasses(Context const *ctx, bool is_column_split, common::Span<doubl
 
   double tp_sum;
   double auc_sum;
+
   thrust::tie(auc_sum, tp_sum) =
       thrust::reduce(ctx->CUDACtx()->CTP(), reduce_in, reduce_in + n_classes, Pair{0.0, 0.0},
                      PairPlus<double, double>{});
@@ -304,6 +315,7 @@ void SegmentedReduceAUC(common::Span<size_t const> d_unique_idx,
         double auc = area_fn(fp_prev, fp, tp_prev, tp, class_id);
         return auc;
       });
+
   thrust::reduce_by_key(thrust::cuda::par(alloc), key_in,
                         key_in + d_unique_idx.size(), val_in,
                         thrust::make_discard_iterator(), dh::tbegin(d_auc));
@@ -377,6 +389,7 @@ double GPUMultiClassAUCOVR(Context const *ctx, MetaInfo const &info,
   // unique values are sparse, so we need a CSR style indptr
   dh::TemporaryArray<uint32_t> unique_class_ptr(d_class_ptr.size());
   auto d_unique_class_ptr = dh::ToSpan(unique_class_ptr);
+
   auto n_uniques = dh::SegmentedUniqueByKey(
       thrust::cuda::par(alloc),
       dh::tbegin(d_class_ptr),
@@ -387,6 +400,7 @@ double GPUMultiClassAUCOVR(Context const *ctx, MetaInfo const &info,
       d_unique_class_ptr.data(),
       dh::tbegin(d_unique_idx),
       thrust::equal_to<thrust::pair<uint32_t, float>>{});
+
   d_unique_idx = d_unique_idx.subspan(0, n_uniques);
 
   auto get_class_id = [=] XGBOOST_DEVICE(size_t idx) { return idx / n_samples; };
@@ -504,9 +518,11 @@ std::pair<double, std::uint32_t> GPURankingAUC(Context const *ctx, common::Span<
   auto check_it = dh::MakeTransformIterator<size_t>(
       thrust::make_counting_iterator(0),
       [=] XGBOOST_DEVICE(size_t i) { return d_group_ptr[i + 1] - d_group_ptr[i]; });
+
   size_t n_valid = thrust::count_if(
       thrust::cuda::par(alloc), check_it, check_it + group_ptr.size() - 1,
       [=] XGBOOST_DEVICE(size_t len) { return len >= 3; });
+
   if (n_valid < info.group_ptr_.size() - 1) {
     InvalidGroupAUC();
   }
@@ -605,6 +621,7 @@ std::pair<double, std::uint32_t> GPURankingAUC(Context const *ctx, common::Span<
    */
   double auc = thrust::reduce(thrust::cuda::par(alloc), dh::tbegin(s_d_auc),
                               dh::tend(s_d_auc), 0.0);
+
   return std::make_pair(auc, n_valid);
 }
 
@@ -632,6 +649,7 @@ std::tuple<double, double, double> GPUBinaryPRAUC(Context const *ctx,
       });
   dh::XGBCachingDeviceAllocator<char> alloc;
   double total_pos, total_neg;
+
   thrust::tie(total_pos, total_neg) =
       thrust::reduce(thrust::cuda::par(alloc), it, it + labels.Size(),
                      Pair{0.0, 0.0}, PairPlus<double, double>{});
@@ -686,6 +704,7 @@ double GPUMultiClassPRAUC(Context const *ctx, common::Span<float const> predts,
         return thrust::make_pair(y * w, (1.0f - y) * w);
       });
   dh::XGBCachingDeviceAllocator<char> alloc;
+
   thrust::reduce_by_key(thrust::cuda::par(alloc), key_it,
                         key_it + predts.size(), val_it,
                         thrust::make_discard_iterator(), totals.begin(),
@@ -758,6 +777,7 @@ std::pair<double, uint32_t> GPURankingPRAUCImpl(Context const *ctx,
   // unique values are sparse, so we need a CSR style indptr
   dh::TemporaryArray<uint32_t> unique_class_ptr(d_group_ptr.size());
   auto d_unique_class_ptr = dh::ToSpan(unique_class_ptr);
+
   auto n_uniques = dh::SegmentedUniqueByKey(
       thrust::cuda::par(alloc),
       dh::tbegin(d_group_ptr),
@@ -768,6 +788,7 @@ std::pair<double, uint32_t> GPURankingPRAUCImpl(Context const *ctx,
       d_unique_class_ptr.data(),
       dh::tbegin(d_unique_idx),
       thrust::equal_to<thrust::pair<uint32_t, float>>{});
+
   d_unique_idx = d_unique_idx.subspan(0, n_uniques);
 
   auto get_group_id = [=] XGBOOST_DEVICE(size_t idx) {
@@ -818,6 +839,7 @@ std::pair<double, uint32_t> GPURankingPRAUCImpl(Context const *ctx,
           }
           return thrust::make_pair(0.0, static_cast<uint32_t>(1));
         });
+
     thrust::tie(auc, invalid_groups) = thrust::reduce(
         thrust::cuda::par(alloc), it, it + n_groups,
         thrust::pair<double, uint32_t>(0.0, 0), PairPlus<double, uint32_t>{});
@@ -851,10 +873,12 @@ std::pair<double, std::uint32_t> GPURankingPRAUC(Context const *ctx,
 
   dh::XGBDeviceAllocator<char> alloc;
   auto labels = info.labels.View(ctx->Device());
+
   if (thrust::any_of(thrust::cuda::par(alloc), dh::tbegin(labels.Values()),
                      dh::tend(labels.Values()), PRAUCLabelInvalid{})) {
     InvalidLabels();
   }
+
   /**
    * Get total positive/negative for each group.
    */
@@ -874,6 +898,7 @@ std::pair<double, std::uint32_t> GPURankingPRAUC(Context const *ctx,
         auto y = labels(i);
         return thrust::make_pair(y * w, (1.0 - y) * w);
       });
+
   thrust::reduce_by_key(thrust::cuda::par(alloc), key_it,
                         key_it + predts.size(), val_it,
                         thrust::make_discard_iterator(), totals.begin(),

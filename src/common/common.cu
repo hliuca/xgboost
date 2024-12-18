@@ -2,6 +2,7 @@
  * Copyright 2018-2022 XGBoost contributors
  */
 #include "common.h"
+#include "cuda_to_hip.h"
 
 namespace xgboost {
 namespace common {

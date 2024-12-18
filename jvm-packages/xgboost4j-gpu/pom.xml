@@ -104,6 +104,8 @@
                                 <argument>${log.capi.invocation}</argument>
                                 <argument>--use-cuda</argument>
                                 <argument>${use.cuda}</argument>
+                                <argument>--use-hip</argument>
+                                <argument>${use.hip}</argument>
                             </arguments>
                             <workingDirectory>${user.dir}</workingDirectory>
                         </configuration>

@@ -171,6 +171,7 @@ void GetColumnSizesScan(DeviceOrd device, size_t num_columns, std::size_t num_cu
       column_sizes_scan->begin(), [=] __device__(size_t column_size) {
         return thrust::min(num_cuts_per_feature, column_size);
       });
+
   thrust::exclusive_scan(thrust::cuda::par(alloc), cut_ptr_it,
                          cut_ptr_it + column_sizes_scan->size(), cuts_ptr->DevicePointer());
   thrust::exclusive_scan(thrust::cuda::par(alloc), column_sizes_scan->begin(),
@@ -296,6 +297,7 @@ void ProcessSlidingWindow(AdapterBatch const &batch, MetaInfo const &info,
                                  &column_sizes_scan,
                                  &sorted_entries);
   dh::XGBDeviceAllocator<char> alloc;
+
   thrust::sort(thrust::cuda::par(alloc), sorted_entries.begin(),
                sorted_entries.end(), detail::EntryCompareOp());
 
@@ -355,11 +357,13 @@ void ProcessWeightedSlidingWindow(Batch batch, MetaInfo const& info,
           bst_group_t group_idx = dh::SegmentId(d_group_ptr, ridx);
           return weights[group_idx];
         });
+
     auto retit = thrust::copy_if(thrust::cuda::par(alloc),
                                  weight_iter + begin, weight_iter + end,
                                  batch_iter + begin,
                                  d_temp_weights.data(),  // output
                                  is_valid);
+
     CHECK_EQ(retit - d_temp_weights.data(), d_temp_weights.size());
   } else {
     CHECK_EQ(batch.NumRows(), weights.size());
@@ -368,11 +372,13 @@ void ProcessWeightedSlidingWindow(Batch batch, MetaInfo const& info,
         [=]__device__(size_t idx) -> float {
           return weights[batch.GetElement(idx).row_idx];
         });
+
     auto retit = thrust::copy_if(thrust::cuda::par(alloc),
                                  weight_iter + begin, weight_iter + end,
                                  batch_iter + begin,
                                  d_temp_weights.data(),  // output
                                  is_valid);
+
     CHECK_EQ(retit - d_temp_weights.data(), d_temp_weights.size());
   }
 

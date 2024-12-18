@@ -70,7 +70,7 @@ TEST(Stats, Median) {
     auto m = out(0);
     ASSERT_EQ(m, .5f);
 
-#if defined(XGBOOST_USE_CUDA)
+#if defined(XGBOOST_USE_CUDA) || defined(XGBOOST_USE_HIP)
     ctx = ctx.MakeCUDA(0);
     ASSERT_FALSE(ctx.IsCPU());
     Median(&ctx, values, weights, &out);
@@ -89,7 +89,7 @@ TEST(Stats, Median) {
     ASSERT_EQ(out(0), .5f);
     ASSERT_EQ(out(1), .5f);
 
-#if defined(XGBOOST_USE_CUDA)
+#if defined(XGBOOST_USE_CUDA) || defined(XGBOOST_USE_HIP)
     ctx = ctx.MakeCUDA(0);
     Median(&ctx, values, weights, &out);
     ASSERT_EQ(out(0), .5f);
@@ -121,7 +121,7 @@ TEST(Stats, Mean) {
   TestMean(&ctx);
 }
 
-#if defined(XGBOOST_USE_CUDA)
+#if defined(XGBOOST_USE_CUDA) || defined(XGBOOST_USE_HIP)
 TEST(Stats, GPUMean) {
   auto ctx = MakeCUDACtx(0);
   TestMean(&ctx);

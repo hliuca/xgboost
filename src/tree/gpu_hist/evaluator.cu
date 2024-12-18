@@ -44,6 +44,7 @@ void GPUHistEvaluator::Reset(common::HistogramCuts const &cuts, common::Span<Fea
     CHECK_NE(node_categorical_storage_size_, 0);
     split_cats_.resize(node_categorical_storage_size_);
     h_split_cats_.resize(node_categorical_storage_size_);
+
     dh::safe_cuda(
         cudaMemsetAsync(split_cats_.data().get(), '\0', split_cats_.size() * sizeof(CatST)));
 
@@ -57,6 +58,7 @@ void GPUHistEvaluator::Reset(common::HistogramCuts const &cuts, common::Span<Fea
     auto d_fidxes = dh::ToSpan(feature_idx_);
     auto it = thrust::make_counting_iterator(0ul);
     auto values = cuts.cut_values_.ConstDeviceSpan();
+
     thrust::transform(thrust::cuda::par(alloc), it, it + feature_idx_.size(), feature_idx_.begin(),
                       [=] XGBOOST_DEVICE(size_t i) {
                         auto fidx = dh::SegmentId(ptrs, i);
@@ -77,6 +79,7 @@ common::Span<bst_feature_t const> GPUHistEvaluator::SortHistogram(
   auto it = thrust::make_counting_iterator(0u);
   auto d_feature_idx = dh::ToSpan(feature_idx_);
   auto total_bins = shared_inputs.feature_values.size();
+
   thrust::transform(thrust::cuda::par(alloc), it, it + data.size(), dh::tbegin(data),
                     [=] XGBOOST_DEVICE(uint32_t i) {
                       auto const &input = d_inputs[i / total_bins];
@@ -90,6 +93,7 @@ common::Span<bst_feature_t const> GPUHistEvaluator::SortHistogram(
                       }
                       return thrust::make_tuple(i, 0.0f);
                     });
+
   // Sort an array segmented according to
   // - nodes
   // - features within each node

@@ -54,6 +54,7 @@ TEST(HistUtil, DeviceSketch) {
   EXPECT_EQ(device_cuts.MinValues(), host_cuts.MinValues());
 }
 
+#ifndef XGBOOST_USE_HIP
 TEST(HistUtil, SketchBatchNumElements) {
 #if defined(XGBOOST_USE_RMM) && XGBOOST_USE_RMM == 1
   LOG(WARNING) << "Test not runnable with RMM enabled.";
@@ -61,7 +62,9 @@ TEST(HistUtil, SketchBatchNumElements) {
 #endif  // defined(XGBOOST_USE_RMM) && XGBOOST_USE_RMM == 1
   size_t constexpr kCols = 10000;
   int device;
+
   dh::safe_cuda(cudaGetDevice(&device));
+
   auto avail = static_cast<size_t>(dh::AvailableMemory(device) * 0.8);
   auto per_elem = detail::BytesPerElement(false);
   auto avail_elem = avail / per_elem;
@@ -69,6 +72,7 @@ TEST(HistUtil, SketchBatchNumElements) {
   auto batch = detail::SketchBatchNumElements(0, rows, kCols, rows * kCols, device, 256, false);
   ASSERT_EQ(batch, avail_elem);
 }
+#endif
 
 TEST(HistUtil, DeviceSketchMemory) {
   auto ctx = MakeCUDACtx(0);

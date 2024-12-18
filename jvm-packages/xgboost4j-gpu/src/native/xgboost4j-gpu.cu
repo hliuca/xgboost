@@ -1,6 +1,10 @@
 #include <jni.h>
 
+#if defined(XGBOOST_USE_CUDA)
 #include "../../../../src/common/device_helpers.cuh"
+#elif defined(XGBOOST_USE_HIP)
+#include "../../../../src/common/device_helpers.hip.h"
+#endif
 #include "../../../../src/common/cuda_pinned_allocator.h"
 #include "../../../../src/data/array_interface.h"
 #include "jvm_utils.h"

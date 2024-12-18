@@ -44,6 +44,7 @@ void IterativeDMatrix::InitFromCUDA(Context const* ctx, BatchParam const& p,
   bst_feature_t cols = 0;
 
   int32_t current_device;
+
   dh::safe_cuda(cudaGetDevice(&current_device));
   auto get_device = [&]() {
     auto d = (ctx->IsCPU()) ? DeviceOrd::CUDA(current_device) : ctx->Device();
@@ -83,7 +84,9 @@ void IterativeDMatrix::InitFromCUDA(Context const* ctx, BatchParam const& p,
     row_stride = std::max(row_stride, cuda_impl::Dispatch(proxy, [=](auto const& value) {
                             return GetRowCounts(value, row_counts_span, get_device(), missing);
                           }));
+
     nnz += thrust::reduce(thrust::cuda::par(alloc), row_counts.begin(), row_counts.end());
+
     batches++;
   } while (iter.Next());
   iter.Reset();

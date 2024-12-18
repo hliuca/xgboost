@@ -133,6 +133,7 @@ void SortPositionBatch(common::Span<const PerNodeData<OpDataT>> d_batch_info,
         return IndexFlagTuple{static_cast<bst_uint>(item_idx), op_res, batch_idx, op_res};
       });
   size_t temp_bytes = 0;
+#if defined(XGBOOST_USE_CUDA)
   if (tmp->empty()) {
     dh::safe_cuda(cub::DeviceScan::InclusiveScan(
         nullptr, temp_bytes, input_iterator, discard_write_iterator, IndexFlagOp(), total_rows));
@@ -141,6 +142,16 @@ void SortPositionBatch(common::Span<const PerNodeData<OpDataT>> d_batch_info,
   temp_bytes = tmp->size();
   dh::safe_cuda(cub::DeviceScan::InclusiveScan(tmp->data().get(), temp_bytes, input_iterator,
                                                discard_write_iterator, IndexFlagOp(), total_rows));
+#elif defined(XGBOOST_USE_HIP)
+  if (tmp->empty()) {
+    rocprim::inclusive_scan(nullptr, temp_bytes, input_iterator, discard_write_iterator,
+                                   total_rows,IndexFlagOp());
+    tmp->resize(temp_bytes);
+  }
+  temp_bytes = tmp->size();
+  rocprim::inclusive_scan(tmp->data().get(), temp_bytes, input_iterator,
+                                 discard_write_iterator, total_rows, IndexFlagOp());
+#endif
 
   constexpr int kBlockSize = 256;
 
@@ -276,6 +287,7 @@ class RowPartitioner {
       h_batch_info[i] = {ridx_segments_.at(nidx.at(i)).segment, op_data.at(i)};
       total_rows += ridx_segments_.at(nidx.at(i)).segment.Size();
     }
+
     dh::safe_cuda(cudaMemcpyAsync(d_batch_info.data().get(), h_batch_info.data(),
                                   h_batch_info.size() * sizeof(PerNodeData<OpDataT>),
                                   cudaMemcpyDefault));
@@ -325,6 +337,7 @@ class RowPartitioner {
   template <typename FinalisePositionOpT>
   void FinalisePosition(common::Span<bst_node_t> d_out_position, FinalisePositionOpT op) {
     dh::TemporaryArray<NodePositionInfo> d_node_info_storage(ridx_segments_.size());
+
     dh::safe_cuda(cudaMemcpyAsync(d_node_info_storage.data().get(), ridx_segments_.data(),
                                   sizeof(NodePositionInfo) * ridx_segments_.size(),
                                   cudaMemcpyDefault));
