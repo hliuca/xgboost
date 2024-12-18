@@ -19,7 +19,7 @@
 #include <string>
 #include <vector>
 
-#if defined(__CUDACC__)
+#if defined(__CUDACC__) || defined(__HIPCC__)
 #include "../../src/collective/communicator-inl.h"  // for GetRank
 #include "../../src/common/common.h"                // for AllVisibleGPUs
 #endif  // defined(__CUDACC__)
@@ -30,19 +30,19 @@
 #include <thread>
 #endif
 
-#if defined(__CUDACC__)
+#if defined(__CUDACC__) || defined(__HIPCC__)
 #define DeclareUnifiedTest(name) GPU ## name
 #else
 #define DeclareUnifiedTest(name) name
 #endif
 
-#if defined(__CUDACC__)
+#if defined(__CUDACC__) || defined(__HIPCC__)
 #define GPUIDX (common::AllVisibleGPUs() == 1 ? 0 : collective::GetRank())
 #else
 #define GPUIDX (-1)
 #endif
 
-#if defined(__CUDACC__)
+#if defined(__CUDACC__) || defined(__HIPCC__)
 #define DeclareUnifiedDistributedTest(name) MGPU ## name
 #else
 #define DeclareUnifiedDistributedTest(name) name
@@ -319,7 +319,7 @@ class RandomDataGenerator {
   [[nodiscard]] std::shared_ptr<DMatrix> GenerateSparsePageDMatrix(std::string prefix,
                                                                    bool with_label) const;
 
-#if defined(XGBOOST_USE_CUDA)
+#if defined(XGBOOST_USE_CUDA) || defined(XGBOOST_USE_HIP)
   std::shared_ptr<DMatrix> GenerateDeviceDMatrix(bool with_label);
 #endif
   std::shared_ptr<DMatrix> GenerateQuantileDMatrix(bool with_label);

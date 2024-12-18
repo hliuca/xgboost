@@ -76,7 +76,9 @@ class pinned_allocator {
     return result;
   }
 
-  inline void deallocate(pointer p, size_type) { dh::safe_cuda(cudaFreeHost(p)); } // NOLINT
+  inline void deallocate(pointer p, size_type) {
+      dh::safe_cuda(cudaFreeHost(p));
+  } // NOLINT
 
   inline size_type max_size() const { return (std::numeric_limits<size_type>::max)() / sizeof(T); } // NOLINT
 

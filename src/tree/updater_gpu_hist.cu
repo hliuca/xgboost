@@ -16,6 +16,7 @@
 #include "../collective/broadcast.h"
 #include "../common/bitfield.h"
 #include "../common/categorical.h"
+
 #include "../common/cuda_context.cuh"  // CUDAContext
 #include "../common/device_helpers.cuh"
 #include "../common/hist_util.h"
@@ -501,9 +502,11 @@ struct GPUHistMakerDevice {
     }
 
     dh::TemporaryArray<RegTree::Node> d_nodes(p_tree->GetNodes().size());
+
     dh::safe_cuda(cudaMemcpyAsync(d_nodes.data().get(), p_tree->GetNodes().data(),
                                   d_nodes.size() * sizeof(RegTree::Node),
                                   cudaMemcpyHostToDevice));
+
     auto const& h_split_types = p_tree->GetSplitTypes();
     auto const& categories = p_tree->GetSplitCategories();
     auto const& categories_segments = p_tree->GetSplitCategoriesPtr();
@@ -572,6 +575,7 @@ struct GPUHistMakerDevice {
 
     auto s_position = p_out_position->ConstDeviceSpan();
     positions.resize(s_position.size());
+
     dh::safe_cuda(cudaMemcpyAsync(positions.data().get(), s_position.data(),
                                   s_position.size_bytes(), cudaMemcpyDeviceToDevice,
                                   ctx_->CUDACtx()->Stream()));
@@ -598,9 +602,11 @@ struct GPUHistMakerDevice {
 
     auto const& h_nodes = p_tree->GetNodes();
     dh::caching_device_vector<RegTree::Node> nodes(h_nodes.size());
+
     dh::safe_cuda(cudaMemcpyAsync(nodes.data().get(), h_nodes.data(),
                                   h_nodes.size() * sizeof(RegTree::Node), cudaMemcpyHostToDevice,
                                   ctx_->CUDACtx()->Stream()));
+
     auto d_nodes = dh::ToSpan(nodes);
     CHECK_EQ(out_preds_d.Shape(1), 1);
     dh::LaunchN(d_position.size(), ctx_->CUDACtx()->Stream(),
@@ -856,6 +862,7 @@ class GPUHistMaker : public TreeUpdater {
         this->hist_maker_param_.CheckTreesSynchronized(ctx_, tree);
         ++t_idx;
       }
+
       dh::safe_cuda(cudaGetLastError());
     } catch (const std::exception& e) {
       LOG(FATAL) << "Exception in gpu_hist: " << e.what() << std::endl;

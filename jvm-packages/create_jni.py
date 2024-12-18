@@ -21,6 +21,8 @@ CONFIG = {
     "USE_S3": "OFF",
     "USE_CUDA": "OFF",
     "USE_NCCL": "OFF",
+    "USE_HIP": "OFF",
+    "USE_RCCL": "OFF",
     "JVM_BINDINGS": "ON",
     "LOG_CAPI_INVOCATION": "OFF",
     "CMAKE_EXPORT_COMPILE_COMMANDS": "ON",
@@ -80,7 +82,7 @@ def native_build(args):
 
     print("building Java wrapper")
     with cd(".."):
-        build_dir = "build-gpu" if cli_args.use_cuda == "ON" else "build"
+        build_dir = 'build-gpu' if cli_args.use_cuda == 'ON' or cli_args.use_hip == 'ON' else 'build'
         maybe_makedirs(build_dir)
 
         if sys.platform == "linux":
@@ -97,6 +99,10 @@ def native_build(args):
             CONFIG["USE_CUDA"] = "ON"
             CONFIG["USE_NCCL"] = "ON"
             CONFIG["USE_DLOPEN_NCCL"] = "OFF"
+        elif cli_args.use_hip== 'ON':
+            CONFIG['USE_HIP'] = 'ON'
+            CONFIG['USE_RCCL'] = 'ON'
+            CONFIG["USE_DLOPEN_RCCL"] = "OFF"
 
         args = ["-D{0}:BOOL={1}".format(k, v) for k, v in CONFIG.items()]
 
@@ -135,9 +141,9 @@ def native_build(args):
             run(f'"{sys.executable}" mapfeat.py')
             run(f'"{sys.executable}" mknfold.py machine.txt 1')
 
-    xgboost4j = "xgboost4j-gpu" if cli_args.use_cuda == "ON" else "xgboost4j"
+    xgboost4j = "xgboost4j-gpu" if cli_args.use_cuda == "ON" or cli_args.use_hip== "ON" else "xgboost4j"
     xgboost4j_spark = (
-        "xgboost4j-spark-gpu" if cli_args.use_cuda == "ON" else "xgboost4j-spark"
+        "xgboost4j-spark-gpu" if cli_args.use_cuda == "ON" or cli_args.use_hip == "ON" else "xgboost4j-spark"
     )
 
     print("copying native library")

@@ -45,7 +45,7 @@ class EllpackPageSource : public PageSourceIncMixIn<EllpackPage> {
   void Fetch() final;
 };
 
-#if !defined(XGBOOST_USE_CUDA)
+#if !defined(XGBOOST_USE_CUDA) && !defined(XGBOOST_USE_HIP)
 inline void EllpackPageSource::Fetch() {
   // silent the warning about unused variables.
   (void)(row_stride_);

@@ -13,6 +13,11 @@ if(USE_CUDA)
   list(APPEND TEST_SOURCES ${CUDA_TEST_SOURCES})
 endif()
 
+if (USE_HIP)
+  file(GLOB_RECURSE HIP_TEST_SOURCES "*.hip")
+  list(APPEND TEST_SOURCES ${HIP_TEST_SOURCES})
+endif (USE_HIP)
+
 file(GLOB_RECURSE SYCL_TEST_SOURCES "plugin/test_sycl_*.cc")
 list(REMOVE_ITEM TEST_SOURCES ${SYCL_TEST_SOURCES})
 
@@ -61,6 +66,11 @@ target_sources(testxgboost PRIVATE ${TEST_SOURCES} ${xgboost_SOURCE_DIR}/plugin/
 if(USE_CUDA AND PLUGIN_RMM)
   target_include_directories(testxgboost PRIVATE ${CUDA_INCLUDE_DIRS})
 endif()
+
+if (USE_HIP AND PLUGIN_RMM)
+  find_package(HIP)
+  target_include_directories(testxgboost PRIVATE ${HIP_INCLUDE_DIRS})
+endif (USE_HIP AND PLUGIN_RMM)
 
 target_include_directories(testxgboost
   PRIVATE

@@ -799,9 +799,9 @@ void MetaInfo::Validate(DeviceOrd device) const {
   }
 }
 
-#if !defined(XGBOOST_USE_CUDA)
+#if !defined(XGBOOST_USE_CUDA) && !defined(XGBOOST_USE_HIP)
 void MetaInfo::SetInfoFromCUDA(Context const&, StringView, Json) { common::AssertGPUSupport(); }
-#endif  // !defined(XGBOOST_USE_CUDA)
+#endif  // !defined(XGBOOST_USE_CUDA) && !defined(XGBOOST_USE_HIP)
 
 bool MetaInfo::IsVerticalFederated() const {
   return collective::IsFederated() && IsColumnSplit();

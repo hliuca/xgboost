@@ -324,7 +324,7 @@ TEST(Learner, BinaryModelIO) {
   ASSERT_EQ(config_str.find("WARNING"), std::string::npos);
 }
 
-#if defined(XGBOOST_USE_CUDA)
+#if defined(XGBOOST_USE_CUDA) || defined(XGBOOST_USE_HIP)
 // Tests for automatic GPU configuration.
 TEST(Learner, GPUConfiguration) {
   using Arg = std::pair<std::string, std::string>;
@@ -374,7 +374,7 @@ TEST(Learner, GPUConfiguration) {
     ASSERT_EQ(learner->Ctx()->Device(), DeviceOrd::CUDA(0));
   }
 }
-#endif  // defined(XGBOOST_USE_CUDA)
+#endif  // defined(XGBOOST_USE_CUDA) || defined(XGBOOST_USE_HIP)
 
 TEST(Learner, Seed) {
   auto m = RandomDataGenerator{10, 10, 0}.GenerateDMatrix();
@@ -813,7 +813,7 @@ class ColumnSplitTrainingTest
 auto MakeParamsForTest() {
   std::vector<std::tuple<std::string, bool, bool>> configs;
   for (auto tm : {"hist", "approx"}) {
-#if defined(XGBOOST_USE_CUDA)
+#if defined(XGBOOST_USE_CUDA) || defined(XGBOOST_USE_HIP)
     std::array<bool, 2> use_gpu{true, false};
 #else
     std::array<bool, 1> use_gpu{false};

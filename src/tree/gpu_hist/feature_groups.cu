@@ -7,7 +7,6 @@
 #include <vector>
 
 #include "feature_groups.cuh"
-
 #include "../../common/device_helpers.cuh"
 #include "../../common/hist_util.h"
 

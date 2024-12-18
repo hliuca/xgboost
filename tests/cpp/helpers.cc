@@ -430,7 +430,7 @@ void RandomDataGenerator::GenerateCSR(
   if (device_.IsCPU()) {
     iter = std::make_unique<NumpyArrayIterForTest>(this->sparsity_, rows_, cols_, n_batches_);
   } else {
-#if defined(XGBOOST_USE_CUDA)
+#if defined(XGBOOST_USE_CUDA) || defined(XGBOOST_USE_HIP)
     iter = std::make_unique<CudaArrayIterForTest>(this->sparsity_, rows_, cols_, n_batches_);
 #else
     CHECK(iter);
@@ -476,7 +476,7 @@ std::shared_ptr<DMatrix> RandomDataGenerator::GenerateQuantileDMatrix(bool with_
   return m;
 }
 
-#if !defined(XGBOOST_USE_CUDA)
+#if !defined(XGBOOST_USE_CUDA) && !defined(XGBOOST_USE_HIP)
 CudaArrayIterForTest::CudaArrayIterForTest(float sparsity, size_t rows, size_t cols, size_t batches)
     : ArrayIterForTest{sparsity, rows, cols, batches} {
   common::AssertGPUSupport();
@@ -730,6 +730,7 @@ class RMMAllocator {
       cuda_mr.push_back(std::make_unique<CUDAMemoryResource>());
       pool_mr.push_back(std::make_unique<PoolMemoryResource>(cuda_mr[i].get(), 0ul));
     }
+
     CHECK_EQ(cudaSetDevice(current_device), cudaSuccess);
   }
   ~RMMAllocator() = default;

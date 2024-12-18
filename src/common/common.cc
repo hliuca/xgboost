@@ -55,7 +55,7 @@ void EscapeU8(std::string const &string, std::string *p_buffer) {
   }
 }
 
-#if !defined(XGBOOST_USE_CUDA)
+#if !defined(XGBOOST_USE_CUDA) && !defined(XGBOOST_USE_HIP)
 int AllVisibleGPUs() { return 0; }
 #endif  // !defined(XGBOOST_USE_CUDA)
 

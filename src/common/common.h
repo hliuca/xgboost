@@ -25,6 +25,13 @@
 
 #define WITH_CUDA() true
 
+#elif defined(__HIPCC__)
+#include "cuda_to_hip.h"
+#include <thrust/system/hip/error.h>
+#include <thrust/system_error.h>
+
+#define WITH_CUDA() true
+
 #else
 
 #define WITH_CUDA() false
@@ -32,14 +39,14 @@
 #endif  // defined(__CUDACC__)
 
 namespace dh {
-#if defined(__CUDACC__)
+#if defined(__CUDACC__) || defined(__HIPCC__)
 /*
  * Error handling  functions
  */
 #define safe_cuda(ans) ThrowOnCudaError((ans), __FILE__, __LINE__)
 
-inline cudaError_t ThrowOnCudaError(cudaError_t code, const char *file,
-                                    int line) {
+inline cudaError_t ThrowOnCudaError(cudaError_t code, const char *file, int line)
+{
   if (code != cudaSuccess) {
     LOG(FATAL) << thrust::system_error(code, thrust::cuda_category(),
                                        std::string{file} + ": " +  // NOLINT
@@ -47,7 +54,7 @@ inline cudaError_t ThrowOnCudaError(cudaError_t code, const char *file,
   }
   return code;
 }
-#endif  // defined(__CUDACC__)
+#endif
 }  // namespace dh
 
 namespace xgboost::common {
@@ -170,13 +177,13 @@ class Range {
 int AllVisibleGPUs();
 
 inline void AssertGPUSupport() {
-#ifndef XGBOOST_USE_CUDA
+#if !defined(XGBOOST_USE_CUDA) && !defined(XGBOOST_USE_HIP)
     LOG(FATAL) << "XGBoost version not compiled with GPU support.";
-#endif  // XGBOOST_USE_CUDA
+#endif  // XGBOOST_USE_CUDA && XGBOOST_USE_HIP
 }
 
 inline void AssertNCCLSupport() {
-#if !defined(XGBOOST_USE_NCCL)
+#if !defined(XGBOOST_USE_NCCL) && !defined(XGBOOST_USE_RCCL)
     LOG(FATAL) << "XGBoost version not compiled with NCCL support.";
 #endif  // !defined(XGBOOST_USE_NCCL)
 }
@@ -189,7 +196,7 @@ inline void AssertSYCLSupport() {
 
 void SetDevice(std::int32_t device);
 
-#if !defined(XGBOOST_USE_CUDA)
+#if !defined(XGBOOST_USE_CUDA) && !defined(XGBOOST_USE_HIP)
 inline void SetDevice(std::int32_t device) {
   if (device >= 0) {
     AssertGPUSupport();

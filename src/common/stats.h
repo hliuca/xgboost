@@ -112,7 +112,7 @@ void Median(Context const* ctx, linalg::TensorView<float const, 2> t, OptionalWe
 
 void Mean(Context const* ctx, linalg::VectorView<float const> v, linalg::VectorView<float> out);
 
-#if !defined(XGBOOST_USE_CUDA)
+#if !defined(XGBOOST_USE_CUDA) && !defined(XGBOOST_USE_HIP)
 inline void Median(Context const*, linalg::TensorView<float const, 2>, OptionalWeights,
                    linalg::Tensor<float, 1>*) {
   common::AssertGPUSupport();
@@ -120,7 +120,7 @@ inline void Median(Context const*, linalg::TensorView<float const, 2>, OptionalW
 inline void Mean(Context const*, linalg::VectorView<float const>, linalg::VectorView<float>) {
   common::AssertGPUSupport();
 }
-#endif  // !defined(XGBOOST_USE_CUDA)
+#endif  // !defined(XGBOOST_USE_CUDA) && !defined(XGBOOST_USE_HIP)
 }  // namespace cuda_impl
 
 /**

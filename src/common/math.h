@@ -143,7 +143,7 @@ CheckNAN(T) {
   return false;
 }
 
-#if XGBOOST_STRICT_R_MODE && !defined(__CUDA_ARCH__)
+#if XGBOOST_STRICT_R_MODE && !defined(__CUDA_ARCH__) && !defined(__HIPCC__)
 
 bool CheckNAN(double v);
 
@@ -152,23 +152,27 @@ bool CheckNAN(double v);
 XGBOOST_DEVICE bool inline CheckNAN(float x) {
 #if defined(__CUDA_ARCH__)
   return isnan(x);
+#elif defined(__HIPCC__)
+  return __builtin_isnan(x);
 #else
   return std::isnan(x);
-#endif  // defined(__CUDA_ARCH__)
+#endif  // defined(__CUDA_ARCH__) || defined(__HIPCC__)
 }
 
 XGBOOST_DEVICE bool inline CheckNAN(double x) {
 #if defined(__CUDA_ARCH__)
   return isnan(x);
+#elif defined(__HIPCC__)
+  return __builtin_isnan(x);
 #else
   return std::isnan(x);
-#endif  // defined(__CUDA_ARCH__)
+#endif  // defined(__CUDA_ARCH__) || defined(__HIPCC__)
 }
 
 #endif  // XGBOOST_STRICT_R_MODE && !defined(__CUDA_ARCH__)
 // GPU version is not uploaded in CRAN anyway.
 // Specialize only when using R with CPU.
-#if XGBOOST_STRICT_R_MODE && !defined(XGBOOST_USE_CUDA)
+#if XGBOOST_STRICT_R_MODE && !defined(XGBOOST_USE_CUDA) && !defined(XGBOOST_USE_HIP)
 double LogGamma(double v);
 
 #else  // Not R or R with GPU.
@@ -191,7 +195,7 @@ XGBOOST_DEVICE inline T LogGamma(T v) {
 #endif  // _MSC_VER
 }
 
-#endif  // XGBOOST_STRICT_R_MODE && !defined(XGBOOST_USE_CUDA)
+#endif  // XGBOOST_STRICT_R_MODE && !defined(XGBOOST_USE_CUDA) && !defined(XGBOOST_USE_HIP)
 
 }  // namespace common
 }  // namespace xgboost

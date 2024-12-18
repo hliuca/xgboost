@@ -1,7 +1,7 @@
 /**
  * Copyright 2023-2024, XGBoost Contributors
  */
-#if defined(XGBOOST_USE_NCCL)
+#if defined(XGBOOST_USE_NCCL) || defined(XGBOOST_USE_RCCL)
 #include <cstdint>  // for int8_t, int64_t
 
 #include "../common/device_helpers.cuh"
@@ -9,7 +9,11 @@
 #include "allgather.h"  // for AllgatherVOffset
 #include "coll.cuh"
 #include "comm.cuh"
+#if defined(XGBOOST_USE_NCCL)
 #include "nccl.h"
+#elif defined(XGBOOST_USE_RCCL)
+#include <rccl/rccl.h>
+#endif
 #include "xgboost/collective/result.h"  // for Result
 #include "xgboost/span.h"               // for Span
 
